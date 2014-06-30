@@ -2133,6 +2133,8 @@ int QCamera2HardwareInterface::stopPreview()
     }
     ts_makeup_finish();
 #endif
+
+    m_cbNotifier.flushPreviewNotifications();
     // delete all channels from preparePreview
     unpreparePreview();
     CDBG_HIGH("%s: X", __func__);
