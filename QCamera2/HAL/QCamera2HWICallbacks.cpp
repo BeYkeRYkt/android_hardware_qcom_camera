@@ -1265,7 +1265,7 @@ void QCamera2HardwareInterface::dumpJpegToFile(const void *data,
                 mDumpFrmCnt = 0;
             }
             if (mDumpFrmCnt >= 0 && mDumpFrmCnt <= frm_num) {
-                snprintf(buf, sizeof(buf), "/data/%d_%d.jpg", mDumpFrmCnt, index);
+                snprintf(buf, sizeof(buf), "/data/misc/camera/%d_%d.jpg", mDumpFrmCnt, index);
 
                 int file_fd = open(buf, O_RDWR | O_CREAT, 0777);
                 if (file_fd > 0) {
