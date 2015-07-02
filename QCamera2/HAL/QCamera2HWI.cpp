@@ -1897,6 +1897,9 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
         if (mParameters.isSeeMoreEnabled()) {
             streamInfo->pp_config.feature_mask |= CAM_QCOM_FEATURE_LLVD;
         }
+        if (mParameters.isHighQualityNoiseReductionMode()) {
+            streamInfo->pp_config.feature_mask |= CAM_QTI_FEATURE_SW_TNR;
+        }
 
     case CAM_STREAM_TYPE_PREVIEW:
         if (mParameters.getRecordingHintValue()) {
@@ -1912,6 +1915,9 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
             }
             if (mParameters.isSeeMoreEnabled()) {
                 streamInfo->pp_config.feature_mask |= CAM_QCOM_FEATURE_LLVD;
+            }
+            if (mParameters.isHighQualityNoiseReductionMode()) {
+                streamInfo->pp_config.feature_mask |= CAM_QTI_FEATURE_SW_TNR;
             }
         }
         break;

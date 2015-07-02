@@ -322,6 +322,10 @@ public:
     static const char KEY_QC_SEE_MORE[];
     static const char KEY_QC_SUPPORTED_SEE_MORE_MODES[];
 
+    //Noise reduction mode
+    static const char KEY_QC_NOISE_REDUCTION_MODE[];
+    static const char KEY_QC_NOISE_REDUCTION_MODE_VALUES[];
+
     //Longshot
     static const char KEY_QC_LONGSHOT_SUPPORTED[];
     static const char KEY_QC_MAX_LONGSHOT_SNAP[];
@@ -555,6 +559,9 @@ public:
     static const char CDS_MODE_ON[];
     static const char CDS_MODE_AUTO[];
 
+    static const char VALUE_FAST[];
+    static const char VALUE_HIGH_QUALITY[];
+
     static const char KEY_SELECTED_AUTO_SCENE[];
 #ifdef TARGET_TS_MAKEUP
     static const char KEY_TS_MAKEUP[];
@@ -699,6 +706,7 @@ public:
     inline bool isTouchFocusing() {return m_bTouchFocusOn;};
     inline bool isChromaFlashEnabled() {return m_bChromaFlashOn;};
     inline bool isSeeMoreEnabled() {return m_bSeeMoreOn;};
+    inline bool isHighQualityNoiseReductionMode() {return m_bHighQualityNoiseReductionMode;};
     inline bool isTruePortraitEnabled() {return m_bTruePortraitOn;};
     inline bool isLowMemoryDevice() {return m_bIsLowMemoryDevice;};
     inline uint32_t TpMaxMetaSize() {
@@ -798,6 +806,7 @@ private:
     int32_t setTruePortrait(const QCameraParameters& );
     int32_t setFssr(const QCameraParameters& );
     int32_t setSeeMore(const QCameraParameters& );
+    int32_t setNoiseReductionMode(const QCameraParameters& );
     int32_t setRedeyeReduction(const QCameraParameters& );
     int32_t setGpsLocation(const QCameraParameters& );
     int32_t setRecordingHint(const QCameraParameters& );
@@ -870,6 +879,7 @@ private:
     int32_t setTruePortrait(const char *truePortraitStr);
     int32_t setFssr(const char *fssrStr);
     int32_t setSeeMore(const char *optiZoomStr);
+    int32_t setNoiseReductionMode(const char *optiZoomStr);
     int32_t setRedeyeReduction(const char *redeyeStr);
     int32_t setWaveletDenoise(const char *wnrStr);
     int32_t setFaceRecognition(const char *faceRecog, uint32_t maxFaces);
@@ -941,6 +951,7 @@ private:
     static const QCameraMap<int> FSSR_MODES_MAP[];
     static const QCameraMap<int> MULTI_TOUCH_FOCUS_MODES_MAP[];
     static const QCameraMap<cam_cds_mode_type_t> CDS_MODES_MAP[];
+    static const QCameraMap<int> NOISE_REDUCTION_MODES_MAP[];
 
     cam_capability_t *m_pCapability;
     mm_camera_vtbl_t *m_pCamOpsTbl;
@@ -996,6 +1007,7 @@ private:
     bool m_bOptiZoomOn;
     bool m_bFssrOn;
     bool m_bSeeMoreOn;
+    bool m_bHighQualityNoiseReductionMode;
     bool m_bUbiRefocus;
     cam_fps_range_t m_hfrFpsRange;
     bool m_bHfrMode;
