@@ -39,6 +39,13 @@ typedef enum camera_metadata_enum_android_video_hdr_mode {
     ANDROID_VIDEO_HDR_MODE_STAGGERED,
 } camera_metadata_enum_android_video_hdr_mode_t;
 
+// QCAMERA3_IR_MODE
+typedef enum camera_metadata_enum_android_ir_mode {
+    ANDROID_IR_MODE_OFF,
+    ANDROID_IR_MODE_ON,
+    ANDROID_IR_MODE_AUTO,
+} camera_metadata_enum_android_ir_mode_t;
+
 enum qcamera3_ext_section {
     QCAMERA3_PRIVATEDATA = VENDOR_SECTION,
     QCAMERA3_CDS,
@@ -48,6 +55,7 @@ enum qcamera3_ext_section {
     QCAMERA3_TEMPORAL_DENOISE,
     QCAMERA3_VIDEO_HDR,
     QCAMERA3_ADJUST,
+    QCAMERA3_MODE,
     QCAMERA3_SECTIONS_END
 };
 
@@ -60,6 +68,7 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_TEMPORAL_DENOISE_START = QCAMERA3_TEMPORAL_DENOISE << 16,
     QCAMERA3_VIDEO_HDR_START = QCAMERA3_VIDEO_HDR << 16,
     QCAMERA3_ADJUST_START = QCAMERA3_ADJUST << 16,
+    QCAMERA3_MODE_START = QCAMERA3_MODE << 16,
 };
 
 enum qcamera3_ext_tags {
@@ -147,6 +156,9 @@ enum qcamera3_ext_tags {
     QCAMERA3_SATURATION,
     QCAMERA3_ADJUST_END,
 
+    QCAMERA3_AVAILABLE_IR_MODES = QCAMERA3_MODE_START,
+    QCAMERA3_IR_MODE,
+    QCAMERA3_MODE_END,
 };
 
 // QCAMERA3_OPAQUE_RAW_FORMAT
