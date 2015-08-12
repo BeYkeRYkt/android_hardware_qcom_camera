@@ -1855,6 +1855,9 @@ typedef enum {
     CAM_INTF_PARM_INSTANT_AEC,
     /* bayer proc reprocess debug section */
     CAM_INTF_META_BAYER_PROC, /* cam_intf_meta_bayer_proc_t */
+    /* IR mode camera parameter */
+    CAM_INTF_PARM_IR_CAMERA_MODE,
+
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2381,6 +2384,13 @@ typedef struct {
     cam_intf_meta_bayer_proc_input_aec_t meta_bayer_proc_input_aec;
 } cam_intf_meta_bayer_proc_t;
 
+typedef enum {
+    CAM_IR_CAMERA_MODE_OFF,
+    CAM_IR_CAMERA_MODE_ON,
+    CAM_IR_CAMERA_MODE_AUTO,
+    CAM_IR_CAMERA_MODE_MAX
+} cam_ir_camera_modes_t;
+
 /***********************************
 * ENUM definition for custom parameter type
 ************************************/
@@ -2388,6 +2398,5 @@ typedef enum {
     CAM_CUSTOM_PARM_EXAMPLE,
     CAM_CUSTOM_PARM_MAX,
 } cam_custom_parm_type;
-
 
 #endif /* __QCAMERA_TYPES_H__ */

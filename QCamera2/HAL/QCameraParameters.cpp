@@ -324,6 +324,7 @@ const char QCameraParameters::VALUE_OFF[] = "off";
 const char QCameraParameters::VALUE_ON[] = "on";
 const char QCameraParameters::VALUE_TRUE[] = "true";
 const char QCameraParameters::VALUE_FALSE[] = "false";
+const char QCameraParameters::VALUE_AUTO[] = "auto";
 
 const char QCameraParameters::VALUE_FAST[] = "fast";
 const char QCameraParameters::VALUE_HIGH_QUALITY[] = "high-quality";
@@ -438,6 +439,9 @@ const char QCameraParameters::KEY_QC_NOISE_REDUCTION_MODE_VALUES[] = "noise-redu
 
 const char QCameraParameters::VALUE_VIDEO_HDR_MODE_SENSOR[] = "sensor";
 const char QCameraParameters::VALUE_VIDEO_HDR_MODE_STAGGERED[] = "staggered";
+
+const char QCameraParameters::KEY_QC_IR_CAMERA_MODE[] = "ir-camera-mode";
+const char QCameraParameters::KEY_QC_IR_CAMERA_MODE_SUPPORTED[] = "ir-camera-mode-values";
 
 #ifdef TARGET_TS_MAKEUP
 const char QCameraParameters::KEY_TS_MAKEUP[] = "tsmakeup";
@@ -792,6 +796,13 @@ const QCameraParameters::QCameraMap<cam_intf_video_hdr_mode_t>
     { VALUE_ON, CAM_INTF_VIDEO_HDR_MODE_SENSOR },
     { VALUE_VIDEO_HDR_MODE_SENSOR, CAM_INTF_VIDEO_HDR_MODE_SENSOR },
     { VALUE_VIDEO_HDR_MODE_STAGGERED, CAM_INTF_VIDEO_HDR_MODE_STAGGERED }
+};
+
+const QCameraParameters::QCameraMap<cam_ir_camera_modes_t>
+        QCameraParameters::IR_CAMERA_MODES_MAP[] = {
+    { VALUE_OFF,  CAM_IR_CAMERA_MODE_OFF },
+    { VALUE_ON,   CAM_IR_CAMERA_MODE_ON },
+    { VALUE_AUTO, CAM_IR_CAMERA_MODE_AUTO }
 };
 
 #define DEFAULT_CAMERA_AREA "(0, 0, 0, 0, 0)"
@@ -4852,6 +4863,7 @@ int32_t QCameraParameters::updateParameters(QCameraParameters& params,
     if ((rc = setCustomParams(params)))                 final_rc = rc;
     if ((rc = setNoiseReductionMode(params)))           final_rc = rc;
     if ((rc = setCDSMode(params)))                      final_rc = rc;
+    if ((rc = setIRCameraMode(params)))                 final_rc = rc;
 
     if ((rc = updateFlash(false)))                      final_rc = rc;
     if ((rc = setLongshotParam(params)))                final_rc = rc;
@@ -5775,6 +5787,16 @@ int32_t QCameraParameters::initDefaultParameters()
     set(KEY_QC_LONG_SHOT, "off");
     //Enable longshot by default
     set(KEY_QC_LONGSHOT_SUPPORTED, VALUE_TRUE);
+
+    // Set infrared mode
+    String8 irModes = createValuesString(
+            m_pCapability->ir_camera_modes,
+            m_pCapability->ir_camera_modes_count,
+            IR_CAMERA_MODES_MAP,
+            PARAM_MAP_SIZE(IR_CAMERA_MODES_MAP));
+    set(KEY_QC_IR_CAMERA_MODE_SUPPORTED, irModes);
+
+    set(KEY_QC_IR_CAMERA_MODE, VALUE_OFF);
 
     int32_t rc = commitParameters();
     if (rc == NO_ERROR) {
@@ -10923,6 +10945,63 @@ void QCameraParameters::setHDRSceneEnable(bool bflag)
       default:
         return "<Unknown!>";
       }
+}
+
+/*===========================================================================
+ * FUNCTION   : setIRCameraMode
+ *
+ * DESCRIPTION: set infrared camera mode from user setting
+ *
+ * PARAMETERS :
+ *   @params  : user setting parameters
+ *
+ * RETURN     : int32_t type of status
+ *              NO_ERROR  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int32_t QCameraParameters::setIRCameraMode(const QCameraParameters& params)
+{
+    const char *str = params.get(KEY_QC_IR_CAMERA_MODE);
+    const char *prev_str = get(KEY_QC_IR_CAMERA_MODE);
+
+    if (str != NULL) {
+        if (prev_str == NULL || strcmp(str, prev_str) != 0) {
+            return setIRCameraMode(str);
+        }
+    }
+
+    return NO_ERROR;
+}
+
+/*===========================================================================
+ * FUNCTION   : setIRCameraMode
+ *
+ * DESCRIPTION: set infrared camera mode
+ *
+ * PARAMETERS :
+ *   @irModeStr : infrared camera mode string
+ *
+ * RETURN     : int32_t type of status
+ *              NO_ERROR  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int32_t QCameraParameters::setIRCameraMode(const char *irModeStr)
+{
+    if (irModeStr != NULL) {
+        int32_t value = lookupAttr(IR_CAMERA_MODES_MAP,
+                PARAM_MAP_SIZE(IR_CAMERA_MODES_MAP), irModeStr);
+        if (value != NAME_NOT_FOUND) {
+            CDBG("%s: Setting IR Camera Mode to %s", __func__, irModeStr);
+            updateParamEntry(KEY_QC_IR_CAMERA_MODE, irModeStr);
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(m_pParamBuf, CAM_INTF_PARM_IR_CAMERA_MODE,
+                    (cam_ir_camera_modes_t)value)) {
+                ALOGE("%s:Failed to update IR mode", __func__);
+                return BAD_VALUE;
+            }
+        }
+    }
+    ALOGE("Invalid IR Camera Mode: %s", (irModeStr == NULL) ? "NULL" : irModeStr);
+    return BAD_VALUE;
 }
 
 /*===========================================================================

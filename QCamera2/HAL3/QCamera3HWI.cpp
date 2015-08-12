@@ -252,6 +252,14 @@ const QCamera3HardwareInterface::QCameraMap<
     { ANDROID_VIDEO_HDR_MODE_STAGGERED, CAM_INTF_VIDEO_HDR_MODE_STAGGERED }
 };
 
+const QCamera3HardwareInterface::QCameraMap<
+        camera_metadata_enum_android_ir_mode_t,
+        cam_ir_camera_modes_t> QCamera3HardwareInterface::IR_MODES_MAP[] = {
+    { ANDROID_IR_MODE_OFF,  CAM_IR_CAMERA_MODE_OFF },
+    { ANDROID_IR_MODE_ON,   CAM_IR_CAMERA_MODE_ON },
+    { ANDROID_IR_MODE_AUTO, CAM_IR_CAMERA_MODE_AUTO }
+};
+
 /* Since there is no mapping for all the options some Android enum are not listed.
  * Also, the order in this list is important because while mapping from HAL to Android it will
  * traverse from lower to higher index which means that for HAL values that are map to different
@@ -4236,6 +4244,16 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(CAM_INTF_PARM_SATURATION, (int32_t *)&saturation, 1);
     }
 
+    IF_META_AVAILABLE(cam_ir_camera_modes_t, ir_mode, CAM_INTF_PARM_IR_CAMERA_MODE, metadata) {
+        int32_t fwk_irMode = lookupFwkName(IR_MODES_MAP,
+                METADATA_MAP_SIZE(IR_MODES_MAP), *ir_mode);
+        if (NAME_NOT_FOUND != fwk_irMode) {
+            camMetadata.update(QCAMERA3_IR_MODE, (int32_t *)&fwk_irMode, 1);
+        } else {
+            CDBG_HIGH("%s: Metadata not found : QCAMERA3_IR_MODE", __func__);
+        }
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -6167,6 +6185,22 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
                 uhd_present * 2);
     }
 
+    uint8_t availIrModes[CAM_IR_CAMERA_MODE_MAX];
+    size = 0;
+    count = MIN(gCamCapability[cameraId]->ir_camera_modes_count,
+            CAM_IR_CAMERA_MODE_MAX);
+    for (size_t i = 0; i < count; i++) {
+        int irMode = lookupFwkName(IR_MODES_MAP, METADATA_MAP_SIZE(IR_MODES_MAP),
+                gCamCapability[cameraId]->ir_camera_modes[i]);
+        if (NAME_NOT_FOUND != irMode) {
+            availIrModes[size] = irMode;
+            size++;
+        }
+    }
+    staticInfo.update(QCAMERA3_AVAILABLE_IR_MODES,
+                      availIrModes,
+                      size);
+
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
 }
@@ -7879,6 +7913,24 @@ int QCamera3HardwareInterface::translateToHalMetadata
         dim.height = frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_JPEG_THUMB_SIZE, dim)) {
             rc = BAD_VALUE;
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_IR_MODE)) {
+        int32_t fwk_irMode =
+                frame_settings.find(QCAMERA3_IR_MODE).data.i32[0];
+        int irMode = lookupHalName(IR_MODES_MAP,
+                METADATA_MAP_SIZE(IR_MODES_MAP), fwk_irMode);
+
+        if (NAME_NOT_FOUND != irMode) {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata,
+                    CAM_INTF_PARM_IR_CAMERA_MODE,
+                    (cam_ir_camera_modes_t)irMode)) {
+                rc = BAD_VALUE;
+            }
+        } else {
+            ALOGE("%s: Invalid ir mode %d", __func__,
+                    fwk_irMode);
         }
     }
 
