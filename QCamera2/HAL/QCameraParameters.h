@@ -780,8 +780,9 @@ public:
     int32_t configureFlash(cam_capture_frame_config_t &frame_config);
     int32_t configureAEBracketing(cam_capture_frame_config_t &frame_config);
     int32_t configureHDRBracketing(cam_capture_frame_config_t &frame_config);
+    int32_t configureLowLight(cam_capture_frame_config_t &frame_config);
     int32_t configFrameCapture(bool commitSettings);
-    int32_t resetFrameCapture(bool commitSettings);
+    int32_t resetFrameCapture(bool commitSettings, bool lowLightEnabled);
     cam_still_more_t getStillMoreSettings() {return m_stillmore_config;};
     void setStillMoreSettings(cam_still_more_t stillmore_config)
             {m_stillmore_config = stillmore_config;};
@@ -805,6 +806,11 @@ public:
             { return m_captureFrameConfig; };
     void setJpegRotation(int rotation);
     uint32_t getJpegRotation() { return mJpegRotation;};
+
+    void setLowLightLevel(cam_low_light_mode_t value)
+            { m_LowLightLevel = value; };
+    cam_low_light_mode_t getLowLightLevel() {return m_LowLightLevel;};
+    bool getLowLightCapture() { return m_LLCaptureEnabled; };
 
     /* Dual camera specific */
     void setDcrf();
@@ -955,6 +961,7 @@ private:
     int32_t setCacheVideoBuffers(const char *cacheVideoBufStr);
     int32_t setCDSMode(int32_t cds_mode, bool initCommit);
     int32_t setEztune();
+    void setLowLightCapture();
 
     int32_t parse_pair(const char *str, int *first, int *second,
                        char delim, char **endptr);
@@ -1119,6 +1126,8 @@ private:
     bool m_bDcrfEnabled;
     uint32_t mRotation;
     uint32_t mJpegRotation;
+    bool m_LLCaptureEnabled;
+    cam_low_light_mode_t m_LowLightLevel;
 };
 
 }; // namespace qcamera

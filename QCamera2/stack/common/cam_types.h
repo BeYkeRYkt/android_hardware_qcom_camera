@@ -780,10 +780,11 @@ typedef enum {
 } cam_tonemap_mode_t;
 
 typedef enum {
-  CAM_CDS_MODE_OFF,
-  CAM_CDS_MODE_ON,
-  CAM_CDS_MODE_AUTO,
-  CAM_CDS_MODE_MAX
+    CAM_CDS_MODE_OFF,
+    CAM_CDS_MODE_ON,
+    CAM_CDS_MODE_AUTO,
+    CAM_CDS_MODE_LOCK,
+    CAM_CDS_MODE_MAX
 } cam_cds_mode_type_t;
 
 typedef struct  {
@@ -844,6 +845,11 @@ typedef enum {
     CAM_EXP_BRACKETING_ON
 } cam_bracket_mode;
 
+typedef enum {
+    CAM_LOW_LIGHT_OFF = 0,
+    CAM_LOW_LIGHT_ON,
+} cam_low_light_mode_t;
+
 typedef struct {
     cam_bracket_mode mode;
     char values[MAX_EXP_BRACKETING_LENGTH];  /* user defined values */
@@ -863,6 +869,7 @@ typedef enum {
     CAM_CAPTURE_NORMAL,
     CAM_CAPTURE_FLASH,
     CAM_CAPTURE_BRACKETING,
+    CAM_CAPTURE_LOW_LIGHT,
     CAM_CAPTURE_MAX
 } cam_capture_type;
 
@@ -874,6 +881,7 @@ typedef struct {
     union {
         cam_flash_mode_t flash_mode;
         cam_capture_bracketing_t hdr_mode;
+        cam_low_light_mode_t low_light_mode;
     };
 } cam_capture_settings_t;
 
@@ -1845,12 +1853,14 @@ typedef enum {
     /* metadata tag for DCRF info */
     CAM_INTF_META_DCRF,
     /* FLIP mode parameter*/
-    CAM_INTF_PARM_FLIP,
+    CAM_INTF_PARM_FLIP,       /* 190 */
     /*Frame divert info from ISP*/
-    CAM_INTF_BUF_DIVERT_INFO, /* 190 */
+    CAM_INTF_BUF_DIVERT_INFO,
     /*AF state change detected by AF module*/
-    CAM_INTF_AF_STATE_TRANSITION, /* 191 */
-    CAM_INTF_PARM_MAX /* 192 */
+    CAM_INTF_AF_STATE_TRANSITION,
+    /*3A low light level information*/
+    CAM_INTF_META_LOW_LIGHT,
+    CAM_INTF_PARM_MAX /* 194 */
 } cam_intf_parm_type_t;
 
 typedef struct {
@@ -2366,6 +2376,4 @@ typedef enum {
     CAM_CUSTOM_PARM_EXAMPLE,
     CAM_CUSTOM_PARM_MAX,
 } cam_custom_parm_type;
-
-
 #endif /* __QCAMERA_TYPES_H__ */
