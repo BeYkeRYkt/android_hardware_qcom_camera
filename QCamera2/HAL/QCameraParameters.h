@@ -671,7 +671,8 @@ public:
     bool isSceneSelectionEnabled() {return m_bSceneSelection;};
     int32_t setSelectedScene(cam_scene_mode_type scene);
     cam_scene_mode_type getSelectedScene();
-    bool isFaceDetectionEnabled() {return ((m_nFaceProcMask & CAM_FACE_PROCESS_MASK_DETECTION) != 0);};
+    bool isFaceDetectionEnabled() {return ((m_nFaceProcMask &
+            (CAM_FACE_PROCESS_MASK_DETECTION | CAM_FACE_PROCESS_MASK_FOCUS)) != 0);};
     bool getFaceDetectionOption() { return  m_bFaceDetectionOn;}
     int32_t setFaceDetectionOption(bool enabled);
     int32_t setHistogram(bool enabled);
@@ -738,6 +739,7 @@ public:
     inline bool isStillMoreEnabled() {return m_bStillMoreOn;};
     bool isOptiZoomEnabled();
     inline bool isLowMemoryDevice() {return m_bIsLowMemoryDevice;};
+    bool isPreviewSeeMoreRequired();
     int32_t commitAFBracket(cam_af_bracketing_t afBracket);
     int32_t commitFlashBracket(cam_flash_bracketing_t flashBracket);
     int32_t set3ALock(const char *lockStr);
