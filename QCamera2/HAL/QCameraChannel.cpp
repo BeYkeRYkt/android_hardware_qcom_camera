@@ -949,7 +949,13 @@ int32_t QCameraReprocessChannel::addReprocStreamsFromSource(
             rc = pStream->getFormat(streamInfo->fmt);
             if (pStream->isTypeOf(CAM_STREAM_TYPE_POSTVIEW) ||
                     pStream->isTypeOf(CAM_STREAM_TYPE_PREVIEW)) {
+                int width, height;
                 param.getThumbnailSize(&(streamInfo->dim.width), &(streamInfo->dim.height));
+                param.getSecondThumbnailSize(&width, &height);
+                if (width * height > streamInfo->dim.width * streamInfo->dim.height) {
+                    streamInfo->dim.width = width;
+                    streamInfo->dim.height = height;
+                }
             }
             else {
                 rc = pStream->getFrameDimension(streamInfo->dim);

@@ -187,6 +187,7 @@ typedef struct {
 
   /* thumbnail dimension */
   mm_jpeg_dim_t thumb_dim;
+  mm_jpeg_dim_t second_thumb_dim;
 
   /* rotation informaiton */
   uint32_t rotation;
@@ -234,6 +235,7 @@ typedef struct {
   int32_t dst_index;
   uint32_t thumb_index;
   mm_jpeg_dim_t thumb_dim;
+  mm_jpeg_dim_t second_thumb_dim;
 
   /* rotation informaiton */
   uint32_t rotation;

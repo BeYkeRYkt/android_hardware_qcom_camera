@@ -6689,6 +6689,23 @@ void QCamera2HardwareInterface::getThumbnailSize(cam_dimension_t &dim)
 }
 
 /*===========================================================================
+ * FUNCTION   : getSecondThumbnailSize
+ *
+ * DESCRIPTION: get user set second thumbnail size
+ *
+ * PARAMETERS :
+ *   @dim     : output of thumbnail dimension
+ *
+ * RETURN     : none
+ *==========================================================================*/
+void QCamera2HardwareInterface::getSecondThumbnailSize(cam_dimension_t &dim)
+{
+    pthread_mutex_lock(&m_parm_lock);
+    mParameters.getSecondThumbnailSize(&dim.width, &dim.height);
+    pthread_mutex_unlock(&m_parm_lock);
+}
+
+/*===========================================================================
  * FUNCTION   : getJpegQuality
  *
  * DESCRIPTION: get user set jpeg quality

@@ -492,6 +492,7 @@ int32_t QCameraPostProcessor::getJpegEncodingConfig(mm_jpeg_encode_params_t& enc
 
     if (m_bThumbnailNeeded == TRUE) {
         m_parent->getThumbnailSize(encode_parm.thumb_dim.dst_dim);
+        m_parent->getSecondThumbnailSize(encode_parm.second_thumb_dim.dst_dim);
         if (thumb_stream == NULL) {
             thumb_stream = main_stream;
 
@@ -500,6 +501,8 @@ int32_t QCameraPostProcessor::getJpegEncodingConfig(mm_jpeg_encode_params_t& enc
                     && (m_parent->needRotationReprocess())) {
                 IMG_SWAP(encode_parm.thumb_dim.dst_dim.width,
                         encode_parm.thumb_dim.dst_dim.height);
+                IMG_SWAP(encode_parm.second_thumb_dim.dst_dim.width,
+                        encode_parm.second_thumb_dim.dst_dim.height);
             }
         }
         pStreamMem = thumb_stream->getStreamBufs();
@@ -536,12 +539,14 @@ int32_t QCameraPostProcessor::getJpegEncodingConfig(mm_jpeg_encode_params_t& enc
         memset(&src_dim, 0, sizeof(cam_dimension_t));
         thumb_stream->getFrameDimension(src_dim);
         encode_parm.thumb_dim.src_dim = src_dim;
+        encode_parm.second_thumb_dim.src_dim = src_dim;
 
         if (!m_parent->needRotationReprocess()) {
             encode_parm.thumb_rotation = m_parent->getJpegRotation();
         }
 
         encode_parm.thumb_dim.crop = crop;
+        encode_parm.second_thumb_dim.crop = crop;
     }
 
     encode_parm.num_dst_bufs = 1;
@@ -1888,6 +1893,7 @@ int32_t QCameraPostProcessor::encodeData(qcamera_jpeg_data_t *jpeg_job_data,
     // thumbnail dim
     if (m_bThumbnailNeeded == TRUE) {
         m_parent->getThumbnailSize(jpg_job.encode_job.thumb_dim.dst_dim);
+        m_parent->getSecondThumbnailSize(jpg_job.encode_job.second_thumb_dim.dst_dim);
 
         if (thumb_stream == NULL) {
             // need jpeg thumbnail, but no postview/preview stream exists
@@ -1900,11 +1906,14 @@ int32_t QCameraPostProcessor::encodeData(qcamera_jpeg_data_t *jpeg_job_data,
                 && (m_parent->needRotationReprocess())) {
             IMG_SWAP(jpg_job.encode_job.thumb_dim.dst_dim.width,
                     jpg_job.encode_job.thumb_dim.dst_dim.height);
+            IMG_SWAP(jpg_job.encode_job.second_thumb_dim.dst_dim.width,
+                    jpg_job.encode_job.second_thumb_dim.dst_dim.height);
         }
 
         memset(&src_dim, 0, sizeof(cam_dimension_t));
         thumb_stream->getFrameDimension(src_dim);
         jpg_job.encode_job.thumb_dim.src_dim = src_dim;
+        jpg_job.encode_job.second_thumb_dim.src_dim = src_dim;
 
         // crop is the same if frame is the same
         if (thumb_frame != main_frame) {
@@ -1924,6 +1933,7 @@ int32_t QCameraPostProcessor::encodeData(qcamera_jpeg_data_t *jpeg_job_data,
         }
 
         jpg_job.encode_job.thumb_dim.crop = crop;
+        jpg_job.encode_job.second_thumb_dim.crop = crop;
         if (thumb_frame)
             jpg_job.encode_job.thumb_index = thumb_frame->buf_idx;
         CDBG_HIGH("%s, thumbnail src w/h (%dx%d), dst w/h (%dx%d)", __func__,

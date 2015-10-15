@@ -523,6 +523,71 @@ OMX_ERRORTYPE mm_jpeg_speed_mode(
 }
 
 
+/** mm_jpeg_second_thumbnail:
+ *
+ *  Arguments:
+ *    @p_session: job session
+ *
+ *  Return:
+ *       OMX error values
+ *
+ *  Description:
+ *      Configure second thumbnail
+ *
+ **/
+OMX_ERRORTYPE mm_jpeg_second_thumbnail(
+  mm_jpeg_job_session_t* p_session)
+{
+  OMX_ERRORTYPE rc = 0;
+  OMX_INDEXTYPE indextype;
+  QOMX_THUMBNAIL_INFO thumbnail_info;
+  mm_jpeg_dim_t *p_thumb_dim = &p_session->params.second_thumb_dim;
+  QOMX_YUV_FRAME_INFO *p_frame_info = &thumbnail_info.tmbOffset;
+  mm_jpeg_encode_params_t *p_params = &p_session->params;
+  mm_jpeg_encode_job_t *p_jobparams = &p_session->encode_job;
+  mm_jpeg_buf_t *p_tmb_buf = &p_params->src_thumb_buf[p_jobparams->thumb_index];
+
+  rc = OMX_GetExtensionIndex(p_session->omx_handle,
+    QOMX_IMAGE_EXT_SECOND_THUMBNAIL_NAME, &indextype);
+  if (rc != OMX_ErrorNone) {
+    CDBG_ERROR("%s:%d] Failed", __func__, __LINE__);
+    return rc;
+  }
+
+  if ((p_thumb_dim->crop.width == 0) || (p_thumb_dim->crop.height == 0)) {
+    p_thumb_dim->crop.width = p_thumb_dim->src_dim.width;
+    p_thumb_dim->crop.height = p_thumb_dim->src_dim.height;
+  }
+
+  /* fill second thumbnail info */
+  memset(&thumbnail_info, 0x0, sizeof(QOMX_THUMBNAIL_INFO));
+  thumbnail_info.scaling_enabled = 1;
+  thumbnail_info.input_width = (OMX_U32)p_thumb_dim->src_dim.width;
+  thumbnail_info.input_height = (OMX_U32)p_thumb_dim->src_dim.height;
+  thumbnail_info.crop_info.nWidth = (OMX_U32)p_thumb_dim->crop.width;
+  thumbnail_info.crop_info.nHeight = (OMX_U32)p_thumb_dim->crop.height;
+  thumbnail_info.crop_info.nLeft = p_thumb_dim->crop.left;
+  thumbnail_info.crop_info.nTop = p_thumb_dim->crop.top;
+  thumbnail_info.rotation = (OMX_U32)p_session->params.thumb_rotation;
+  thumbnail_info.output_width = (OMX_U32)p_thumb_dim->dst_dim.width;
+  thumbnail_info.output_height = (OMX_U32)p_thumb_dim->dst_dim.height;
+
+  memset(p_frame_info, 0x0, sizeof(*p_frame_info));
+
+  p_frame_info->cbcrStartOffset[0] = p_tmb_buf->offset.mp[0].len;
+  p_frame_info->cbcrStartOffset[1] = p_tmb_buf->offset.mp[1].len;
+  p_frame_info->yOffset = p_tmb_buf->offset.mp[0].offset;
+  p_frame_info->cbcrOffset[0] = p_tmb_buf->offset.mp[1].offset;
+  p_frame_info->cbcrOffset[1] = p_tmb_buf->offset.mp[2].offset;
+
+  rc = OMX_SetParameter(p_session->omx_handle, indextype, &thumbnail_info);
+  if (rc != OMX_ErrorNone) {
+    CDBG_ERROR("%s:%d] Failed", __func__, __LINE__);
+    return rc;
+  }
+  return rc;
+}
+
 /** mm_jpeg_mem_ops:
  *
  *  Arguments:
@@ -1064,10 +1129,18 @@ OMX_ERRORTYPE mm_jpeg_session_config_main(mm_jpeg_job_session_t *p_session)
     CDBG_ERROR("%s: config mem ops failed", __func__);
     return rc;
   }
+
   /* set the jpeg speed mode */
   rc = mm_jpeg_speed_mode(p_session);
   if (OMX_ErrorNone != rc) {
     CDBG_ERROR("%s: config speed mode failed", __func__);
+    return rc;
+  }
+
+  /* set the second thumbnail */
+  rc = mm_jpeg_second_thumbnail(p_session);
+  if (OMX_ErrorNone != rc) {
+    CDBG_ERROR("%s: config second thumbnail failed", __func__);
     return rc;
   }
 
