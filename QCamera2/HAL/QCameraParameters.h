@@ -706,7 +706,6 @@ public:
     inline bool isTouchFocusing() {return m_bTouchFocusOn;};
     inline bool isChromaFlashEnabled() {return m_bChromaFlashOn;};
     inline bool isSeeMoreEnabled() {return m_bSeeMoreOn;};
-    inline bool isHighQualityNoiseReductionMode() {return m_bHighQualityNoiseReductionMode;};
     inline bool isTruePortraitEnabled() {return m_bTruePortraitOn;};
     inline bool isLowMemoryDevice() {return m_bIsLowMemoryDevice;};
     inline uint32_t TpMaxMetaSize() {
@@ -1007,7 +1006,6 @@ private:
     bool m_bOptiZoomOn;
     bool m_bFssrOn;
     bool m_bSeeMoreOn;
-    bool m_bHighQualityNoiseReductionMode;
     bool m_bUbiRefocus;
     cam_fps_range_t m_hfrFpsRange;
     bool m_bHfrMode;

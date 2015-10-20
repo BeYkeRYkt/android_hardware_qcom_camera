@@ -626,6 +626,7 @@ typedef union {
     INCLUDE(CAM_INTF_META_STATS_SHARPNESS_MAP_MODE,   uint8_t,                     1);
     INCLUDE(CAM_INTF_META_STATS_SHARPNESS_MAP,        cam_sharpness_map_t,         3);
     INCLUDE(CAM_INTF_META_ASD_HDR_SCENE_DATA,      cam_asd_hdr_scene_data_t,       1);
+    INCLUDE(CAM_INTF_NOISE_REDUCTION_MODE,            cam_noise_reduction_mode_t,  1);
     INCLUDE(CAM_INTF_META_PRIVATE_DATA,               char,                        MAX_METADATA_PAYLOAD_SIZE);
 
 } metadata_type_t;

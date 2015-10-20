@@ -733,9 +733,9 @@ const QCameraParameters::QCameraMap<cam_cds_mode_type_t>
 
 const QCameraParameters::QCameraMap<int>
         QCameraParameters::NOISE_REDUCTION_MODES_MAP[] = {
-    { VALUE_OFF, 0 },
-    { VALUE_FAST,  1 },
-    { VALUE_HIGH_QUALITY,  2 }
+    { VALUE_OFF, CAM_NOISE_REDUCTION_MODE_OFF },
+    { VALUE_FAST, CAM_NOISE_REDUCTION_MODE_FAST },
+    { VALUE_HIGH_QUALITY, CAM_NOISE_REDUCTION_MODE_HIGH_QUALITY}
 };
 
 #define DEFAULT_CAMERA_AREA "(0, 0, 0, 0, 0)"
@@ -800,7 +800,6 @@ QCameraParameters::QCameraParameters()
       m_bOptiZoomOn(false),
       m_bFssrOn(false),
       m_bSeeMoreOn(false),
-      m_bHighQualityNoiseReductionMode(false),
       m_bHfrMode(false),
       mHfrMode(CAM_HFR_MODE_OFF),
       m_bDisplayFrame(true),
@@ -899,7 +898,6 @@ QCameraParameters::QCameraParameters(const String8 &params)
     m_bOptiZoomOn(false),
     m_bFssrOn(false),
     m_bSeeMoreOn(false),
-    m_bHighQualityNoiseReductionMode(false),
     m_bHfrMode(false),
     mHfrMode(CAM_HFR_MODE_OFF),
     m_bAeBracketingEnabled(false),
@@ -3633,7 +3631,6 @@ int32_t QCameraParameters::setNoiseReductionMode(const QCameraParameters& params
     CDBG_HIGH("%s: str =%s & prev_str =%s", __func__, str, prev_str);
     if (str != NULL) {
         if (prev_str == NULL || strcmp(str, prev_str) != 0) {
-            m_bNeedRestart = true;
             return setNoiseReductionMode(str);
         }
     }
@@ -5200,7 +5197,11 @@ int32_t QCameraParameters::initDefaultParameters()
     //Set video buffers as uncached by default
     set(KEY_QC_CACHE_VIDEO_BUFFERS, VALUE_DISABLE);
 
-    if (m_pCapability->low_power_mode_supported == 1) {
+    //SW TNR and low power are currently mutually exclusive.
+    //If supported TNR has higher priority.
+    bool isSwTNRPresent = m_pCapability->qcom_supported_feature_mask &
+        CAM_QTI_FEATURE_SW_TNR;
+    if ((m_pCapability->low_power_mode_supported == 1) && !isSwTNRPresent) {
         set(KEY_QC_LOW_POWER_MODE_SUPPORTED, VALUE_TRUE);
     } else {
         set(KEY_QC_LOW_POWER_MODE_SUPPORTED, VALUE_FALSE);
@@ -7692,16 +7693,23 @@ int32_t QCameraParameters::setSeeMore(const char *seeMoreStr)
  *==========================================================================*/
 int32_t QCameraParameters::setNoiseReductionMode(const char *noiseReductionModeStr)
 {
+    int32_t rc = NO_ERROR;
     CDBG_HIGH("%s: noiseReductionModeStr = %s", __func__, noiseReductionModeStr);
     if (noiseReductionModeStr != NULL) {
-        int value = lookupAttr(NOISE_REDUCTION_MODES_MAP, PARAM_MAP_SIZE(NOISE_REDUCTION_MODES_MAP),
+        int value = lookupAttr(NOISE_REDUCTION_MODES_MAP,
+                PARAM_MAP_SIZE(NOISE_REDUCTION_MODES_MAP),
                 noiseReductionModeStr);
         if (value != NAME_NOT_FOUND) {
-            m_bHighQualityNoiseReductionMode =
-                    !strncmp(VALUE_HIGH_QUALITY, noiseReductionModeStr, strlen(VALUE_HIGH_QUALITY));
+            rc = AddSetParmEntryToBatch(m_pParamBuf,
+                    CAM_INTF_NOISE_REDUCTION_MODE,
+                    sizeof(cam_noise_reduction_mode_t),
+                    &value);
+            if (rc != NO_ERROR) {
+                ALOGE("%s:Failed to update noise reduction mode", __func__);
+                return rc;
+            }
             updateParamEntry(KEY_QC_NOISE_REDUCTION_MODE, noiseReductionModeStr);
-
-            return NO_ERROR;
+            return rc;
         }
     }
     ALOGE("Invalid noise reduction mode value: %s",
@@ -10696,7 +10704,7 @@ uint8_t QCameraParameters::getNumOfExtraBuffersForVideo()
 {
     uint8_t numOfBufs = 0;
 
-    if (isSeeMoreEnabled() || isHighQualityNoiseReductionMode()) {
+    if (isSeeMoreEnabled()) {
         numOfBufs = 1;
     }
 
@@ -10717,8 +10725,7 @@ uint8_t QCameraParameters::getNumOfExtraBuffersForPreview()
 {
     uint8_t numOfBufs = 0;
 
-    if ((isSeeMoreEnabled() || isHighQualityNoiseReductionMode())
-            && !isZSLMode() && getRecordingHintValue()) {
+    if (isSeeMoreEnabled() && !isZSLMode() && getRecordingHintValue()) {
         numOfBufs = 1;
     }
 
