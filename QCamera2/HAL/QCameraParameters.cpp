@@ -10631,17 +10631,23 @@ bool QCameraParameters::isMobicatEnabled()
  *==========================================================================*/
 bool QCameraParameters::needThumbnailReprocess(uint32_t *pFeatureMask)
 {
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_CHROMA_FLASH;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_UBIFOCUS;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_REFOCUS;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_OPTIZOOM;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_HDR;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_DENOISE2D;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_CAC;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_SHARPNESS;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_FLIP;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_TRUEPORTRAIT;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_FSSR;
+    *pFeatureMask &= ~CAM_QCOM_FEATURE_MULTI_TOUCH_FOCUS;
+
     if (isUbiFocusEnabled() || isChromaFlashEnabled() ||
             isOptiZoomEnabled() || isUbiRefocus() || isfssrEnabled() ||
             isMultiTouchFocusEnabled() ||
             (isHDREnabled() && !isHDRThumbnailProcessNeeded()) || isDifferentFlipZSL()) {
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_CHROMA_FLASH;
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_UBIFOCUS;
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_REFOCUS;
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_OPTIZOOM;
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_FSSR;
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_MULTI_TOUCH_FOCUS;
-        *pFeatureMask &= ~CAM_QCOM_FEATURE_HDR;
         return false;
     } else {
         cam_dimension_t thumb_dim;

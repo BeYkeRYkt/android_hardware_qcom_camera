@@ -917,6 +917,7 @@ int32_t QCameraReprocessChannel::addReprocStreamsFromSource(
     for (uint32_t i = 0; i < pSrcChannel->getNumOfStreams(); i++) {
         pStream = pSrcChannel->getStreamByIndex(i);
         if (pStream != NULL) {
+            uint32_t feature_mask = config.feature_mask;
             if (pStream->isTypeOf(CAM_STREAM_TYPE_METADATA) ||
                 pStream->isTypeOf(CAM_STREAM_TYPE_RAW)) {
                 // Skip metadata&raw for reprocess now because PP module cannot handle
@@ -928,21 +929,9 @@ int32_t QCameraReprocessChannel::addReprocStreamsFromSource(
                     pStream->isTypeOf(CAM_STREAM_TYPE_POSTVIEW) ||
                     pStream->isOrignalTypeOf(CAM_STREAM_TYPE_PREVIEW) ||
                     pStream->isOrignalTypeOf(CAM_STREAM_TYPE_POSTVIEW)) {
-                uint32_t feature_mask = config.feature_mask;
 
                 // skip thumbnail reprocessing if not needed
                 if (!param.needThumbnailReprocess(&feature_mask)) {
-                    continue;
-                }
-                // CAC, SHARPNESS, FLIP and WNR would have been already applied -
-                // on preview/postview stream in realtime. Need not apply again.
-                feature_mask &= ~(CAM_QCOM_FEATURE_DENOISE2D |
-                        CAM_QCOM_FEATURE_CAC |
-                        CAM_QCOM_FEATURE_SHARPNESS |
-                        CAM_QCOM_FEATURE_FLIP);
-                if (!feature_mask) {
-                    // Skip thumbnail stream reprocessing since no other
-                    //reprocessing is enabled.
                     continue;
                 }
             }
@@ -967,7 +956,6 @@ int32_t QCameraReprocessChannel::addReprocStreamsFromSource(
             }
 
             //FSSR generates 4x output
-            uint32_t feature_mask = config.feature_mask;
             if (feature_mask & CAM_QCOM_FEATURE_FSSR) {
                 (streamInfo->dim).width *= 2;
                 (streamInfo->dim).height *= 2;
