@@ -2285,7 +2285,8 @@ void * QCameraCbNotifier::cbNotifyRoutine(void * data)
                                     if (!longShotEnabled) {
                                         numOfSnapshotRcvd++;
                                         if (numOfSnapshotExpected > 0 &&
-                                            numOfSnapshotExpected == numOfSnapshotRcvd) {
+                                                numOfSnapshotExpected == numOfSnapshotRcvd) {
+                                            numOfSnapshotRcvd = 0;
                                             // notify HWI that snapshot is done
                                             pme->mParent->processSyncEvt(QCAMERA_SM_EVT_SNAPSHOT_DONE,
                                                                          NULL);
