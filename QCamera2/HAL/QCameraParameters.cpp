@@ -10702,12 +10702,7 @@ uint8_t QCameraParameters::getNumOfExtraBuffersForImageProc()
  *==========================================================================*/
 uint8_t QCameraParameters::getNumOfExtraBuffersForVideo()
 {
-    uint8_t numOfBufs = 0;
-
-    if (isSeeMoreEnabled()) {
-        numOfBufs = 1;
-    }
-
+    uint8_t numOfBufs = 3;
     return numOfBufs;
 }
 
@@ -10726,7 +10721,7 @@ uint8_t QCameraParameters::getNumOfExtraBuffersForPreview()
     uint8_t numOfBufs = 0;
 
     if (isSeeMoreEnabled() && !isZSLMode() && getRecordingHintValue()) {
-        numOfBufs = 1;
+        numOfBufs = 3;
     }
 
     return numOfBufs;
