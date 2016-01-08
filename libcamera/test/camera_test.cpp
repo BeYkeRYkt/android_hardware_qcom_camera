@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundataion. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -195,6 +195,7 @@ struct TestConfig
     int statsLogMask;
     int focusModeIdx;
     bool faceDetect;
+    string disMode;
 };
 
 /**
@@ -657,6 +658,9 @@ const char usageStr[] =
     "usage: camera-test [options]\n"
     "\n"
     "  -t <duration>   capture duration in seconds [10]\n"
+    "  -c <dis mode>   enable DIS\n"
+    "                    - eis_2_0\n"
+    "                    - disable\n"
     "  -d              dump frames\n"
     "  -i              info mode\n"
     "                    - print camera capabilities\n"
@@ -868,6 +872,16 @@ int CameraTest::setParameters()
                                 picSize_.width, picSize_.height);
                         params_.setPictureSize(picSize_);
                     }
+
+            if (config_.disMode == "disable") {
+                printf("disable dis\n");
+                params_.set("recording-hint", "false");
+                params_.set("dis", config_.disMode.c_str());
+            } else {
+                printf("enable dis mode %s\n", config_.disMode.c_str());
+                params_.set("recording-hint", "true");
+                params_.set("dis", config_.disMode.c_str());
+            }
 
 			printf("setting focus mode: %s\n",
 				 caps_.focusModes[focusModeIdx].c_str());
@@ -1082,6 +1096,7 @@ static int setDefaultConfig(TestConfig &cfg) {
     cfg.focusModeIdx = 3;
     cfg.storagePath = 0;
     cfg.faceDetect = 0;
+    cfg.disMode = "disable";
 
     switch (cfg.func) {
     case CAM_FUNC_OPTIC_FLOW:
@@ -1129,8 +1144,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     int exposureValueInt = 0;
     int gainValueInt = 0;
 
-    while ((c = getopt(argc, argv,
-                                "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
+    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:")) != -1) {
         switch (c) {
         case 'f':
             {
@@ -1155,8 +1169,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     setDefaultConfig(cfg);
 
     optind = 1;
-    while ((c = getopt(argc, argv,
-                                "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
+    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:")) != -1) {
         switch (c) {
         case 'F':
             cfg.faceDetect = 1;
@@ -1245,6 +1258,11 @@ static TestConfig parseCommandline(int argc, char* argv[])
         case 'i':
             cfg.infoMode = true;
             break;
+        case 'c': {
+                string str(optarg);
+                cfg.disMode = str;
+                break;
+            }
         case  'e':
             cfg.exposureValue =  atoi(optarg);
             if (cfg.exposureValue < MIN_EXPOSURE_VALUE || cfg.exposureValue > MAX_EXPOSURE_VALUE) {
