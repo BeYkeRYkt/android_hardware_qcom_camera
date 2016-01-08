@@ -1,6 +1,6 @@
 /*
 ** Copyright 2008, The Android Open Source Project
-** Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+** Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
 ** Not a Contribution. Apache license notifications and license are
 ** retained for attribution purposes only.
 **
@@ -480,6 +480,12 @@ public:
     static const char CDS_MODE_ON[];
     static const char CDS_MODE_AUTO[];
 
+    //Values for IS Mode
+    static const char IS_MODE_DIS[];
+    static const char IS_MODE_GA_DIS[];
+    static const char IS_MODE_EIS_1_0[];
+    static const char IS_MODE_EIS_2_0[];
+
     static const char KEY_SELECTED_AUTO_SCENE[];
 
     enum {
@@ -627,6 +633,7 @@ public:
     int32_t setDisplayFrame(bool enabled) {m_bDisplayFrame=enabled; return 0;};
     bool isAdvCamFeaturesEnabled() {return isUbiFocusEnabled() ||
         isChromaFlashEnabled() || isOptiZoomEnabled() || isHDREnabled();}
+    cam_is_type_t getISType();
 
 private:
     int32_t setPreviewSize(const QCameraParameters& );
@@ -746,7 +753,6 @@ private:
     int32_t setFaceRecognition(const char *faceRecog, int maxFaces);
     int32_t setTintlessValue(const char *tintStr);
 
-
     int32_t parse_pair(const char *str, int *first, int *second,
                        char delim, char **endptr);
     void parseSizesList(const char *sizesStr, vector<Size> &sizes);
@@ -812,6 +818,7 @@ private:
     static const QCameraMap CHROMA_FLASH_MODES_MAP[];
     static const QCameraMap OPTI_ZOOM_MODES_MAP[];
     static const QCameraMap CDS_MODES_MAP[];
+    static const QCameraMap DIS_MODES_MAP[];
 
     cam_capability_t *m_pCapability;
     mm_camera_vtbl_t *m_pCamOpsTbl;

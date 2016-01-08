@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -306,6 +306,9 @@ typedef struct{
     /* opti Zoom info */
     cam_opti_zoom_t      opti_zoom_settings_need;
 
+    /* dis modes */
+    uint8_t supported_dis_modes_cnt;
+    cam_is_type_t supported_dis_modes[IS_TYPE_CNT];
 } cam_capability_t;
 
 typedef enum {

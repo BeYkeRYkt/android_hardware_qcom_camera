@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundataion. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -1861,16 +1861,7 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
         streamInfo->useAVTimer = mParameters.isAVTimerEnabled();
     case CAM_STREAM_TYPE_PREVIEW:
         if (mParameters.getRecordingHintValue()) {
-            const char* dis_param = mParameters.get(QCameraParameters::KEY_QC_DIS);
-            bool disEnabled = (dis_param != NULL)
-                    && !strcmp(dis_param,QCameraParameters::VALUE_ENABLE);
-            if(disEnabled) {
-                char value[PROPERTY_VALUE_MAX];
-                property_get("persist.camera.is_type", value, "0");
-                streamInfo->is_type = static_cast<cam_is_type_t>(atoi(value));
-            } else {
-                streamInfo->is_type = IS_TYPE_NONE;
-            }
+            streamInfo->is_type = mParameters.getISType();
         }
         break;
     default:

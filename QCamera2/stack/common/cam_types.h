@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -586,7 +586,8 @@ typedef enum {
     IS_TYPE_DIS,
     IS_TYPE_GA_DIS,
     IS_TYPE_EIS_1_0,
-    IS_TYPE_EIS_2_0
+    IS_TYPE_EIS_2_0,
+    IS_TYPE_CNT
 } cam_is_type_t;
 
 #define CAM_REPROCESS_MASK_TYPE_WNR (1<<0)

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -337,6 +337,12 @@ const char QCameraParameters::CDS_MODE_OFF[] = "off";
 const char QCameraParameters::CDS_MODE_ON[] = "on";
 const char QCameraParameters::CDS_MODE_AUTO[] = "auto";
 
+//Values for IS Mode
+const char QCameraParameters::IS_MODE_DIS[] = "dis";
+const char QCameraParameters::IS_MODE_GA_DIS[] = "ga_dis";
+const char QCameraParameters::IS_MODE_EIS_1_0[] = "eis_1_0";
+const char QCameraParameters::IS_MODE_EIS_2_0[] = "eis_2_0";
+
 const char QCameraParameters::KEY_SELECTED_AUTO_SCENE[] = "selected-auto-scene";
 
 static const char* portrait = "portrait";
@@ -606,6 +612,15 @@ const QCameraParameters::QCameraMap QCameraParameters::CDS_MODES_MAP[] = {
     { CDS_MODE_OFF, CAM_CDS_MODE_OFF },
     { CDS_MODE_ON, CAM_CDS_MODE_ON },
     { CDS_MODE_AUTO, CAM_CDS_MODE_AUTO}
+};
+
+const QCameraParameters::QCameraMap QCameraParameters::DIS_MODES_MAP[] = {
+    { VALUE_DISABLE, IS_TYPE_NONE },
+    { IS_MODE_DIS, IS_TYPE_DIS },
+    { IS_MODE_GA_DIS, IS_TYPE_GA_DIS},
+    { IS_MODE_EIS_1_0, IS_TYPE_EIS_1_0},
+    { IS_MODE_EIS_2_0, IS_TYPE_EIS_2_0},
+    { VALUE_ENABLE, IS_TYPE_EIS_2_0},
 };
 
 #define DEFAULT_CAMERA_AREA "(0, 0, 0, 0, 0)"
@@ -3904,6 +3919,8 @@ int32_t QCameraParameters::commitParameters()
  *==========================================================================*/
 int32_t QCameraParameters::initDefaultParameters()
 {
+    char value[PROPERTY_VALUE_MAX];
+
     if(initBatchUpdate(m_pParamBuf) < 0 ) {
         ALOGE("%s:Failed to initialize group update table", __func__);
         return BAD_TYPE;
@@ -4374,8 +4391,22 @@ int32_t QCameraParameters::initDefaultParameters()
     setMCEValue(VALUE_ENABLE);
 
     // Set DIS
-    set(KEY_QC_SUPPORTED_DIS_MODES, enableDisableValues);
-    setDISValue(VALUE_DISABLE);
+    string disModeValues = createValuesString(
+            (int *)m_pCapability->supported_dis_modes,
+            m_pCapability->supported_dis_modes_cnt,
+            DIS_MODES_MAP,
+            sizeof(DIS_MODES_MAP) / sizeof(QCameraMap));
+    set(KEY_QC_SUPPORTED_DIS_MODES, disModeValues);
+
+    property_get("persist.camera.is_type", value, "0");
+    cam_is_type_t isType = static_cast<cam_is_type_t>(atoi(value));
+    const char *isMode = lookupNameByValue(DIS_MODES_MAP,
+            sizeof(DIS_MODES_MAP)/sizeof(QCameraMap),
+            isType);
+    if (isMode == NULL) {
+        isMode = VALUE_DISABLE;
+    }
+    setDISValue(isMode);
 
     // Set Histogram
     set(KEY_QC_SUPPORTED_HISTOGRAM_MODES,
@@ -4409,8 +4440,6 @@ int32_t QCameraParameters::initDefaultParameters()
     }
 
     // Set HDR output scaling
-    char value[PROPERTY_VALUE_MAX];
-
     property_get("persist.camera.hdr.outcrop", value, VALUE_DISABLE);
 
     if (strncmp(VALUE_ENABLE, value, sizeof(VALUE_ENABLE))) {
@@ -5763,17 +5792,33 @@ int32_t QCameraParameters::setCDSMode(const QCameraParameters& params)
  *==========================================================================*/
 int32_t QCameraParameters::setDISValue(const char *disStr)
 {
+    bool supported = false;
     if (disStr != NULL) {
-        int32_t value = lookupAttr(ENABLE_DISABLE_MODES_MAP,
-                                   sizeof(ENABLE_DISABLE_MODES_MAP)/sizeof(QCameraMap),
+        int32_t value = lookupAttr(DIS_MODES_MAP,
+                                   sizeof(DIS_MODES_MAP)/sizeof(QCameraMap),
                                    disStr);
         if (value != NAME_NOT_FOUND) {
+            for (int32_t i = 0; i < m_pCapability->supported_dis_modes_cnt; i++) {
+                if ((int32_t)m_pCapability->supported_dis_modes[i] == value) {
+                    supported = true;
+                    break;
+                }
+            }
+            if (!supported) {
+                ALOGE("Not suported DIS value: %s", (disStr == NULL) ? "NULL" : disStr);
+                return BAD_VALUE;
+            }
             //For some IS types (like EIS 2.0), when DIS value is changed, we need to restart
             //preview because of topology change in backend. But, for now, restart preview
             //for all IS types.
             m_bNeedRestart = true;
             ALOGD("%s: Setting DIS value %s", __func__, disStr);
             updateParamEntry(KEY_QC_DIS, disStr);
+            if (value != IS_TYPE_NONE) {
+                value = TRUE;
+            } else {
+                value = FALSE;
+            }
             return AddSetParmEntryToBatch(m_pParamBuf,
                                           CAM_INTF_PARM_DIS_ENABLE,
                                           sizeof(value),
@@ -5782,6 +5827,32 @@ int32_t QCameraParameters::setDISValue(const char *disStr)
     }
     ALOGE("Invalid DIS value: %s", (disStr == NULL) ? "NULL" : disStr);
     return BAD_VALUE;
+}
+
+/*===========================================================================
+ * FUNCTION   : getISType
+ *
+ * DESCRIPTION: get DIS value
+ *
+ * PARAMETERS :
+ *
+ * RETURN     : is type
+ *==========================================================================*/
+cam_is_type_t QCameraParameters::getISType()
+{
+    cam_is_type_t rc = IS_TYPE_NONE;
+    const char *disStr = get(KEY_QC_DIS);
+
+    if (disStr != NULL) {
+        int32_t value = lookupAttr(DIS_MODES_MAP,
+                        sizeof(DIS_MODES_MAP)/sizeof(QCameraMap),
+                        disStr);
+        if (value != NAME_NOT_FOUND) {
+            rc = (cam_is_type_t) value;
+        }
+    }
+
+    return rc;
 }
 
 /*===========================================================================
