@@ -909,6 +909,7 @@ QCameraParameters::QCameraParameters()
     mRotation = 0;
     mJpegRotation = 0;
     m_bOEMFeatEnabled = isOEMFeat1PropEnabled();
+    mVideoBatchSize = 0;
 }
 
 /*===========================================================================
@@ -1007,6 +1008,8 @@ QCameraParameters::QCameraParameters(const String8 &params)
     mRotation = 0;
     mJpegRotation = 0;
     m_bOEMFeatEnabled = isOEMFeat1PropEnabled();
+    mBufBatchCnt = 0;
+    mVideoBatchSize = 0;
 }
 
 /*===========================================================================
@@ -2289,11 +2292,9 @@ bool QCameraParameters::UpdateHFRFrameRate(const QCameraParameters& params)
             && (parm_maxfps != 0)) {
         //Configure buffer batch count to use batch mode for higher fps
         setBufBatchCount((int8_t)(m_hfrFpsRange.video_max_fps / parm_maxfps));
-        set(KEY_QC_VIDEO_BATCH_SIZE, getBufBatchCount());
     } else {
         //Reset batch count and update KEY for encoder
         setBufBatchCount(0);
-        set(KEY_QC_VIDEO_BATCH_SIZE, getBufBatchCount());
     }
     return updateNeeded;
 }
@@ -4872,6 +4873,8 @@ int32_t QCameraParameters::updateParameters(QCameraParameters& params,
     setLowLightCapture();
     if ((rc = updateFlash(false)))                      final_rc = rc;
 
+    setVideoBatchSize();
+
 #ifdef TARGET_TS_MAKEUP
     if (params.get(KEY_TS_MAKEUP) != NULL) {
         set(KEY_TS_MAKEUP,params.get(KEY_TS_MAKEUP));
@@ -5053,8 +5056,9 @@ int32_t QCameraParameters::initDefaultParameters()
     // Set default preview format
     CameraParameters::setPreviewFormat(PIXEL_FORMAT_YUV420SP);
 
-    // Set default Video Format
-    set(KEY_VIDEO_FRAME_FORMAT, "YVU420SemiPlanar");
+    // Set default Video Format as OPAQUE
+    // Internally both Video and Camera subsystems use NV21_VENUS
+    set(KEY_VIDEO_FRAME_FORMAT, PIXEL_FORMAT_ANDROID_OPAQUE);
 
     // Set supported picture formats
     String8 pictureTypeValues(PIXEL_FORMAT_JPEG);
@@ -9437,20 +9441,23 @@ int32_t QCameraParameters::getStreamFormat(cam_stream_type_t streamType,
     format = CAM_FORMAT_MAX;
     switch (streamType) {
     case CAM_STREAM_TYPE_PREVIEW:
+        if (!isUBWCEnabled()) {
 #if VENUS_PRESENT
-        cam_dimension_t preview;
-        cam_dimension_t video;
-        getStreamDimension(CAM_STREAM_TYPE_VIDEO , video);
-        getStreamDimension(CAM_STREAM_TYPE_PREVIEW, preview);
-        if (getRecordingHintValue() == true &&
-                video.width == preview.width &&
-                video.height == preview.height &&
-                mPreviewFormat == CAM_FORMAT_YUV_420_NV21) {
-            format = CAM_FORMAT_YUV_420_NV21_VENUS;
-        }
-        else
+            cam_dimension_t preview;
+            cam_dimension_t video;
+            getStreamDimension(CAM_STREAM_TYPE_VIDEO , video);
+            getStreamDimension(CAM_STREAM_TYPE_PREVIEW, preview);
+            if (getRecordingHintValue() == true &&
+                    video.width == preview.width &&
+                    video.height == preview.height &&
+                    mPreviewFormat == CAM_FORMAT_YUV_420_NV21) {
+                format = CAM_FORMAT_YUV_420_NV21_VENUS;
+            } else
 #endif
             format = mPreviewFormat;
+        } else {
+            format = mPreviewFormat;
+        }
         break;
     case CAM_STREAM_TYPE_POSTVIEW:
     case CAM_STREAM_TYPE_CALLBACK:
@@ -12943,6 +12950,7 @@ void QCameraParameters::setBufBatchCount(int8_t buf_cnt)
 
     if (!(count != 0 || buf_cnt > CAMERA_MIN_BATCH_COUNT)) {
         CDBG_HIGH("%s : Buffer batch count = %d", __func__, mBufBatchCnt);
+        set(KEY_QC_VIDEO_BATCH_SIZE, mBufBatchCnt);
         return;
     }
 
@@ -12954,14 +12962,56 @@ void QCameraParameters::setBufBatchCount(int8_t buf_cnt)
     if (count > 0) {
         mBufBatchCnt = count;
         CDBG_HIGH("%s : Buffer batch count = %d", __func__, mBufBatchCnt);
+        set(KEY_QC_VIDEO_BATCH_SIZE, mBufBatchCnt);
         return;
     }
 
     if (buf_cnt > CAMERA_MIN_BATCH_COUNT) {
         mBufBatchCnt = buf_cnt;
         CDBG_HIGH("%s : Buffer batch count = %d", __func__, mBufBatchCnt);
+        set(KEY_QC_VIDEO_BATCH_SIZE, mBufBatchCnt);
         return;
     }
+}
+
+/*===========================================================================
+ * FUNCTION   : setVideoBatch()
+ *
+ * DESCRIPTION: Function to batching for video.
+ *
+ * PARAMETERS : none
+ *
+ * RETURN     :  None
+ *==========================================================================*/
+void QCameraParameters::setVideoBatchSize()
+{
+    char value[PROPERTY_VALUE_MAX];
+    int8_t minBatchcnt = 2; //Batching enabled only if batch size if greater that 2;
+    int32_t width = 0, height = 0;
+    mVideoBatchSize = 0;
+
+    if (getBufBatchCount()) {
+        //We don't need HAL to HAL batching if camera batching enabled.
+        return;
+    }
+    getVideoSize(&width, &height);
+
+    if ((width <= 1920) && (height <= 1080)) {
+        //We enable batching only for 1080p or below.
+        //Batch size is 6 is optimized and gives better power saving.
+        property_get("persist.camera.video.batchsize", value, "6");
+    } else {
+        property_get("persist.camera.video.batchsize", value, "0");
+    }
+    mVideoBatchSize = atoi(value);
+    if (mVideoBatchSize > CAMERA_MAX_CONSUMER_BATCH_BUFFER_SIZE) {
+        mVideoBatchSize = CAMERA_MAX_CONSUMER_BATCH_BUFFER_SIZE;
+    } else if (mVideoBatchSize <= minBatchcnt) {
+        //Batching enabled only if batch size if greater that 2;
+        mVideoBatchSize = 0;
+    }
+    CDBG ("%s: mVideoBatchSize = %d", __func__, mVideoBatchSize);
+    set(KEY_QC_VIDEO_BATCH_SIZE, mVideoBatchSize);
 }
 
 /*===========================================================================

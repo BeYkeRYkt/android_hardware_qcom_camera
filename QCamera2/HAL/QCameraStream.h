@@ -46,6 +46,10 @@ typedef void (*stream_cb_routine)(mm_camera_super_buf_t *frame,
                                   QCameraStream *stream,
                                   void *userdata);
 
+#define CAMERA_MAX_CONSUMER_BATCH_BUFFER_SIZE   16
+#define CAMERA_MIN_VIDEO_BATCH_BUFFERS          3
+
+
 class QCameraStream
 {
 public:
@@ -117,6 +121,21 @@ public:
 
     void cond_wait();
     void cond_signal(bool forceExit = false);
+
+    //Frame Buffer will be stored here in case framework batch mode.
+    camera_memory_t *mCurMetaMemory; // Current metadata buffer ptr
+    int8_t mCurBufIndex;             // Buffer count filled in current metadata
+    int8_t mCurMetaIndex;            // Active metadata buffer index
+
+    nsecs_t mFirstTimeStamp;         // Timestamp of first frame in Metadata.
+
+    // Buffer storage structure.
+    typedef struct {
+        bool consumerOwned; // Metadata is with Consumer if TRUE
+        uint8_t numBuffers; // Num of buffer need to released
+        uint8_t buf_index[CAMERA_MAX_CONSUMER_BATCH_BUFFER_SIZE];
+    } MetaMemory;
+    MetaMemory mStreamMetaMemory[CAMERA_MIN_VIDEO_BATCH_BUFFERS];
 
 private:
     uint32_t mCamHandle;

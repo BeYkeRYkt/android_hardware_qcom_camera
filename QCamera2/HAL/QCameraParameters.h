@@ -820,6 +820,8 @@ public:
     QCameraManualCaptureModes getManualCaptureMode()
             {return m_ManualCaptureMode;};
     int64_t getExposureTime() {return m_expTime;};
+    void setVideoBatchSize();
+    int8_t  getVideoBatchSize() {return mVideoBatchSize;};
 
     cam_capture_frame_config_t getCaptureFrameConfig()
             { return m_captureFrameConfig; };
@@ -1151,6 +1153,7 @@ private:
     int64_t m_expTime;
     int32_t m_isoValue;
     QCameraManualCaptureModes m_ManualCaptureMode;
+    int8_t mVideoBatchSize;
 };
 
 }; // namespace qcamera
