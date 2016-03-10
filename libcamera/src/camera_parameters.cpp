@@ -303,9 +303,19 @@ string CameraParams::get(const string& key) const
     return str;
 }
 
+int CameraParams::getInt(const string& key) const
+{
+    return params_cast(priv_)->getInt(key.c_str());
+}
+
 void CameraParams::set(const string& key, const string& value)
 {
     return params_cast(priv_)->set(key.c_str(), value.c_str());
+}
+
+void CameraParams::setInt(const string& key, int value)
+{
+    return params_cast(priv_)->set(key.c_str(), value);
 }
 
 vector<string> CameraParams::getSupportedFocusModes() const

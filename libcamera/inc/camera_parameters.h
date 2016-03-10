@@ -233,6 +233,16 @@ public:
     virtual std::string get(const std::string& key) const;
 
     /**
+     * generic get function to get string representation of value of
+     * a parameter using a key.
+     *
+     * @param key [in]
+     *
+     * @return int : value
+     */
+    virtual int getInt(const std::string& key) const;
+
+    /**
      * generic set function to set value of a parameter using
      * key-value pair
      *
@@ -240,6 +250,15 @@ public:
      * @param value [in]
      */
     virtual void set(const std::string& key, const std::string& value);
+
+    /**
+     * generic set int function to set value of a parameter using
+     * key-value pair
+     *
+     * @param key [in]
+     * @param value [in]
+     */
+    virtual void setInt(const std::string& key, int value);
 
     /**
      * get a list of supported focus modes
