@@ -397,6 +397,9 @@ typedef struct mm_jpeg_obj_t {
   uint32_t reuse_reproc_buffer;
 
   cam_jpeg_metadata_t *jpeg_metadata;
+
+  // dummy OMX handle
+  OMX_HANDLETYPE dummy_handle;
 } mm_jpeg_obj;
 
 /** mm_jpeg_pending_func_t:
