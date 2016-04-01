@@ -1865,7 +1865,12 @@ uint8_t get_num_of_cameras()
     /* unlock the mutex */
     pthread_mutex_unlock(&g_intf_lock);
     ALOGI("%s: num_cameras=%d\n", __func__, (int)g_cam_ctrl.num_cam);
+#if 1
+    /*Disable google HAL API for Automotive*/
+    return 0;
+#else
     return(uint8_t)g_cam_ctrl.num_cam;
+#endif
 }
 
 /*===========================================================================
