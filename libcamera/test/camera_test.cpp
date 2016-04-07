@@ -109,6 +109,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include "turbojpeg.h"
 
@@ -122,6 +123,8 @@
 #define DEFAULT_GAIN_VALUE  50
 #define MIN_GAIN_VALUE 0
 #define MAX_GAIN_VALUE 255
+#define QCAMERA_DUMP_LOCATION "/CAMdata/"
+
 
 #define DEFAULT_CAMERA_FPS 30
 #define MS_PER_SEC 1000
@@ -188,6 +191,7 @@ struct TestConfig
     int picSizeIdx;
     int fps;
     AppLoglevel logLevel;
+    int storagePath;
     int statsLogMask;
     int focusModeIdx;
 };
@@ -274,7 +278,7 @@ CameraTest::CameraTest(TestConfig config) :
 int CameraTest::initialize(int camId)
 {
     int rc;
-    rc = ICameraDevice::createInstance(camId, &camera_);
+    rc = ICameraDevice::createInstance(camId, &camera_);//open camera here, sofia marked for study
     if (rc != 0) {
         printf("could not open camera %d\n", camId);
         return rc;
@@ -460,9 +464,17 @@ void CameraTest::onPreviewFrame(ICameraFrame* frame)
 
         if ( config_.outputFormat == RAW_FORMAT )
         {
+            if(config_.storagePath ==1){
+                    snprintf(name, 50, QCAMERA_DUMP_LOCATION "P_%dx%d_%04d_%llu.raw",
+                 pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
+            }else
             snprintf(name, 50, "P_%dx%d_%04d_%llu.raw",
                  pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
         }else{
+            if(config_.storagePath ==1){
+                    snprintf(name, 50, QCAMERA_DUMP_LOCATION "P_%dx%d_%04d_%llu.yuv",
+                 pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
+            }else
              snprintf(name, 50, "P_%dx%d_%04d_%llu.yuv",
                  pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
         }
@@ -484,11 +496,19 @@ void CameraTest::onPictureFrame(ICameraFrame* frame)
     char yuvName[128], jpgName[128];
     char rawName[128];
     if (config_.snapshotFormat == RAW_FORMAT) {
-        snprintf(rawName, 128, "snapshot_%s_mipi.raw", caps_.rawSize.c_str());
+        if(config_.storagePath ==1){
+                snprintf(rawName, 128, QCAMERA_DUMP_LOCATION "snapshot_%s_mipi.raw",
+                         caps_.rawSize.c_str());
+        }else
+                snprintf(rawName, 128, "snapshot_%s_mipi.raw", caps_.rawSize.c_str());
         dumpToFile(frame->data, frame->size, rawName, frame->timeStamp);
     } else {
-        snprintf(jpgName, 128, "snapshot_%dx%d.jpg", picSize_.width, picSize_.height);
-       dumpToFile(frame->data, frame->size, jpgName, frame->timeStamp);
+        if(config_.storagePath ==1){
+                snprintf(jpgName, 128, QCAMERA_DUMP_LOCATION "snapshot_%dx%d.jpg",
+                      picSize_.width, picSize_.height);
+        }else
+                snprintf(jpgName, 128, "snapshot_%dx%d.jpg", picSize_.width, picSize_.height);
+                dumpToFile(frame->data, frame->size, jpgName, frame->timeStamp);
     }
     /* notify the waiting thread about picture done */
     pthread_mutex_lock(&mutexPicDone);
@@ -514,10 +534,14 @@ void CameraTest::onVideoFrame(ICameraFrame* frame)
 {
     if (vFrameCount_ > 0 && vFrameCount_ % 30 == 0) {
         char name[50];
-        snprintf(name, 50, "V_%dx%d_%04d_%llu.yuv",
-                 vSize_.width, vSize_.height, vFrameCount_,frame->timeStamp);
+        if(config_.storagePath ==1){
+               snprintf(name, 50, QCAMERA_DUMP_LOCATION "V_%dx%d_%04d_%llu.yuv",
+                      vSize_.width, vSize_.height, vFrameCount_,frame->timeStamp);
+        }else
+               snprintf(name, 50, "V_%dx%d_%04d_%llu.yuv",
+                      vSize_.width, vSize_.height, vFrameCount_,frame->timeStamp);
         if (config_.dumpFrames == true) {
-            dumpToFile(frame->data, frame->size, name, frame->timeStamp);
+               dumpToFile(frame->data, frame->size, name, frame->timeStamp);
         }
         //printf("Video FPS = %.2f\n", vFpsAvg_);
     }
@@ -667,6 +691,9 @@ const char usageStr[] =
     "                    3: continuous-video\n"
     "                    4: continuous-picture\n"
     "                    5: manual\n"
+    "  -P              picture storage path\n"
+    "                    0: default path\n"
+    "                    1: Customization storage path\n"
     "  -h              print this message\n"
 ;
 
@@ -769,7 +796,7 @@ int CameraTest::setParameters()
     pSize_ = config_.pSize;
     vSize_ = config_.vSize;
     picSize_ = config_.picSize;
-	focusModeIdx = config_.focusModeIdx;
+    focusModeIdx = config_.focusModeIdx;
 	switch ( config_.func ){
 		case CAM_FUNC_OPTIC_FLOW:
 			if (config_.outputFormat == RAW_FORMAT) {
@@ -1007,6 +1034,7 @@ static int setDefaultConfig(TestConfig &cfg) {
     cfg.snapshotFormat = JPEG_FORMAT;
     cfg.statsLogMask = STATS_NO_LOG;
     cfg.focusModeIdx = 3;
+    cfg.storagePath = 0;
     switch (cfg.func) {
     case CAM_FUNC_OPTIC_FLOW:
         cfg.pSize   = VGASize;
@@ -1053,7 +1081,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     int exposureValueInt = 0;
     int gainValueInt = 0;
 
-    while ((c = getopt(argc, argv, "hdt:io:e:g:p:v:ns:f:r:V:j:S:u:")) != -1) {
+    while ((c = getopt(argc, argv, "hdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
         switch (c) {
         case 'f':
             {
@@ -1078,7 +1106,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     setDefaultConfig(cfg);
 
     optind = 1;
-    while ((c = getopt(argc, argv, "hdt:io:e:g:p:v:ns:f:r:V:j:S:u:")) != -1) {
+    while ((c = getopt(argc, argv, "hdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
         switch (c) {
         case 't':
             cfg.runTime = atoi(optarg);
@@ -1229,6 +1257,31 @@ static TestConfig parseCommandline(int argc, char* argv[])
 	case 'u':
             cfg.focusModeIdx = atoi(optarg); // 2: MACRO 1: INFINITY ;//3: CONTINOUS VIDEO; 5: manual
 	    break;
+        case 'P':
+            cfg.storagePath = (int)atoi(optarg);
+            switch (cfg.storagePath) {
+                 case 0: /* Default Path */
+                     printf("Default Path\n");
+                     break;
+                 case 1:
+                     if(access(QCAMERA_DUMP_LOCATION, 0)==0)
+                         printf("%s already created!\n",QCAMERA_DUMP_LOCATION);
+                     else{
+                         int status = mkdir(QCAMERA_DUMP_LOCATION, 0666);
+                         if(status==0)
+                             printf("create %s!\n",QCAMERA_DUMP_LOCATION);
+                         else{
+                             printf("create storage path failed, Setting to default path\n");
+                             cfg.storagePath = 0;
+                         }
+                     }
+                     break;
+                 default:
+                     printf("Invalid storage path. Setting to default path\n");
+                     cfg.storagePath = 0;
+                     break;
+            }
+            break;
         case 'h':
         case '?':
             printUsageExit(0);
