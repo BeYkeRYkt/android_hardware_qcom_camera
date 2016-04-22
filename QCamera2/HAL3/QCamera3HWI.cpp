@@ -1384,14 +1384,13 @@ int QCamera3HardwareInterface::configureStreams(
 
                 if (stream_usage & private_handle_t::PRIV_FLAGS_VIDEO_ENCODER) {
                     mStreamConfigInfo.type[i] = CAM_STREAM_TYPE_VIDEO;
-                    mStreamConfigInfo.postprocess_mask[i] = fullFeatureMask;
-                    mStreamConfigInfo.postprocess_mask[i] |= feature_mask;
                 } else {
                     mStreamConfigInfo.type[i] = CAM_STREAM_TYPE_PREVIEW;
-                    mStreamConfigInfo.postprocess_mask[i] = CAM_QCOM_FEATURE_NONE;
                     padding_info.width_padding = mSurfaceStridePadding;
                     padding_info.height_padding = CAM_PAD_TO_2;
                 }
+                mStreamConfigInfo.postprocess_mask[i] = fullFeatureMask;
+                mStreamConfigInfo.postprocess_mask[i] |= feature_mask;
             }
             break;
             case HAL_PIXEL_FORMAT_YCbCr_420_888:
