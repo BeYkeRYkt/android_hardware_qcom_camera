@@ -319,6 +319,7 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
       mFirstConfiguration(true),
       mFlush(false),
       mFlushPerf(false),
+      mOverrideCDS(false),
       mParamHeap(NULL),
       mParameters(NULL),
       mPrevParameters(NULL),
@@ -1391,6 +1392,8 @@ int QCamera3HardwareInterface::configureStreams(
                     mStreamConfigInfo.postprocess_mask[i] = CAM_QCOM_FEATURE_NONE;
                     padding_info.width_padding = mSurfaceStridePadding;
                     padding_info.height_padding = CAM_PAD_TO_2;
+                    /* if pp mask is none CDS is disable. */
+                    mOverrideCDS = true;
                 }
             }
             break;
@@ -6754,8 +6757,8 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
     if (CAM_CDS_MODE_MAX == cds_mode) {
         cds_mode = CAM_CDS_MODE_AUTO;
     }
-    //@note: force cds mode to be OFF when TNR is enabled.
-    if (m_bTnrEnabled == true) {
+    //@note: force cds mode to be OFF when TNR is enabled or PP mask is none.
+    if (m_bTnrEnabled || mOverrideCDS) {
         CDBG_HIGH("%s: default CDS mode %d is forced to be OFF because TNR is enabled.",
                 __func__, cds_mode);
         cds_mode = CAM_CDS_MODE_OFF;
@@ -7618,6 +7621,11 @@ int QCamera3HardwareInterface::translateToHalMetadata
     // CDS
     if (frame_settings.exists(QCAMERA3_CDS_MODE)) {
         int32_t *cds = frame_settings.find(QCAMERA3_CDS_MODE).data.i32;
+        if (mOverrideCDS) {
+            CDBG_HIGH("%s: default CDS mode %d is forced to be OFF.",
+                    __func__, *cds);
+            *cds = CAM_CDS_MODE_OFF;
+        }
         if ((CAM_CDS_MODE_MAX <= (*cds)) || (0 > (*cds))) {
             ALOGE("%s: Invalid CDS mode %d!", __func__, *cds);
         } else {

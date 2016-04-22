@@ -262,6 +262,7 @@ private:
     bool mFirstConfiguration;
     bool mFlush;
     bool mFlushPerf;
+    bool mOverrideCDS;
     bool mEnableRawDump;
     QCamera3HeapMemory *mParamHeap;
     metadata_buffer_t* mParameters;
