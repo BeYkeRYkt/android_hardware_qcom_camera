@@ -8775,12 +8775,9 @@ void *QCamera2HardwareInterface::deferredWorkRoutine(void *obj)
                                 rc);
                         if (rc != 0) {
                             ALOGE("getRelatedCamCalibration failed");
-                            pme->mCameraHandle->ops->close_camera(
-                                pme->mCameraHandle->camera_handle);
-                            pme->mCameraHandle = NULL;
-                            break;
+                        } else {
+                            pme->m_bRelCamCalibValid = true;
                         }
-                        pme->m_bRelCamCalibValid = true;
                         pme->mJpegMetadata.sensor_mount_angle  =
                             cap->sensor_mount_angle;
                         pme->mJpegMetadata.default_sensor_flip = FLIP_NONE;
