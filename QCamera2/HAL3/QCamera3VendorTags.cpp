@@ -50,7 +50,8 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_CROP_END,
         QCAMERA3_TUNING_META_DATA_END,
         QCAMERA3_TEMPORAL_DENOISE_END,
-        QCAMERA3_VIDEO_HDR_END
+        QCAMERA3_VIDEO_HDR_END,
+        QCAMERA3_ADJUST_END,
 } ;
 
 typedef struct vendor_tag_info {
@@ -66,7 +67,8 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.crop",
     "org.codeaurora.qcamera3.tuning_meta_data",
     "org.codeaurora.qcamera3.temporal_denoise",
-    "org.codeaurora.qcamera3.video_hdr_mode"
+    "org.codeaurora.qcamera3.video_hdr_mode",
+    "org.codeaurora.qcamera3.adjust",
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -107,6 +109,17 @@ vendor_tag_info_t qcamera3_video_hdr[QCAMERA3_VIDEO_HDR_END -
     { "vhdr_supported_modes", TYPE_BYTE }
 };
 
+vendor_tag_info_t qcamera3_adjust[QCAMERA3_ADJUST_END -
+        QCAMERA3_ADJUST_START] = {
+    { "available_sharpness_control", TYPE_BYTE },
+    { "available_contrast_control", TYPE_BYTE },
+    { "available_brightness_control", TYPE_BYTE },
+    { "available_saturation_control", TYPE_BYTE },
+    { "contrast", TYPE_BYTE },
+    { "brightness", TYPE_BYTE },
+    { "saturation", TYPE_BYTE },
+};
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -115,7 +128,8 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_crop,
     qcamera3_tuning_meta_data,
     qcamera3_temporal_denoise,
-    qcamera3_video_hdr
+    qcamera3_video_hdr,
+    qcamera3_adjust,
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -144,7 +158,16 @@ uint32_t qcamera3_all_tags[] = {
 
     // QCAMERA3_VIDEO_HDR
     (uint32_t)QCAMERA3_VIDEO_HDR_MODE,
-    (uint32_t)QCAMERA3_VIDEO_HDR_AVAILABLE_VIDEO_HDR_MODES
+    (uint32_t)QCAMERA3_VIDEO_HDR_AVAILABLE_VIDEO_HDR_MODES,
+
+    // QCAMERA3_ADJUST_START
+    (uint32_t)QCAMERA3_AVAILABLE_SHARPNESS_CONTROL,
+    (uint32_t)QCAMERA3_AVAILABLE_CONTRAST_CONTROL,
+    (uint32_t)QCAMERA3_AVAILABLE_BRIGHTNESS_CONTROL,
+    (uint32_t)QCAMERA3_AVAILABLE_SATURATION_CONTROL,
+    (uint32_t)QCAMERA3_CONTRAST,
+    (uint32_t)QCAMERA3_BRIGHTNESS,
+    (uint32_t)QCAMERA3_SATURATION,
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;
