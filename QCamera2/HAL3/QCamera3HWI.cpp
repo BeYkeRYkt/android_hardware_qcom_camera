@@ -4224,6 +4224,18 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_VIDEO_HDR_MODE, (int32_t *)&vhdr, 1);
     }
 
+    IF_META_AVAILABLE(int32_t, contrast, CAM_INTF_PARM_CONTRAST, metadata) {
+        camMetadata.update(QCAMERA3_CONTRAST, (int32_t *)&contrast, 1);
+    }
+
+    IF_META_AVAILABLE(int32_t, brightness, CAM_INTF_PARM_BRIGHTNESS, metadata) {
+        camMetadata.update(CAM_INTF_PARM_BRIGHTNESS, (int32_t *)&brightness, 1);
+    }
+
+    IF_META_AVAILABLE(int32_t, saturation, CAM_INTF_PARM_SATURATION, metadata) {
+        camMetadata.update(CAM_INTF_PARM_SATURATION, (int32_t *)&saturation, 1);
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -6102,6 +6114,35 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
                  vhdr_mode, vhdr_mode_num);
     }
 
+    uint8_t control[4];
+    control[0] = (uint8_t)gCamCapability[cameraId]->sharpness_ctrl.min_value;
+    control[1] = (uint8_t)gCamCapability[cameraId]->sharpness_ctrl.max_value;
+    control[2] = (uint8_t)gCamCapability[cameraId]->sharpness_ctrl.step;
+    control[3] = (uint8_t)gCamCapability[cameraId]->sharpness_ctrl.def_value;
+    staticInfo.update(QCAMERA3_AVAILABLE_SHARPNESS_CONTROL, control,
+                  sizeof(control)/sizeof(control[0]));
+
+    control[0] = (uint8_t)gCamCapability[cameraId]->contrast_ctrl.min_value;
+    control[1] = (uint8_t)gCamCapability[cameraId]->contrast_ctrl.max_value;
+    control[2] = (uint8_t)gCamCapability[cameraId]->contrast_ctrl.step;
+    control[3] = (uint8_t)gCamCapability[cameraId]->contrast_ctrl.def_value;
+    staticInfo.update(QCAMERA3_AVAILABLE_CONTRAST_CONTROL, control,
+                  sizeof(control)/sizeof(control[0]));
+
+    control[0] = (uint8_t)gCamCapability[cameraId]->brightness_ctrl.min_value;
+    control[1] = (uint8_t)gCamCapability[cameraId]->brightness_ctrl.max_value;
+    control[2] = (uint8_t)gCamCapability[cameraId]->brightness_ctrl.step;
+    control[3] = (uint8_t)gCamCapability[cameraId]->brightness_ctrl.def_value;
+    staticInfo.update(QCAMERA3_AVAILABLE_BRIGHTNESS_CONTROL, control,
+                  sizeof(control)/sizeof(control[0]));
+
+    control[0] = (uint8_t)gCamCapability[cameraId]->saturation_ctrl.min_value;
+    control[1] = (uint8_t)gCamCapability[cameraId]->saturation_ctrl.max_value;
+    control[2] = (uint8_t)gCamCapability[cameraId]->saturation_ctrl.step;
+    control[3] = (uint8_t)gCamCapability[cameraId]->saturation_ctrl.def_value;
+    staticInfo.update(QCAMERA3_AVAILABLE_SATURATION_CONTROL, control,
+                  sizeof(control)/sizeof(control[0]));
+
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
 }
@@ -7657,6 +7698,42 @@ int QCamera3HardwareInterface::translateToHalMetadata
             ALOGE("%s: Invalid Video HDR mode %d!", __func__, vhdr);
         } else {
             if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_VIDEO_HDR, vhdr)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_CONTRAST)) {
+        int32_t value = (int32_t)frame_settings.find(QCAMERA3_CONTRAST).data.u8[0];
+        if ((gCamCapability[mCameraId]->contrast_ctrl.max_value < value) ||
+                (gCamCapability[mCameraId]->contrast_ctrl.min_value > value)) {
+            ALOGE("%s: Invalid contrast value %d!", __func__, value);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_CONTRAST, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_BRIGHTNESS)) {
+        int32_t value = (int32_t)frame_settings.find(QCAMERA3_BRIGHTNESS).data.u8[0];
+        if ((gCamCapability[mCameraId]->brightness_ctrl.max_value < value) ||
+                (gCamCapability[mCameraId]->brightness_ctrl.min_value > value)) {
+            ALOGE("%s: Invalid brightness value %d!", __func__, value);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_BRIGHTNESS, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_SATURATION)) {
+        int32_t value = (int32_t)frame_settings.find(QCAMERA3_SATURATION).data.u8[0];
+        if ((gCamCapability[mCameraId]->saturation_ctrl.max_value < value) ||
+                (gCamCapability[mCameraId]->saturation_ctrl.min_value > value)) {
+            ALOGE("%s: Invalid saturation value %d!", __func__, value);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_SATURATION, value)) {
                 rc = BAD_VALUE;
             }
         }
