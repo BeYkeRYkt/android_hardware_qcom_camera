@@ -5362,6 +5362,9 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
             exposureCompensationRange,
             sizeof(exposureCompensationRange)/sizeof(int32_t));
 
+    staticInfo.update(QCAMERA3_AVAILABLE_AE_COMPENSATION_STEP,
+            &gCamCapability[cameraId]->exposure_compensation_step, 1);
+
     uint8_t lensFacing = (facingBack) ?
             ANDROID_LENS_FACING_BACK : ANDROID_LENS_FACING_FRONT;
     staticInfo.update(ANDROID_LENS_FACING, &lensFacing, 1);
