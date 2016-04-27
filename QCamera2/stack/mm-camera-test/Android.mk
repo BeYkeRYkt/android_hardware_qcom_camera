@@ -11,6 +11,7 @@ LOCAL_CFLAGS:= \
         $(mmcamera_debug_cflags) \
         $(USE_SERVER_TREE)
 
+LOCAL_CLANG := true
 ifeq ($(strip $(TARGET_USES_ION)),true)
 LOCAL_CFLAGS += -DUSE_ION
 endif
@@ -111,6 +112,7 @@ endif
 
 LOCAL_CFLAGS += -D_ANDROID_
 
+LOCAL_CLANG := true
 LOCAL_SRC_FILES:= \
         src/mm_qcamera_main_menu.c \
         src/mm_qcamera_app.c \

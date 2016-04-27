@@ -3202,8 +3202,6 @@ int32_t mm_stream_calc_offset_video(cam_format_t fmt,
 {
     int32_t rc = 0;
     int stride = 0, scanline = 0;
-    int meta_stride = 0,meta_scanline = 0;
-
 
     switch (fmt) {
         case CAM_FORMAT_YUV_420_NV12:

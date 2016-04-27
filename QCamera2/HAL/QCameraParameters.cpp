@@ -5410,7 +5410,7 @@ int32_t QCameraParameters::initDefaultParameters()
             m_pCapability->hfr_tbl,
             m_pCapability->hfr_tbl_cnt);
     set(KEY_QC_SUPPORTED_HFR_SIZES, hfrSizeValues.string());
-    CDBG("HFR values %s HFR Sizes = %d", hfrValues.string(), hfrSizeValues.string());
+    CDBG("HFR values %s HFR Sizes = %s", hfrValues.string(), hfrSizeValues.string());
     setHighFrameRate(CAM_HFR_MODE_OFF);
 
     // Set Focus algorithms
@@ -5904,7 +5904,6 @@ TRANS_INIT_ERROR3:
 TRANS_INIT_ERROR2:
     m_pParamHeap->deallocate();
 
-TRANS_INIT_ERROR1:
     delete m_pParamHeap;
     m_pParamHeap = NULL;
 
@@ -7173,7 +7172,7 @@ int32_t QCameraParameters::configFrameCapture(bool commitSettings)
  *==========================================================================*/
 int32_t QCameraParameters::resetFrameCapture(bool commitSettings)
 {
-    int32_t rc = NO_ERROR, i = 0;
+    int32_t rc = NO_ERROR;
     memset(&m_captureFrameConfig, 0, sizeof(cam_capture_frame_config_t));
 
     if (commitSettings) {
@@ -7808,12 +7807,13 @@ int32_t QCameraParameters::parseGains(const char *gainStr, double &r_gain,
 {
     int32_t rc = NO_ERROR;
     char *saveptr = NULL;
-    char* gains = (char*) calloc(1, strlen(gainStr) + 1);
+    size_t gainSize = strlen(gainStr) + 1;
+    char* gains = (char*) calloc(1, gainSize);
     if (NULL == gains) {
         ALOGE("%s: No memory for gains", __func__);
         return NO_MEMORY;
     }
-    strlcpy(gains, gainStr, strlen(gainStr) + 1);
+    strlcpy(gains, gainStr, gainSize);
     char *token = strtok_r(gains, ",", &saveptr);
 
     if (NULL != token) {
@@ -9451,7 +9451,7 @@ int32_t QCameraParameters::getStreamFormat(cam_stream_type_t streamType,
                 CAM_FORMAT_Y_ONLY) {
             format = m_pCapability->analysis_recommended_format;
         } else {
-            ALOGE("%s:%d invalid analysis_recommended_format %d\n",
+            ALOGE("%s invalid analysis_recommended_format %d\n", __func__,
                     m_pCapability->analysis_recommended_format);
             format = mAppPreviewFormat;
         }
@@ -10363,15 +10363,13 @@ uint16_t QCameraParameters::getExifIsoSpeed()
  *              none-zero failure code
  *==========================================================================*/
 int32_t QCameraParameters::getExifGpsProcessingMethod(char *gpsProcessingMethod,
-                                                      uint32_t &count)
+        size_t bufferSize, uint32_t &count)
 {
     const char *str = get(KEY_GPS_PROCESSING_METHOD);
     if(str != NULL) {
-        memcpy(gpsProcessingMethod, ExifAsciiPrefix, EXIF_ASCII_PREFIX_SIZE);
-        count = EXIF_ASCII_PREFIX_SIZE;
-        strlcpy(gpsProcessingMethod + EXIF_ASCII_PREFIX_SIZE, str, strlen(str)+1);
-        count += (uint32_t)strlen(str);
-        gpsProcessingMethod[count++] = '\0'; // increase 1 for the last NULL char
+        memset(gpsProcessingMethod, '\0', bufferSize);
+        strlcat(gpsProcessingMethod, ExifAsciiPrefix, bufferSize);
+        count = strlcat(gpsProcessingMethod, str, bufferSize);
         return NO_ERROR;
     } else {
         return BAD_VALUE;
@@ -11221,7 +11219,7 @@ int32_t QCameraParameters::bundleRelatedCameras(bool sync,
         rc = m_pCamOpsTbl->ops->sync_related_sensors(
                 m_pCamOpsTbl->camera_handle, m_pRelCamSyncBuf);
     } else {
-        ALOGE("%s: Related Cam SyncBuffer not allocated", __func__, rc);
+        ALOGE("%s: Related Cam SyncBuffer not allocated", __func__);
         return NO_INIT;
     }
 
@@ -11450,11 +11448,9 @@ int32_t QCameraParameters::commitParamChanges()
  *
  * RETURN     : none
  *==========================================================================*/
-QCameraReprocScaleParam::QCameraReprocScaleParam(QCameraParameters *parent)
-  : mParent(parent),
-    mScaleEnabled(false),
+QCameraReprocScaleParam::QCameraReprocScaleParam(QCameraParameters *parent __unused)
+  : mScaleEnabled(false),
     mIsUnderScaling(false),
-    mScaleDirection(0),
     mNeedScaleCnt(0),
     mSensorSizeTblCnt(0),
     mSensorSizeTbl(NULL),
@@ -12924,7 +12920,7 @@ void QCameraParameters::setBufBatchCount(int8_t buf_cnt)
  *
  * RETURN     :  error value
  *==========================================================================*/
-int32_t QCameraParameters::setCustomParams(const QCameraParameters& params)
+int32_t QCameraParameters::setCustomParams(const QCameraParameters& params __unused)
 {
     int32_t rc = NO_ERROR;
 

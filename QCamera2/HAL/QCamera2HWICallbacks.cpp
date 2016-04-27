@@ -2217,7 +2217,7 @@ void QCamera2HardwareInterface::dumpJpegToFile(const void *data,
                 snprintf(buf, sizeof(buf), QCAMERA_DUMP_FRM_LOCATION "%d_%d.jpg",
                         mDumpFrmCnt, index);
                 if (true == m_bIntJpegEvtPending) {
-                    strlcpy(m_BackendFileName, buf, sizeof(buf));
+                    strlcpy(m_BackendFileName, buf, sizeof(m_BackendFileName));
                     mBackendFileSize = size;
                 }
 
@@ -2473,7 +2473,7 @@ void QCamera2HardwareInterface::dumpFrameToFile(QCameraStream *stream,
                             }
                         }
 
-                        CDBG_HIGH("%s: written number of bytes %ld\n",
+                        CDBG_HIGH("%s: written number of bytes %d\n",
                             __func__, written_len);
                         close(file_fd);
                     } else {
@@ -2791,7 +2791,7 @@ void * QCameraCbNotifier::cbNotifyRoutine(void * data)
                                     }
                                     if (pme->mJpegCb) {
                                         ALOGI("%s: Calling JPEG Callback!! for camera %d"
-                                                "release_data %p",
+                                                "release_data %p"
                                                 "frame_idx %d",
                                                 __func__, pme->mParent->getCameraId(),
                                                 cb->user_data,

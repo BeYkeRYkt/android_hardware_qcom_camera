@@ -84,10 +84,8 @@ private:
     size_t checkScaleSizeTable(size_t scale_cnt, cam_dimension_t *scale_tbl,
             size_t org_cnt, cam_dimension_t *org_tbl);
 
-    QCameraParameters *mParent;
     bool mScaleEnabled;
     bool mIsUnderScaling;   //if in scale status
-    bool mScaleDirection;   // 0: Upscaling; 1: Downscaling
 
     // picture size cnt that need scale operation
     size_t mNeedScaleCnt;
@@ -660,7 +658,8 @@ public:
     int32_t getExifDateTime(String8 &dateTime, String8 &subsecTime);
     int32_t getExifFocalLength(rat_t *focalLenght);
     uint16_t getExifIsoSpeed();
-    int32_t getExifGpsProcessingMethod(char *gpsProcessingMethod, uint32_t &count);
+    int32_t getExifGpsProcessingMethod(char *gpsProcessingMethod,
+            size_t bufferSize, uint32_t &count);
     int32_t getExifLatitude(rat_t *latitude, char *latRef);
     int32_t getExifLongitude(rat_t *longitude, char *lonRef);
     int32_t getExifAltitude(rat_t *altitude, char *altRef);

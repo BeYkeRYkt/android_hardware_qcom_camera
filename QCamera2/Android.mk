@@ -5,8 +5,6 @@ include $(LOCAL_PATH)/../common.mk
 
 include $(CLEAR_VARS)
 
-LOCAL_CLANG := false
-
 LOCAL_SRC_FILES := \
         util/QCameraCmdThread.cpp \
         util/QCameraQueue.cpp \

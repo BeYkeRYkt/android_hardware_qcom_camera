@@ -60,15 +60,23 @@
 #include <cutils/memory.h>
 #include <SkImageDecoder.h>
 #include <SkImageEncoder.h>
-#include <MediaCodec.h>
 #include <OMX_IVCommon.h>
-#include <foundation/AMessage.h>
-#include <media/ICrypto.h>
-#include <MediaMuxer.h>
-#include <foundation/ABuffer.h>
-#include <MediaErrors.h>
 #include <gralloc_priv.h>
+#include <media/ICrypto.h>
 #include <math.h>
+
+#include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AString.h>
+#include <media/stagefright/DataSource.h>
+#include <media/stagefright/MediaCodec.h>
+#include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/MediaMuxer.h>
+#include <media/stagefright/MetaData.h>
+#include <media/stagefright/NuMediaExtractor.h>
+
 
 #include "qcamera_test.h"
 #include "cam_types.h"
@@ -1980,13 +1988,18 @@ Size CameraContext::getPreviewSizeFromVideoSizes(Size currentVideoSize)
 
     Size tmpPreviewSize;
     Size PreviewSize;
-    Size PreviewSizes[mSupportedPreviewSizes.size()];
+    Size *PreviewSizes = new Size[mSupportedPreviewSizes.size()];
     double tolerance = 0.00001;
     double videoRatio;
     double previewRatio;
     size_t i = 0;
     size_t j = 0;
     int delta;
+
+    memset(&PreviewSize, 0, sizeof(PreviewSize));
+    if (NULL == PreviewSizes) {
+        return PreviewSize;
+    }
 
     // Find all the resolutions with the same aspect ratio and choose the
     // same or the closest resolution from them. Choose the closest resolution
@@ -2040,9 +2053,9 @@ Size CameraContext::getPreviewSizeFromVideoSizes(Size currentVideoSize)
                 }
             }
         }
-    } else {
-        memset(&PreviewSize, 0, sizeof(PreviewSize));
     }
+    delete [] PreviewSizes;
+
     return PreviewSize;
 }
 

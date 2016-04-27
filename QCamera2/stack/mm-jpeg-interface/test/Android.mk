@@ -6,6 +6,7 @@ include $(LOCAL_PATH)/../../common.mk
 include $(CLEAR_VARS)
 LOCAL_PATH := $(MM_JPEG_TEST_PATH)
 LOCAL_MODULE_TAGS := optional
+LOCAL_CLANG := true
 
 LOCAL_CFLAGS := -DCAMERA_ION_HEAP_ID=ION_IOMMU_HEAP_ID
 LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
@@ -44,6 +45,7 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 LOCAL_PATH := $(MM_JPEG_TEST_PATH)
 LOCAL_MODULE_TAGS := optional
+LOCAL_CLANG := true
 
 LOCAL_CFLAGS := -DCAMERA_ION_HEAP_ID=ION_IOMMU_HEAP_ID
 LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter

@@ -171,6 +171,9 @@ int createEncodingSession(mm_camera_test_obj_t *test_obj,
                                              &test_obj->current_jpeg_sess_id);
 }
 
+static void mm_app_snapshot_metadata_notify_cb(mm_camera_super_buf_t *bufs,
+  void *user_data) __attribute__((unused));
+
 /** mm_app_snapshot_metadata_notify_cb
  *  @bufs: Pointer to super buffer
  *  @user_data: Pointer to user data
