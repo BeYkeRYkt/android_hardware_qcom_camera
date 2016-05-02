@@ -15,6 +15,8 @@ ifeq ($(strip $(TARGET_USES_ION)),true)
 LOCAL_CFLAGS += -DUSE_ION
 endif
 
+LOCAL_CLANG := false
+
 LOCAL_CFLAGS += -D_ANDROID_
 
 LOCAL_SRC_FILES:= \
@@ -94,6 +96,8 @@ include $(BUILD_EXECUTABLE)
 
 # Build tuning library
 include $(CLEAR_VARS)
+
+LOCAL_CLANG := false
 
 LOCAL_CFLAGS:= \
         -DAMSS_VERSION=$(AMSS_VERSION) \
