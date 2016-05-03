@@ -1716,6 +1716,11 @@ uint8_t get_num_of_cameras()
     char prop[PROPERTY_VALUE_MAX];
     uint32_t globalLogLevel = 0;
 
+#if 1
+    /*Disable google HAL API for Automotive*/
+    CDBG("No android sensors for automotive");
+    return 0;
+#else
     property_get("persist.camera.hal.debug", prop, "0");
     int val = atoi(prop);
     if (0 <= val) {
@@ -1805,7 +1810,6 @@ uint8_t get_num_of_cameras()
     close(sd_fd);
     dev_fd = -1;
 
-
     num_media_devices = 0;
     while (1) {
         uint32_t num_entities = 1U;
@@ -1865,10 +1869,7 @@ uint8_t get_num_of_cameras()
     /* unlock the mutex */
     pthread_mutex_unlock(&g_intf_lock);
     ALOGI("%s: num_cameras=%d\n", __func__, (int)g_cam_ctrl.num_cam);
-#if 1
-    /*Disable google HAL API for Automotive*/
-    return 0;
-#else
+
     return(uint8_t)g_cam_ctrl.num_cam;
 #endif
 }
