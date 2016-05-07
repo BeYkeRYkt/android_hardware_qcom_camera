@@ -587,6 +587,7 @@ typedef enum {
     IS_TYPE_GA_DIS,
     IS_TYPE_EIS_1_0,
     IS_TYPE_EIS_2_0,
+    IS_TYPE_MVDG,
     IS_TYPE_CNT
 } cam_is_type_t;
 
