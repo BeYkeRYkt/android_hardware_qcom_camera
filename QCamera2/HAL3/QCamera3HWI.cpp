@@ -6144,6 +6144,29 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(QCAMERA3_AVAILABLE_SATURATION_CONTROL, control,
                   sizeof(control)/sizeof(control[0]));
 
+    int32_t available_sizes_tbl[MAX_SIZES_CNT * 2];
+    int32_t uhd_present = 0;
+    for (size_t i = 0; i < gCamCapability[cameraId]->livesnapshot_sizes_tbl_cnt; i++) {
+        available_sizes_tbl[2 * i] =
+                gCamCapability[cameraId]->livesnapshot_sizes_tbl[i].width;
+        available_sizes_tbl[2 * i + 1] =
+                gCamCapability[cameraId]->livesnapshot_sizes_tbl[i].height;
+        if ((VIDEO_4K_WIDTH == gCamCapability[cameraId]->livesnapshot_sizes_tbl[i].width) &&
+                (VIDEO_4K_HEIGHT == gCamCapability[cameraId]->livesnapshot_sizes_tbl[i].height)) {
+            uhd_present = 1;
+        }
+    }
+    staticInfo.update(QCAMERA3_AVAILABLE_LIVESNAPSHOT_SIZES,
+            available_sizes_tbl,
+            gCamCapability[cameraId]->livesnapshot_sizes_tbl_cnt * 2);
+    if (0 != uhd_present) {
+        available_sizes_tbl[0] = VIDEO_4K_WIDTH;
+        available_sizes_tbl[1] = VIDEO_4K_HEIGHT;
+        staticInfo.update(QCAMERA3_AVAILABLE_UHD_LIVESNAPSHOT_SIZES,
+                available_sizes_tbl,
+                uhd_present * 2);
+    }
+
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
 }

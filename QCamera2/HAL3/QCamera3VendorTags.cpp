@@ -50,6 +50,7 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_TEMPORAL_DENOISE_END,
         QCAMERA3_VIDEO_HDR_END,
         QCAMERA3_ADJUST_END,
+        QCAMERA3_LIVESNAPSHOT_END,
 } ;
 
 typedef struct vendor_tag_info {
@@ -67,6 +68,7 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.temporal_denoise",
     "org.codeaurora.qcamera3.video_hdr_mode",
     "org.codeaurora.qcamera3.adjust",
+    "org.codeaurora.qcamera3.livesnapshot",
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -119,6 +121,12 @@ vendor_tag_info_t qcamera3_adjust[QCAMERA3_ADJUST_END -
     { "saturation", TYPE_BYTE },
 };
 
+vendor_tag_info_t qcamera3_livesnapshot[QCAMERA3_LIVESNAPSHOT_END -
+        QCAMERA3_LIVESNAPSHOT_START] = {
+    { "available_livesnapshot_sizes", TYPE_INT32 },
+    { "available_uhd_livesnapshot_sizes", TYPE_INT32 },
+};
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -129,6 +137,7 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_temporal_denoise,
     qcamera3_video_hdr,
     qcamera3_adjust,
+    qcamera3_livesnapshot,
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -168,6 +177,10 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_CONTRAST,
     (uint32_t)QCAMERA3_BRIGHTNESS,
     (uint32_t)QCAMERA3_SATURATION,
+
+    // QCAMERA3_LIVESNAPSHOT_START
+    (uint32_t)QCAMERA3_AVAILABLE_LIVESNAPSHOT_SIZES,
+    (uint32_t)QCAMERA3_AVAILABLE_UHD_LIVESNAPSHOT_SIZES,
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;

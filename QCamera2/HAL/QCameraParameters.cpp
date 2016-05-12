@@ -127,6 +127,7 @@ const char QCameraParameters::KEY_QC_NO_DISPLAY_MODE[] = "no-display-mode";
 const char QCameraParameters::KEY_QC_RAW_PICUTRE_SIZE[] = "raw-size";
 const char QCameraParameters::KEY_QC_SUPPORTED_SKIN_TONE_ENHANCEMENT_MODES[] = "skinToneEnhancement-values";
 const char QCameraParameters::KEY_QC_SUPPORTED_LIVESNAPSHOT_SIZES[] = "supported-live-snapshot-sizes";
+const char QCameraParameters::KEY_QC_SUPPORTED_UHD_LIVESNAPSHOT_SIZES[] = "supported-uhd-live-snapshot-sizes";
 const char QCameraParameters::KEY_QC_SUPPORTED_HDR_NEED_1X[] = "hdr-need-1x-values";
 const char QCameraParameters::KEY_QC_HDR_NEED_1X[] = "hdr-need-1x";
 const char QCameraParameters::KEY_QC_PREVIEW_FLIP[] = "preview-flip";
@@ -5047,6 +5048,19 @@ int32_t QCameraParameters::initDefaultParameters()
         CDBG("%s: supported live snapshot sizes: %s", __func__, liveSnpashotSizeValues.string());
         m_LiveSnapshotSize =
             m_pCapability->livesnapshot_sizes_tbl[m_pCapability->livesnapshot_sizes_tbl_cnt-1];
+    }
+
+    for (size_t i = 0; i < m_pCapability->livesnapshot_sizes_tbl_cnt; i++) {
+        if ((VIDEO_4K_UHD_WIDTH == m_pCapability->livesnapshot_sizes_tbl[i].width) &&
+                  (VIDEO_4K_UHD_HEIGHT == m_pCapability->livesnapshot_sizes_tbl[i].height)) {
+            String8 liveSnpashotSizeValues;
+            char buffer[32];
+            snprintf(buffer, sizeof(buffer), "%dx%d",
+                    VIDEO_4K_UHD_WIDTH, VIDEO_4K_UHD_HEIGHT);
+            liveSnpashotSizeValues.append(buffer);
+            set(KEY_QC_SUPPORTED_UHD_LIVESNAPSHOT_SIZES, liveSnpashotSizeValues.string());
+            break;
+        }
     }
 
     // Set supported preview formats

@@ -46,6 +46,9 @@ static const char ExifUndefinedPrefix[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 
 #define CAMERA_MIN_BATCH_COUNT           4
 
+#define VIDEO_4K_UHD_WIDTH  3840
+#define VIDEO_4K_UHD_HEIGHT 2160
+
 class QCameraAdjustFPS
 {
 public:
@@ -123,6 +126,7 @@ public:
 
     // Supported live snapshot sizes
     static const char KEY_QC_SUPPORTED_LIVESNAPSHOT_SIZES[];
+    static const char KEY_QC_SUPPORTED_UHD_LIVESNAPSHOT_SIZES[];
 
     // Supported Raw formats
     static const char KEY_QC_SUPPORTED_RAW_FORMATS[];
