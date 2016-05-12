@@ -342,6 +342,7 @@ const char QCameraParameters::IS_MODE_DIS[] = "dis";
 const char QCameraParameters::IS_MODE_GA_DIS[] = "ga_dis";
 const char QCameraParameters::IS_MODE_EIS_1_0[] = "eis_1_0";
 const char QCameraParameters::IS_MODE_EIS_2_0[] = "eis_2_0";
+const char QCameraParameters::IS_MODE_MVDG[] = "mvdg";
 
 const char QCameraParameters::KEY_SELECTED_AUTO_SCENE[] = "selected-auto-scene";
 
@@ -620,7 +621,8 @@ const QCameraParameters::QCameraMap QCameraParameters::DIS_MODES_MAP[] = {
     { IS_MODE_GA_DIS, IS_TYPE_GA_DIS},
     { IS_MODE_EIS_1_0, IS_TYPE_EIS_1_0},
     { IS_MODE_EIS_2_0, IS_TYPE_EIS_2_0},
-    { VALUE_ENABLE, IS_TYPE_EIS_2_0},
+    { IS_MODE_MVDG, IS_TYPE_MVDG},
+    { VALUE_ENABLE, IS_TYPE_MVDG},
 };
 
 #define DEFAULT_CAMERA_AREA "(0, 0, 0, 0, 0)"

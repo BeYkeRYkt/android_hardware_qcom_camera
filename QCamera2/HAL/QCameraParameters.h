@@ -485,6 +485,7 @@ public:
     static const char IS_MODE_GA_DIS[];
     static const char IS_MODE_EIS_1_0[];
     static const char IS_MODE_EIS_2_0[];
+    static const char IS_MODE_MVDG[];
 
     static const char KEY_SELECTED_AUTO_SCENE[];
 
