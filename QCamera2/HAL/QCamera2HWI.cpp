@@ -4921,9 +4921,11 @@ int32_t QCamera2HardwareInterface::preparePreview()
     } else {
         bool recordingHint = mParameters.getRecordingHintValue();
         if(recordingHint) {
-            rc = addChannel(QCAMERA_CH_TYPE_SNAPSHOT);
-            if (rc != NO_ERROR) {
-                return rc;
+            if (!mParameters.is4KVideo()) {
+                rc = addChannel(QCAMERA_CH_TYPE_SNAPSHOT);
+                if (rc != NO_ERROR) {
+                    return rc;
+                }
             }
 
             rc = addChannel(QCAMERA_CH_TYPE_VIDEO);
