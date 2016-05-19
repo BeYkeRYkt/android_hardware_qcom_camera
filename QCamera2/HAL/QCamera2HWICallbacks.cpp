@@ -1010,13 +1010,21 @@ void QCamera2HardwareInterface::nodisplay_preview_stream_cb_routine(
             cbArg.cb_type = QCAMERA_DATA_CALLBACK;
             cbArg.msg_type = CAMERA_MSG_PREVIEW_FRAME;
             cbArg.data = preview_mem;
-            cbArg.user_data = (void *) &frame->buf_idx;
-            cbArg.cookie = stream;
-            cbArg.release_cb = returnStreamBuffer;
-            int32_t rc = pme->m_cbNotifier.notifyCallback(cbArg);
-            if (rc != NO_ERROR) {
-                ALOGE("%s: fail sending data notify", __func__);
-                stream->bufDone(frame->buf_idx);
+            qcamera_stream_release_t *streamRelease = (qcamera_stream_release_t *)
+                    malloc(sizeof(qcamera_stream_release_t));
+            if (NULL != streamRelease) {
+                memset(streamRelease, 0, sizeof(qcamera_stream_release_t));
+                streamRelease->stream_handle = stream->getMyHandle();
+                streamRelease->buf_idx = frame->buf_idx;
+                cbArg.user_data = streamRelease;
+                cbArg.cookie = pme;
+                cbArg.release_cb = returnStreamBuffer;
+                int32_t rc = pme->m_cbNotifier.notifyCallback(cbArg);
+                if (NO_ERROR != rc) {
+                    ALOGE("%s: fail sending data notify", __func__);
+                    stream->bufDone(frame->buf_idx);
+                    free(streamRelease);
+                }
             }
         } else {
             stream->bufDone(frame->buf_idx);
