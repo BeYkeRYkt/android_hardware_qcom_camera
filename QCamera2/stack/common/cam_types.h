@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -410,7 +410,7 @@ typedef struct {
                            * otherwise, each planner has its own fd */
     uint32_t cookie;      /* could be job_id(uint32_t) to identify mapping job */
     int32_t fd;           /* origin fd */
-    size_t size;          /* size of the buffer */
+    uint32_t size;        /* size of the buffer */
 } cam_buf_map_type;
 
 typedef struct {
@@ -2284,7 +2284,7 @@ typedef struct {
 } cam_opti_zoom_t;
 
 typedef struct {
-    size_t meta_max_size;
+    uint32_t meta_max_size;
 } cam_true_portrait_t;
 
 typedef enum {
