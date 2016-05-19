@@ -168,6 +168,11 @@ typedef struct {
     uint32_t                 frame_index;  // frame index for the buffer
 } qcamera_callback_argm_t;
 
+typedef struct {
+    uint32_t stream_handle;
+    uint32_t buf_idx;
+} qcamera_stream_release_t;
+
 class QCameraCbNotifier {
 public:
     QCameraCbNotifier(QCamera2HardwareInterface *parent) :
