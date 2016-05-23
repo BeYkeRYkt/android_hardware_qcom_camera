@@ -166,6 +166,11 @@ typedef struct {
 } qcamera_callback_argm_t;
 
 typedef struct {
+    uint32_t stream_handle;
+    uint32_t buf_idx;
+} qcamera_stream_release_t;
+
+typedef struct {
    cam_dimension_t all_preview_sizes[MAX_SIZES_CNT];
    size_t all_preview_sizes_cnt;
    cam_dimension_t all_video_sizes[MAX_SIZES_CNT];
@@ -196,6 +201,8 @@ public:
     static void * cbNotifyRoutine(void * data);
     static void releaseNotifications(void *data, void *user_data);
     static bool matchSnapshotNotifications(void *data, void *user_data);
+    static bool matchPreviewNotifications(void *data, void *user_data);
+    virtual int32_t flushPreviewNotifications();
 private:
 
     camera_notify_callback         mNotifyCb;

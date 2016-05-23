@@ -2137,6 +2137,8 @@ int QCamera2HardwareInterface::stopPreview()
     }
     ts_makeup_finish();
 #endif
+
+    m_cbNotifier.flushPreviewNotifications();
     // delete all channels from preparePreview
     unpreparePreview();
     CDBG_HIGH("%s: X", __func__);
@@ -5971,12 +5973,29 @@ void QCamera2HardwareInterface::returnStreamBuffer(void *data,
                                                    void *cookie,
                                                    int32_t /*cbStatus*/)
 {
-    QCameraStream *stream = ( QCameraStream * ) cookie;
-    int idx = *((int *)data);
-    if ((NULL != stream) && (0 <= idx)) {
-        stream->bufDone((uint32_t)idx);
-    } else {
-        ALOGE("%s: Cannot return buffer %d %p", __func__, idx, cookie);
+    QCamera2HardwareInterface *pme = (QCamera2HardwareInterface *) cookie;
+    qcamera_stream_release_t *streamRelease = (qcamera_stream_release_t *) data;
+    if ((NULL != streamRelease) && (NULL != pme)) {
+        QCameraStream *stream = NULL;
+        for (size_t i = 0; i < QCAMERA_CH_TYPE_MAX; i++) {
+            if (pme->m_channels[i]) {
+                stream = pme->m_channels[i]->getStreamByHandle(
+                        streamRelease->stream_handle);
+                if (NULL != stream) {
+                    break;
+                }
+            }
+        }
+        if (NULL != stream) {
+            stream->bufDone(streamRelease->buf_idx);
+        } else {
+            ALOGE("%s: Stream with handle: %d not present!", __func__,
+                    streamRelease->stream_handle);
+        }
+    }
+
+    if (NULL != streamRelease) {
+        free(streamRelease);
     }
 }
 
