@@ -531,7 +531,6 @@ public:
     int getMaxUnmatchedFramesInQueue();
     int getMinPPBufs();
     bool isZSLMode() {return m_bZslMode;};
-    bool is4KVideo();
     bool isNoDisplayMode() {return m_bNoDisplayMode;};
     bool isWNREnabled() {return m_bWNROn;};
     bool isHfrMode() {return m_bHfrMode;};

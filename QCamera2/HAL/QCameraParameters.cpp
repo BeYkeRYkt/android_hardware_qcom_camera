@@ -1236,20 +1236,6 @@ int32_t QCameraParameters::setVideoSize(const QCameraParameters& params)
     return BAD_VALUE;
 }
 
-bool QCameraParameters::is4KVideo() {
-    int width, height;
-    CameraParameters::getVideoSize(&width, &height);
-
-    if((width == 3840 && height == 2160) ||
-        (width == 4096 && height == 2160)) {
-        ALOGE("%s: 4K Video Mode (%d, %d)",
-            __func__, width, height);
-        return TRUE;
-    } else {
-        return FALSE;
-    }
-}
-
 /*===========================================================================
  * FUNCTION   : setLiveSnapshotSize
  *

@@ -865,10 +865,6 @@ int CameraTest::setParameters()
     printf("setting video fps: %d ( idx = %d )\n", caps_.videoFpsValues[vFpsIdx], vFpsIdx );
     params_.setVideoFPS(caps_.videoFpsValues[vFpsIdx]);
 
-    if (config_.testVideo) {
-        params_.set("recording-hint", "true");
-    }
-
     params_.setStatsLoggingMask(config_.statsLogMask);
 
     return params_.commit();
