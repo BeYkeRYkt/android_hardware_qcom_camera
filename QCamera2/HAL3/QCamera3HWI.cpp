@@ -4710,10 +4710,25 @@ void QCamera3HardwareInterface::extractJpegMetadata(
                 frame_settings.find(ANDROID_JPEG_THUMBNAIL_QUALITY).data.u8,
                 frame_settings.find(ANDROID_JPEG_THUMBNAIL_QUALITY).count);
 
-    if (frame_settings.exists(ANDROID_JPEG_THUMBNAIL_SIZE))
-        jpegMetadata.update(ANDROID_JPEG_THUMBNAIL_SIZE,
-                frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32,
+    if (frame_settings.exists(ANDROID_JPEG_THUMBNAIL_SIZE)) {
+        int32_t thumbnail_size[2];
+        thumbnail_size[0] = frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
+        thumbnail_size[1] = frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
+        if (frame_settings.exists(ANDROID_JPEG_ORIENTATION)) {
+            int32_t orientation =
+                  frame_settings.find(ANDROID_JPEG_ORIENTATION).data.i32[0];
+            if ((orientation == 90) || (orientation == 270)) {
+               //swap thumbnail dimensions for rotations 90 and 270 in jpeg metadata.
+               int32_t temp;
+               temp = thumbnail_size[0];
+               thumbnail_size[0] = thumbnail_size[1];
+               thumbnail_size[1] = temp;
+            }
+         }
+         jpegMetadata.update(ANDROID_JPEG_THUMBNAIL_SIZE,
+                thumbnail_size,
                 frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).count);
+    }
 }
 
 /*===========================================================================
@@ -5265,7 +5280,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
             &maxZoom, 1);
 
-    uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_FREEFORM;
+    uint8_t croppingType = ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY;
     staticInfo.update(ANDROID_SCALER_CROPPING_TYPE, &croppingType, 1);
 
     int32_t max3aRegions[3] = {/*AE*/1,/*AWB*/ 0,/*AF*/ 1};
