@@ -1405,7 +1405,7 @@ int QCamera3HardwareInterface::configureStreams(
             break;
             case HAL_PIXEL_FORMAT_BLOB:
                 mStreamConfigInfo.type[i] = CAM_STREAM_TYPE_SNAPSHOT;
-                if (m_bIs4KVideo && !isZsl) {
+                if (!isZsl) {
                     mStreamConfigInfo.postprocess_mask[i] = fullFeatureMask;
                     mStreamConfigInfo.postprocess_mask[i] &= ~CAM_QCOM_FEATURE_CDS;
                 } else {
