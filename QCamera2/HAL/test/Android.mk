@@ -46,7 +46,7 @@ LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 LOCAL_MODULE:= camera_test
 LOCAL_MODULE_TAGS:= tests
 
-LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter
+LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter -Wno-format
 LOCAL_CFLAGS += -O0
 
 ifeq (1,$(filter 1,$(shell echo "$$(( $(PLATFORM_SDK_VERSION) >= 20 ))" )))
