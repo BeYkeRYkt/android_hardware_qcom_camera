@@ -84,8 +84,8 @@ int mm_app_load_hal(mm_camera_app_t *my_cam_app)
 {
     memset(&my_cam_app->hal_lib, 0, sizeof(hal_interface_lib_t));
     my_cam_app->hal_lib.ptr = dlopen("libmmcamera_interface.so", RTLD_NOW);
-    my_cam_app->hal_lib.ptr_jpeg = dlopen("libmmjpeg_interface.so", RTLD_NOW);
-    if (!my_cam_app->hal_lib.ptr || !my_cam_app->hal_lib.ptr_jpeg) {
+    //my_cam_app->hal_lib.ptr_jpeg = dlopen("libmmjpeg_interface.so", RTLD_NOW);
+    if (!my_cam_app->hal_lib.ptr/* || !my_cam_app->hal_lib.ptr_jpeg*/) {
         CDBG_ERROR("%s Error opening HAL library %s\n", __func__, dlerror());
         return -MM_CAMERA_E_GENERAL;
     }
@@ -93,12 +93,13 @@ int mm_app_load_hal(mm_camera_app_t *my_cam_app)
         dlsym(my_cam_app->hal_lib.ptr, "get_num_of_cameras");
     *(void **)&(my_cam_app->hal_lib.mm_camera_open) =
         dlsym(my_cam_app->hal_lib.ptr, "camera_open");
+/*
     *(void **)&(my_cam_app->hal_lib.jpeg_open) =
         dlsym(my_cam_app->hal_lib.ptr_jpeg, "jpeg_open");
-
+*/
     if (my_cam_app->hal_lib.get_num_of_cameras == NULL ||
-        my_cam_app->hal_lib.mm_camera_open == NULL ||
-        my_cam_app->hal_lib.jpeg_open == NULL) {
+        my_cam_app->hal_lib.mm_camera_open == NULL /*||
+        my_cam_app->hal_lib.jpeg_open == NULL*/) {
         CDBG_ERROR("%s Error loading HAL sym %s\n", __func__, dlerror());
         return -MM_CAMERA_E_GENERAL;
     }
@@ -573,13 +574,14 @@ int mm_app_open(mm_camera_app_t *cam_app,
     memset(&pic_size, 0, sizeof(mm_dimension));
     pic_size.w = 4000;
     pic_size.h = 3000;
+/*
     test_obj->jpeg_hdl = cam_app->hal_lib.jpeg_open(&test_obj->jpeg_ops,pic_size);
     if (test_obj->jpeg_hdl == 0) {
         CDBG_ERROR("%s: jpeg lib open err", __func__);
         rc = -MM_CAMERA_E_GENERAL;
         goto error_after_getparm_buf_map;
     }
-
+*/
     return rc;
 
 error_after_getparm_buf_map:
