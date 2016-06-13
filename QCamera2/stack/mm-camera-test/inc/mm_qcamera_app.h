@@ -30,6 +30,7 @@
 #ifndef __MM_QCAMERA_APP_H__
 #define __MM_QCAMERA_APP_H__
 
+#include <stdint.h>
 #include <pthread.h>
 #include <errno.h>
 #include <sys/ioctl.h>

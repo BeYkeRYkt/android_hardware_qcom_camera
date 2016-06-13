@@ -26,7 +26,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-
+#include <stdint.h>
 #include <pthread.h>
 #include <errno.h>
 #include <sys/ioctl.h>
