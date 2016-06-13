@@ -51,15 +51,15 @@
 
 #undef __FD_SET
 #define __FD_SET(fd, fdsetp) \
-  (((fd_set *)(fdsetp))->fds_bits[(fd) >> 5] |= (1LU<<((fd) & 31)))
+  (((fd_set *)(fdsetp))->__fds_bits[(fd) >> 5] |= (1LU<<((fd) & 31)))
 
 #undef __FD_CLR
 #define __FD_CLR(fd, fdsetp) \
-  (((fd_set *)(fdsetp))->fds_bits[(fd) >> 5] &= ~(1LU<<((fd) & 31)))
+  (((fd_set *)(fdsetp))->__fds_bits[(fd) >> 5] &= ~(1LU<<((fd) & 31)))
 
 #undef  __FD_ISSET
 #define __FD_ISSET(fd, fdsetp) \
-  ((((fd_set *)(fdsetp))->fds_bits[(fd) >> 5] & (1LU<<((fd) & 31))) != 0)
+  ((((fd_set *)(fdsetp))->__fds_bits[(fd) >> 5] & (1LU<<((fd) & 31))) != 0)
 
 #undef  __FD_ZERO
 #define __FD_ZERO(fdsetp) \
