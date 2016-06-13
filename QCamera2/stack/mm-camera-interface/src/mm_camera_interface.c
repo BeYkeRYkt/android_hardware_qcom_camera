@@ -1491,18 +1491,24 @@ uint8_t get_num_of_cameras()
     char subdev_name[32];
     int32_t sd_fd = 0;
     struct sensor_init_cfg_data cfg;
+#ifdef _ANDROID
     char prop[PROPERTY_VALUE_MAX];
-    uint32_t temp;
+#endif
+    uint32_t temp = 0;
     uint32_t log_level;
     uint32_t debug_mask;
+    int decrypt = 0;
 
     /*  Higher 4 bits : Value of Debug log level (Default level is 1 to print all CDBG_HIGH)
         Lower 28 bits : Control mode for sub module logging(Only 3 sub modules in HAL)
                         0x1 for HAL
                         0x10 for mm-camera-interface
                         0x100 for mm-jpeg-interface  */
+#ifdef _ANDROID
     property_get("persist.camera.hal.debug.mask", prop, "268435463"); // 0x10000007=268435463
     temp = (uint32_t) atoi(prop);
+#endif
+
     log_level = ((temp >> 28) & 0xF);
     debug_mask = (temp & HAL_DEBUG_MASK_MM_CAMERA_INTERFACE);
     if (debug_mask > 0)
@@ -1512,8 +1518,10 @@ uint8_t get_num_of_cameras()
 
     CDBG_HIGH("%s gMmCameraIntfLogLevel=%d",__func__, gMmCameraIntfLogLevel);
 
+#ifdef _ANDROID
     property_get("vold.decrypt", prop, "0");
-    int decrypt = atoi(prop);
+    decrypt = atoi(prop);
+#endif
     if (decrypt == 1) {
         return 0;
     }
@@ -1739,8 +1747,10 @@ static mm_camera_ops_t mm_camera_ops = {
  *==========================================================================*/
 uint8_t check_cam_access(uint8_t camera_idx)
 {
-    uint8_t allow = FALSE;
+    uint8_t allow = FALSE; 
+#ifdef _ANDROID_
     char prop[PROPERTY_VALUE_MAX];
+#endif
 
     pthread_mutex_lock(&g_intf_lock);
     //Assuming there are a max of 2 sensors , allow simultaneous access only
@@ -1748,6 +1758,7 @@ uint8_t check_cam_access(uint8_t camera_idx)
     //TBD : For >2 sensors, we have to check sensor type along with VFE
     //capability and is not tested so far. So, return TRUE for now.
     if (g_cam_ctrl.num_cam == 2 && camera_idx < 2) {
+#ifdef _ANDROID_
         memset(prop, 0, sizeof(prop));
         property_get("persist.camera.pip.support", prop, "1");
         if (g_cam_ctrl.cam_obj[1 - camera_idx] == NULL) {
@@ -1758,6 +1769,7 @@ uint8_t check_cam_access(uint8_t camera_idx)
                 allow = TRUE;
             }
         }
+#endif
     } else {
         allow = TRUE;
     }
