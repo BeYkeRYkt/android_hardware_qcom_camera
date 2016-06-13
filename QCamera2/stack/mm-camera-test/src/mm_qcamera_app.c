@@ -127,14 +127,17 @@ int mm_app_allocate_ion_memory(mm_camera_app_buf_t *buf, unsigned int ion_type)
 
     memset(&alloc, 0, sizeof(alloc));
     alloc.len = buf->mem_info.size;
+    if (!alloc.len)
+        alloc.len = 10000000;
     /* to make it page size aligned */
     alloc.len = (alloc.len + 4095U) & (~4095U);
     alloc.align = 4096;
     alloc.flags = ION_FLAG_CACHED;
     alloc.heap_id_mask = ion_type;
+
     rc = ioctl(main_ion_fd, ION_IOC_ALLOC, &alloc);
     if (rc < 0) {
-        CDBG_ERROR("ION allocation failed\n");
+        CDBG_ERROR("\nION allocation failed %d error: %s len: %d\n", rc, strerror(errno), alloc.len);
         goto ION_ALLOC_FAILED;
     }
 
@@ -809,7 +812,7 @@ int commitSetBatch(mm_camera_test_obj_t *test_obj)
 
     if (param_buf->num_entry > 0) {
         rc = test_obj->cam->ops->set_parms(test_obj->cam->camera_handle, param_buf);
-        ALOGD("%s: commitSetBatch done",__func__);
+        CDBG("\n%s: commitSetBatch done\n",__func__);
     }
 
     return rc;
@@ -823,7 +826,7 @@ int commitGetBatch(mm_camera_test_obj_t *test_obj)
 
     if (param_buf->num_entry > 0) {
         rc = test_obj->cam->ops->get_parms(test_obj->cam->camera_handle, param_buf);
-        ALOGD("%s: commitGetBatch done",__func__);
+        CDBG("\n%s: commitGetBatch done\n",__func__);
     }
     return rc;
 }

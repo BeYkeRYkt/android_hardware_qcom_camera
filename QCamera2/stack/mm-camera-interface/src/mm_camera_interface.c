@@ -49,7 +49,7 @@
 
 static pthread_mutex_t g_intf_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static mm_camera_ctrl_t g_cam_ctrl = {0, {{0}}, {0}, {{0}}, {0}};
+mm_camera_ctrl_t g_cam_ctrl = {0, {{0}}, {0}, {{0}}, {0}};
 
 static pthread_mutex_t g_handler_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint16_t g_handler_history_count = 0; /* history count for handler */
@@ -1391,7 +1391,7 @@ void get_sensor_info()
                 facing = (temp & 0xFF00) >> 8;
                 is_yuv = ((entity.flags & CAM_SENSOR_FORMAT_MASK) ?
                         CAM_SENSOR_YUV:CAM_SENSOR_RAW);
-                ALOGD("index = %u flag = %x mount_angle = %u "
+                CDBG("index = %u flag = %x mount_angle = %u "
                         "facing = %u is_yuv = %u\n",
                         (unsigned int)num_cameras, (unsigned int)temp,
                         (unsigned int)mount_angle, (unsigned int)facing,
