@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013,2016 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -288,6 +288,7 @@ OMX_ERRORTYPE mm_jpeg_session_create(mm_jpeg_job_session_t* p_session)
   p_session->fbd_count = 0;
   p_session->encode_pid = -1;
   p_session->config = OMX_FALSE;
+  p_session->encoding = OMX_FALSE;
   p_session->exif_count_local = 0;
   p_session->auto_out_buf = OMX_FALSE;
 
@@ -2562,6 +2563,7 @@ OMX_ERRORTYPE mm_jpeg_fbd(OMX_HANDLETYPE hComponent,
   pthread_mutex_lock(&p_session->lock);
 
   if (MM_JPEG_ABORT_NONE != p_session->abort_state) {
+    p_session->encoding = OMX_FALSE;
     pthread_mutex_unlock(&p_session->lock);
     return ret;
   }
