@@ -194,6 +194,7 @@ struct TestConfig
     int storagePath;
     int statsLogMask;
     int focusModeIdx;
+    bool faceDetect;
 };
 
 /**
@@ -225,6 +226,7 @@ public:
     virtual void onPreviewFrame(ICameraFrame* frame);
     virtual void onVideoFrame(ICameraFrame* frame);
     virtual void onPictureFrame(ICameraFrame* frame);
+    virtual void onMetadataFrame(ICameraFrame *frame);
 
 private:
     ICameraDevice* camera_;
@@ -516,6 +518,42 @@ void CameraTest::onPictureFrame(ICameraFrame* frame)
     pthread_cond_signal(&cvPicDone);
     pthread_mutex_unlock(&mutexPicDone);
     printf("%s:%d\n", __func__, __LINE__);
+}
+
+
+void CameraTest::onMetadataFrame(ICameraFrame *frame)
+{
+    FaceRoi *appFaceData = frame->facedata;
+    printf("\nTotal Faces %d\n", appFaceData->number_of_faces);
+    for(int i = 0; i < appFaceData->number_of_faces; i++) {
+        printf("face %d\n    score %d, id %d, start %d,%d size %dx%d\n",i,
+            appFaceData->faces[i].score, appFaceData->faces[i].id,
+            appFaceData->faces[i].rect[0], appFaceData->faces[i].rect[1],
+            appFaceData->faces[i].rect[2], appFaceData->faces[i].rect[3]);
+        printf("    left eye %d,%d  right eye %d,%d mouth %d,%d\n",
+            appFaceData->faces[i].left_eye[0],
+            appFaceData->faces[i].left_eye[1],
+            appFaceData->faces[i].right_eye[0],
+            appFaceData->faces[i].right_eye[1],
+            appFaceData->faces[i].mouth[0],
+            appFaceData->faces[i].mouth[1]);
+        printf("    smile_degree %d, smile_score %d, blink_detected %d, face_recognised %d\n",
+            appFaceData->faces[i].smile_degree,
+            appFaceData->faces[i].smile_score,
+            appFaceData->faces[i].blink_detected,
+            appFaceData->faces[i].face_recognised);
+        printf("    gaze_angle %d, updown_dir %d, leftright_dir %d, roll_dir %d\n",
+            appFaceData->faces[i].gaze_angle,
+            appFaceData->faces[i].updown_dir,
+            appFaceData->faces[i].leftright_dir,
+            appFaceData->faces[i].roll_dir);
+        printf("    left_right_gaze %d, top_bottom_gaze %d, leye_blink %d, reye_blink %d\n",
+            appFaceData->faces[i].left_right_gaze,
+            appFaceData->faces[i].top_bottom_gaze,
+            appFaceData->faces[i].leye_blink,
+            appFaceData->faces[i].reye_blink);
+    }
+    delete frame->facedata;
 }
 
 /**
@@ -935,6 +973,14 @@ int CameraTest::run()
     printf("start preview\n");
     camera_->startPreview();
 
+    if (config_.faceDetect) {
+        printf("enable face detection\n");
+        camera_->sendFaceDetectCommand(true);
+    } else {
+        printf("disable face detection\n");
+        camera_->sendFaceDetectCommand(false);
+    }
+
     /* Set parameters which are required after starting preview */
     switch(config_.func)
     {
@@ -1035,6 +1081,8 @@ static int setDefaultConfig(TestConfig &cfg) {
     cfg.statsLogMask = STATS_NO_LOG;
     cfg.focusModeIdx = 3;
     cfg.storagePath = 0;
+    cfg.faceDetect = 0;
+
     switch (cfg.func) {
     case CAM_FUNC_OPTIC_FLOW:
         cfg.pSize   = VGASize;
@@ -1081,7 +1129,8 @@ static TestConfig parseCommandline(int argc, char* argv[])
     int exposureValueInt = 0;
     int gainValueInt = 0;
 
-    while ((c = getopt(argc, argv, "hdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
+    while ((c = getopt(argc, argv,
+                                "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
         switch (c) {
         case 'f':
             {
@@ -1106,8 +1155,12 @@ static TestConfig parseCommandline(int argc, char* argv[])
     setDefaultConfig(cfg);
 
     optind = 1;
-    while ((c = getopt(argc, argv, "hdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
+    while ((c = getopt(argc, argv,
+                                "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:")) != -1) {
         switch (c) {
+        case 'F':
+            cfg.faceDetect = 1;
+            break;
         case 't':
             cfg.runTime = atoi(optarg);
             break;

@@ -199,6 +199,37 @@ uint32_t QCamera2Frame::releaseRef()
     return refs_;
 }
 
+static void copyFaces(FaceRoi &appFaceData,
+    const camera_frame_metadata_t &frameMetadata,
+    const camera_face_t *faces)
+{
+    appFaceData.number_of_faces = frameMetadata.number_of_faces;
+    for (int i = 0; (i < appFaceData.number_of_faces) && (i < MAX_FACES); i++) {
+        for(int j = 0; j < 4; j++)
+            appFaceData.faces[i].rect[j] = faces[i].rect[j];
+        appFaceData.faces[i].score = faces[i].score;
+        appFaceData.faces[i].id = faces[i].id;
+        for(int j = 0; j < 2; j++)
+            appFaceData.faces[i].left_eye[j] = faces[i].left_eye[j];
+        for(int j = 0; j < 2; j++)
+            appFaceData.faces[i].right_eye[j] = faces[i].right_eye[j];
+        for(int j = 0; j < 2; j++)
+            appFaceData.faces[i].mouth[j] = faces[i].mouth[j];
+        appFaceData.faces[i].smile_degree = faces[i].smile_degree;
+        appFaceData.faces[i].smile_score = faces[i].smile_score;
+        appFaceData.faces[i].blink_detected = faces[i].blink_detected;
+        appFaceData.faces[i].face_recognised = faces[i].face_recognised;
+        appFaceData.faces[i].gaze_angle = faces[i].gaze_angle;
+        appFaceData.faces[i].updown_dir = faces[i].updown_dir;
+        appFaceData.faces[i].leftright_dir = faces[i].leftright_dir;
+        appFaceData.faces[i].roll_dir = faces[i].roll_dir;
+        appFaceData.faces[i].left_right_gaze = faces[i].left_right_gaze;
+        appFaceData.faces[i].top_bottom_gaze = faces[i].top_bottom_gaze;
+        appFaceData.faces[i].leye_blink = faces[i].leye_blink;
+        appFaceData.faces[i].reye_blink = faces[i].reye_blink;
+    }
+}
+
 void QCamera2Frame::dispatchFrame(ICameraListener* listener,
                           struct camera_device* dev, int64_t timestamp,
                           int32_t msg_type, const camera_memory_t* mem)
@@ -222,6 +253,18 @@ void QCamera2Frame::dispatchFrame(ICameraListener* listener,
           frame->type = CAMERA_FRAME_PICTURE;
           listener->onPictureFrame(static_cast<ICameraFrame*>(frame));
           break;
+      case CAMERA_MSG_PREVIEW_METADATA: {
+          unsigned char *pFaceResult = (unsigned char *) mem->data;
+          camera_frame_metadata_t *roiData =
+              (camera_frame_metadata_t *)pFaceResult;
+          camera_face_t *faces = (camera_face_t *)
+              (pFaceResult + sizeof(camera_frame_metadata_t));
+          FaceRoi *appFaceRoi = new FaceRoi;
+          copyFaces(*appFaceRoi, *roiData, faces);
+          frame->facedata = appFaceRoi;
+          listener->onMetadataFrame(static_cast<ICameraFrame*>(frame));
+          break;
+      }
       default:
           CAM_ERR("unsupported msg_type %d", msg_type);
           // TODO: add support for other messages using metadata callback
@@ -422,6 +465,7 @@ int QCamera2::startPreview()
     }
     isPreviewRequested_ = true;
     dev_->ops->enable_msg_type(dev_, CAMERA_MSG_PREVIEW_FRAME);
+    dev_->ops->enable_msg_type(dev_, CAMERA_MSG_PREVIEW_METADATA);
     if (isPreviewRunning_ == false) {
         rc = dev_->ops->start_preview(dev_);
         if (rc == 0) {
@@ -431,9 +475,21 @@ int QCamera2::startPreview()
     return 0;
 }
 
+void QCamera2::sendFaceDetectCommand(bool turn_on)
+{
+    if (turn_on) {
+        dev_->ops->send_command(dev_, CAMERA_CMD_START_FACE_DETECTION, NULL,
+            NULL);
+    } else {
+        dev_->ops->send_command(dev_, CAMERA_CMD_STOP_FACE_DETECTION, NULL,
+            NULL);
+    }
+}
+
 void QCamera2::stopPreview()
 {
     isPreviewRequested_ = false;
+    dev_->ops->enable_msg_type(dev_, CAMERA_MSG_PREVIEW_METADATA);
     dev_->ops->disable_msg_type(dev_, CAMERA_MSG_PREVIEW_FRAME);
     /* stop preview only if video is not running */
     if (isPreviewRunning_ == true && isVideoRunning_ == false) {

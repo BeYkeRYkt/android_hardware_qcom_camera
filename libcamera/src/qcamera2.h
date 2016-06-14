@@ -122,6 +122,8 @@ public:
     virtual void stopAutoFocus() { dev_->ops->cancel_auto_focus(dev_); }
 
     virtual void cancelPicture() { dev_->ops->cancel_picture(dev_); }
+
+    virtual void sendFaceDetectCommand(bool turn_on);
 };
 
 } /* namespace camera */

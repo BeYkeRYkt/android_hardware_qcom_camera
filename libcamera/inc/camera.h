@@ -64,6 +64,35 @@ struct ControlEvent
     EventType type;
 };
 
+#define MAX_FACES 10
+
+struct FaceData
+{
+    int32_t rect[4];
+    int32_t score;
+    int32_t id;
+    int32_t left_eye[2];
+    int32_t right_eye[2];
+    int32_t mouth[2];
+    int32_t smile_degree;
+    int32_t smile_score;
+    int32_t blink_detected;
+    int32_t face_recognised;
+    int32_t gaze_angle;
+    int32_t updown_dir;
+    int32_t leftright_dir;
+    int32_t roll_dir;
+    int32_t left_right_gaze;
+    int32_t top_bottom_gaze;
+    int32_t leye_blink;
+    int32_t reye_blink;
+};
+
+struct FaceRoi
+{
+  int32_t number_of_faces;
+  FaceData  faces[MAX_FACES];
+};
 /**
  * Interface to an object that represents single image/metadata
  * frame
@@ -128,6 +157,11 @@ public:
      * sharing memory between camera and video encoder
      */
     void *metadata;
+
+    /**
+     * pointer face data
+     */
+    FaceRoi *facedata;
 };
 
 /**
@@ -337,6 +371,9 @@ public:
      * @return int
      */
     virtual int takePicture() = 0;
+
+    virtual void sendFaceDetectCommand(bool turn_on) {};
+
 };
 
 /**
