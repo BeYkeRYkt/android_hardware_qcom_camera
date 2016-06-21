@@ -142,6 +142,8 @@ mm_camera_stream_t * mm_app_add_rdi_stream(mm_camera_test_obj_t *test_obj,
     stream->s_config.stream_info->fmt = fmt;
     stream->s_config.stream_info->dim.width = cam_cap->raw_dim.width;
     stream->s_config.stream_info->dim.height = cam_cap->raw_dim.height;
+    if(cam_cap->padding_info.plane_padding < CAM_PAD_NONE)
+        cam_cap->padding_info.plane_padding = CAM_PAD_NONE;
     stream->s_config.padding_info = cam_cap->padding_info;
 
     rc = mm_app_config_stream(test_obj, channel, stream, &stream->s_config);

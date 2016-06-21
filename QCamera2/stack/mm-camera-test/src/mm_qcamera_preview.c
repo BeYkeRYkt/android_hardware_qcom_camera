@@ -630,7 +630,29 @@ int mm_app_stop_and_del_channel(mm_camera_test_obj_t *test_obj,
 
     return rc;
 }
+static void mm_app_rdi_notify_cb(mm_camera_super_buf_t *bufs,
+                                 void *user_data)
+{
+    char file_name[64];
+    mm_camera_buf_def_t *frame = bufs->bufs[0];
+    mm_camera_test_obj_t *pme = (mm_camera_test_obj_t *)user_data;
 
+    CDBG_ERROR("%s: BEGIN - length=%zu, frame idx = %d stream_id=%d\n",
+         __func__, frame->frame_len, frame->frame_idx, frame->stream_id);
+#ifdef DUMP_RDI
+    snprintf(file_name, sizeof(file_name), "RDI_dump_%d", pme->cam->camera_handle);
+    mm_app_rdi_dump_frame(frame, file_name, "raw", frame->frame_idx,frame->frame_len);
+#endif
+    if (MM_CAMERA_OK != pme->cam->ops->qbuf(bufs->camera_handle,
+                                            bufs->ch_id,
+                                            frame)) {
+        CDBG_ERROR("%s: Failed in RDI Qbuf\n", __func__);
+    }
+    mm_app_cache_ops((mm_camera_app_meminfo_t *)frame->mem_info,
+                     ION_IOC_INV_CACHES);
+
+    CDBG_ERROR("%s: END\n", __func__);
+}
 int mm_app_start_preview(mm_camera_test_obj_t *test_obj)
 {
     int rc = MM_CAMERA_OK;
@@ -652,6 +674,18 @@ int mm_app_start_preview(mm_camera_test_obj_t *test_obj)
                                             PREVIEW_BUF_NUM);
     if (NULL == s_metadata) {
         CDBG_ERROR("%s: add metadata stream failed\n", __func__);
+        mm_app_del_channel(test_obj, channel);
+        return rc;
+    }
+
+    stream = mm_app_add_rdi_stream(test_obj,
+                                       channel,
+                                       mm_app_rdi_notify_cb,
+                                       (void *)test_obj,
+                                       RDI_BUF_NUM,
+                                       0);
+    if (NULL == stream) {
+        CDBG_ERROR("%s: add stream failed\n", __func__);
         mm_app_del_channel(test_obj, channel);
         return rc;
     }

@@ -248,7 +248,7 @@ void mm_app_dump_frame(mm_camera_buf_def_t *frame,
     int offset = 0;
     if ( frame != NULL) {
         snprintf(file_name, sizeof(file_name), "/data/misc/camera/test/%s_%04d.%s", name, frame_idx, ext);
-        file_fd = open(file_name, O_RDWR | O_CREAT, 0777);
+        file_fd = open(file_name, O_RDWR | O_CREAT | O_SYNC, 0777);
         if (file_fd < 0) {
             CDBG_ERROR("%s: cannot open file %s \n", __func__, file_name);
         } else {
@@ -264,6 +264,37 @@ void mm_app_dump_frame(mm_camera_buf_def_t *frame,
 
             close(file_fd);
             CDBG("dump %s", file_name);
+        }
+    }
+}
+
+void mm_app_rdi_dump_frame(mm_camera_buf_def_t *frame,
+                                  char *name,
+                                  char *ext,
+                                  uint32_t frame_idx,uint32_t frame_len)
+{
+    char file_name[64];
+    int file_fd;
+    int i;
+    static int8_t dump_cnt = 10;
+    if(dump_cnt < 0)
+		return;
+	dump_cnt--;
+    if (frame != NULL) {
+        snprintf(file_name, sizeof(file_name), "/data/misc/camera/test/%s_%03u.%s", name,
+                frame_idx, ext);
+        file_fd = open(file_name, O_RDWR | O_CREAT | O_SYNC, 0777);
+        if (file_fd < 0) {
+            CDBG_ERROR("%s: cannot open file %s \n", __func__, file_name);
+        } else {
+            for (i = 0; i < frame->num_planes; i++) {
+                write(file_fd,
+                      (uint8_t *)frame->buffer + frame->planes[i].data_offset,
+                      frame_len);
+            }
+
+            close(file_fd);
+            CDBG("dump %s len=%d \n", file_name,frame_len);
         }
     }
 }
