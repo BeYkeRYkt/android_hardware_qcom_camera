@@ -118,6 +118,7 @@ static void mm_app_preview_notify_cb(mm_camera_super_buf_t *bufs,
     mm_camera_stream_t *p_stream = NULL;
     mm_camera_buf_def_t *frame = bufs->bufs[0];
     mm_camera_test_obj_t *pme = (mm_camera_test_obj_t *)user_data;
+    static int dump_frame_count = 0;
 
     CDBG_ERROR("%s: BEGIN - length=%zu, frame idx = %d\n",
             __func__, frame->frame_len, frame->frame_idx);
@@ -163,13 +164,14 @@ static void mm_app_preview_notify_cb(mm_camera_super_buf_t *bufs,
     if ( 0 < pme->fb_fd ) {
         mm_app_overlay_display(pme, frame->fd);
     }
-#ifdef DUMP_PRV_IN_FILE
-    {
+
+    if (!((frame->frame_idx) % 5) && dump_frame_count < 10) {
       char file_name[64];
       snprintf(file_name, sizeof(file_name), "P_C%d", pme->cam->camera_handle);
       mm_app_dump_frame(frame, file_name, "yuv", frame->frame_idx);
+      dump_frame_count++;
     }
-#endif
+
     if (pme->user_preview_cb) {
         CDBG_ERROR("[DBG] %s, user defined own preview cb. calling it...", __func__);
         pme->user_preview_cb(frame);
