@@ -20,7 +20,9 @@ mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/hardware/qcom/camera/QCamera2/stack/c
 mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/hardware/qcom/camera/mm-image-codec/qomx_core
 mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/frameworks/native/include/media/openmax
 mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/hardware/qcom/camera/mm-image-codec/qexif
-mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/android_compat/inc
+mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/system/core/include
+mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/framework/av/include
+mm_qcamera_app_CPPFLAGS += -I ${WORKSPACE}/hardware/libhardware/include
 
 #sources
 mm_qcamera_app_SOURCES = src/mm_qcamera_main_menu.c

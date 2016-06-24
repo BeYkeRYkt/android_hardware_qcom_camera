@@ -37,6 +37,10 @@ AC_ARG_WITH([glib],
       AC_HELP_STRING([--with-glib],
          [enable glib, building HLOS systems which use glib]))
 
+AC_ARG_WITH([sanitized-headers],
+	[AS_HELP_STRING([--with-sanitized-headers=DIR],[location of the sanitized Linux kernel headers])],
+	[CFLAGS="$CFLAGS -I$withval/media -I $withval"])
+
 AM_CONDITIONAL(USE_GLIB, test "x${with_glib}" = "xyes")
 
 AC_CONFIG_FILES([ \

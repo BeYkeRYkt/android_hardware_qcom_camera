@@ -11,7 +11,10 @@ libmmcamera_interface_la_CFLAGS += -Dstrlcpy=g_strlcpy
 
 libmmcamera_interface_la_CFLAGS += -I ${WORKSPACE}/hardware/qcom/camera/QCamera2/stack/mm-camera-interface/inc
 libmmcamera_interface_la_CFLAGS += -I ${WORKSPACE}/hardware/qcom/camera/QCamera2/stack/common
-libmmcamera_interface_la_CFLAGS += -I ${WORKSPACE}/android_compat/inc
+libmmcamera_interface_la_CFLAGS += -I ${WORKSPACE}/system/core/include
+libmmcamera_interface_la_CFLAGS += -I ${WORKSPACE}/framework/av/include
+libmmcamera_interface_la_CFLAGS += -I ${WORKSPACE}/hardware/libhardware/include
+
 
 libmmcamera_interface_la_SOURCES = src/mm_camera_interface.c
 libmmcamera_interface_la_SOURCES += src/mm_camera.c
