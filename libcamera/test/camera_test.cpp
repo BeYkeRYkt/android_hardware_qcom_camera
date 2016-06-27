@@ -239,6 +239,7 @@ private:
     uint32_t vFrameCount_, pFrameCount_;
     float vFpsAvg_, pFpsAvg_;
 
+    uint64_t vTimeTotal_, pTimeTotal_;
     uint64_t vTimeStampPrev_, pTimeStampPrev_;
 
     pthread_cond_t cvPicDone;
@@ -257,6 +258,8 @@ CameraTest::CameraTest() :
     pFrameCount_(0),
     vFpsAvg_(0.0f),
     pFpsAvg_(0.0f),
+    vTimeTotal_(0),
+    pTimeTotal_(0),
     vTimeStampPrev_(0),
     pTimeStampPrev_(0),
     camera_(NULL)
@@ -489,6 +492,8 @@ void CameraTest::onPreviewFrame(ICameraFrame* frame)
     }
 
     uint64_t diff = frame->timeStamp - pTimeStampPrev_;
+    if (pTimeStampPrev_ != 0)
+      pTimeTotal_ += diff;
     pFpsAvg_ = ((pFpsAvg_ * pFrameCount_) + (1e9 / diff)) / (pFrameCount_ + 1);
     pFrameCount_++;
     pTimeStampPrev_  = frame->timeStamp;
@@ -586,6 +591,8 @@ void CameraTest::onVideoFrame(ICameraFrame* frame)
     }
 
     uint64_t diff = frame->timeStamp - vTimeStampPrev_;
+    if (vTimeStampPrev_ != 0)
+      vTimeTotal_ += diff;
     vFpsAvg_ = ((vFpsAvg_ * vFrameCount_) + (1e9 / diff)) / (vFrameCount_ + 1);
     vFrameCount_++;
     vTimeStampPrev_  = frame->timeStamp;
@@ -978,6 +985,8 @@ int CameraTest::run()
     }
 
     /* initialize perf counters */
+    pTimeTotal_ = 0;
+    vTimeTotal_ = 0;
     vFrameCount_ = 0;
     pFrameCount_ = 0;
     vFpsAvg_ = 0.0f;
@@ -1062,9 +1071,9 @@ int CameraTest::run()
     printf("stop preview\n");
     camera_->stopPreview();
 
-    printf("Average preview FPS = %.2f\n", pFpsAvg_);
+    printf("Average preview FPS = %.2f\n", (1e9 * 1.0 * (pFrameCount_-1))/pTimeTotal_);
     if( config_.testVideo  == true )
-		printf("Average video FPS = %.2f\n", vFpsAvg_);
+		printf("Average video FPS = %.2f\n", (1e9 * 1.0 * (vFrameCount_-1))/vTimeTotal_);
 
 del_camera:
     /* release camera device */
