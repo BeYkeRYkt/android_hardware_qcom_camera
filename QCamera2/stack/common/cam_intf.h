@@ -183,6 +183,10 @@ typedef struct{
     cam_dimension_t raw_dim[MAX_SIZES_CNT];
     uint32_t supported_raw_fmt_cnt;
     cam_format_t supported_raw_fmts[CAM_FORMAT_MAX];
+
+    cam_channel_info_t supported_channel_info[MAX_CID];
+    size_t supported_channel_info_cnt;
+
     /* The minimum frame duration that is supported for above
        raw resolution */
     int64_t raw_min_duration[MAX_SIZES_CNT];
@@ -557,7 +561,7 @@ typedef struct {
 } cam_stream_img_prop_t;
 
 typedef struct {
-    uint8_t enableStream; /*0 – stop and 1-start */
+    uint8_t enableStream; /*0-stop and 1-start */
 } cam_request_frames;
 
 typedef struct {
