@@ -137,6 +137,8 @@
 /*reprocess pipeline stages are pproc and jpeg */
 #define MAX_REPROCESS_PIPELINE_STAGES 2
 
+#define MAX_CID 16
+
 typedef enum {
     CAM_HAL_V1 = 1,
     CAM_HAL_V3 = 3
@@ -328,6 +330,12 @@ typedef enum {
 
     /* RGB formats */
     CAM_FORMAT_8888_ARGB,
+
+    /* MIPI packed */
+    CAM_FORMAT_MIPI_RAW_8BIT_RGB,
+    CAM_FORMAT_MIPI_RAW_8BIT_UYVY,
+    CAM_FORMAT_MIPI_RAW_10BIT_UYVY,
+    CAM_FORMAT_MIPI_RAW_12BIT_UYVY,
 
     CAM_FORMAT_MAX
 } cam_format_t;
@@ -2513,4 +2521,10 @@ typedef struct {
    uint8_t  rdi_cid;
    uint32_t streamId;
 } cam_intf_parm_rdi_cid_t;
+
+typedef struct {
+    cam_format_t fmt;
+    int cid;
+} cam_channel_info_t;
+
 #endif /* __QCAMERA_TYPES_H__ */
