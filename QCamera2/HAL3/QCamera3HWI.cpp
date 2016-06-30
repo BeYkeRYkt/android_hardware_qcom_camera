@@ -774,6 +774,7 @@ int QCamera3HardwareInterface::validateStreamDimensions(
         case ANDROID_SCALER_AVAILABLE_FORMATS_RAW16:
         case ANDROID_SCALER_AVAILABLE_FORMATS_RAW_OPAQUE:
         case HAL_PIXEL_FORMAT_RAW10:
+        case HAL_PIXEL_FORMAT_RAW12:
             count = MIN(gCamCapability[mCameraId]->supported_raw_dim_cnt, MAX_SIZES_CNT);
             for (size_t i = 0; i < count; i++) {
                 if ((gCamCapability[mCameraId]->raw_dim[i].width == (int32_t)newStream->width) &&
@@ -874,6 +875,7 @@ bool QCamera3HardwareInterface::isSupportChannelNeeded(camera3_stream_configurat
         switch(streamList->streams[i]->format) {
             case HAL_PIXEL_FORMAT_RAW_OPAQUE:
             case HAL_PIXEL_FORMAT_RAW10:
+            case HAL_PIXEL_FORMAT_RAW12:
             case HAL_PIXEL_FORMAT_RAW16:
             case HAL_PIXEL_FORMAT_BLOB:
                 break;
@@ -1159,6 +1161,7 @@ int QCamera3HardwareInterface::configureStreams(
                 }
                 break;
             case HAL_PIXEL_FORMAT_RAW10:
+            case HAL_PIXEL_FORMAT_RAW12:
             case HAL_PIXEL_FORMAT_RAW_OPAQUE:
             case HAL_PIXEL_FORMAT_RAW16:
                 rawStreamCnt++;
@@ -1432,6 +1435,7 @@ int QCamera3HardwareInterface::configureStreams(
             case HAL_PIXEL_FORMAT_RAW_OPAQUE:
             case HAL_PIXEL_FORMAT_RAW16:
             case HAL_PIXEL_FORMAT_RAW10:
+            case HAL_PIXEL_FORMAT_RAW12:
                 mStreamConfigInfo.type[i] = CAM_STREAM_TYPE_RAW;
                 isRawStreamRequested = true;
                 break;
@@ -1510,6 +1514,7 @@ int QCamera3HardwareInterface::configureStreams(
                 case HAL_PIXEL_FORMAT_RAW_OPAQUE:
                 case HAL_PIXEL_FORMAT_RAW16:
                 case HAL_PIXEL_FORMAT_RAW10:
+                case HAL_PIXEL_FORMAT_RAW12:
                     mRawChannel = new QCamera3RawChannel(
                             mCameraHandle->camera_handle,
                             mCameraHandle->ops, captureResultCb,
@@ -5314,6 +5319,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
             ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
             ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
             HAL_PIXEL_FORMAT_RAW10,
+            HAL_PIXEL_FORMAT_RAW12,
             HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED};
     size_t scalar_formats_count = sizeof(scalar_formats) / sizeof(int32_t);
     staticInfo.update(ANDROID_SCALER_AVAILABLE_FORMATS,
@@ -5403,6 +5409,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         switch (scalar_formats[j]) {
         case ANDROID_SCALER_AVAILABLE_FORMATS_RAW16:
         case ANDROID_SCALER_AVAILABLE_FORMATS_RAW_OPAQUE:
+        case HAL_PIXEL_FORMAT_RAW12:
         case HAL_PIXEL_FORMAT_RAW10:
             for (size_t i = 0; i < gCamCapability[cameraId]->supported_raw_dim_cnt; i++) {
                 available_stream_configs[idx] = scalar_formats[j];
@@ -5456,6 +5463,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         case ANDROID_SCALER_AVAILABLE_FORMATS_RAW16:
         case ANDROID_SCALER_AVAILABLE_FORMATS_RAW_OPAQUE:
         case HAL_PIXEL_FORMAT_RAW10:
+        case HAL_PIXEL_FORMAT_RAW12:
             for (size_t i = 0; i < gCamCapability[cameraId]->supported_raw_dim_cnt; i++) {
                 available_min_durations[idx] = scalar_formats[j];
                 available_min_durations[idx+1] =
