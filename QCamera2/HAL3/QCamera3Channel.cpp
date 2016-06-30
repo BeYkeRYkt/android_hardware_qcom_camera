@@ -619,7 +619,7 @@ cam_format_t QCamera3Channel::getStreamDefaultFormat(cam_stream_type_t type)
         streamFormat = CAM_FORMAT_YUV_420_NV21;
         break;
     case CAM_STREAM_TYPE_RAW:
-        streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG;
+        streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_12BPP_GBRG;
         break;
     default:
         streamFormat = CAM_FORMAT_YUV_420_NV21;
@@ -783,7 +783,7 @@ int32_t QCamera3RegularChannel::initialize(cam_is_type_t isType)
          mCamera3Stream->format == HAL_PIXEL_FORMAT_RAW16) {
          // Bayer pattern doesn't matter here.
          // All CAMIF raw format uses 10bit.
-         streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG;
+         streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_12BPP_GBRG;
     } else {
         //TODO: Fail for other types of streams for now
         ALOGE("%s: format is not IMPLEMENTATION_DEFINED or flexible", __func__);
