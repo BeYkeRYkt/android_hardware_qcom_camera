@@ -197,7 +197,47 @@ struct TestConfig
     bool faceDetect;
     string disMode;
 };
+void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1)
+{
+  int i,j, ful_x, ful_y, flr_x, flr_y, f_w, f_h;
+  uint8_t *ptr = (uint8_t*)where;
+  ful_x = width/2 + x*width/2000;
+  if (ful_x < 0) ful_x = 0;
+  if (ful_x > width - 1) ful_x = width-1;
+  ful_y = height/2 + y*height/2000;
+  if (ful_y < 0) ful_y = 0;
+  if (ful_y > height - 1) ful_y = height-1;
+  flr_x = width/2 + x1*width/2000;
+  if (flr_x < 0) flr_x = 0;
+  if (flr_x > width - 1) flr_x = width-1;
+  flr_y = height/2 + y1*height/2000;
+  if (flr_y < 0) flr_y = 0;
+  if (flr_y > height - 1) flr_y = height-1;
 
+  f_w = flr_x - ful_x;
+  f_h = flr_y - ful_y;
+  if (f_w < 0) f_w = 0;
+  if (f_h < 0) f_h = 0;
+
+  ptr = (uint8_t*)where + ful_y*width+ful_x;
+  for (j = 0; j < f_w; j++) {
+    *ptr++ = 0xFF;
+  }
+  ptr+= width*(f_h-1) - f_w;
+  for (j = 0; j < f_w; j++) {
+    *ptr++ = 0xFF;
+  }
+  ptr = (uint8_t*)where + ful_y*width+ful_x;
+  for (j = 0; j < f_h; j++) {
+    *ptr = 0xFF;
+    ptr+= width;
+  }
+  ptr = (uint8_t*)where + ful_y*width+ful_x + f_w-1;
+  for (j = 0; j < f_h; j++) {
+    *ptr = 0xFF;
+    ptr+= width;
+  }
+}
 /**
  * CLASS  CameraTest
  *
@@ -526,38 +566,38 @@ void CameraTest::onPictureFrame(ICameraFrame* frame)
     printf("%s:%d\n", __func__, __LINE__);
 }
 
-
+FaceRoi appFaceData;
 void CameraTest::onMetadataFrame(ICameraFrame *frame)
 {
-    FaceRoi *appFaceData = frame->facedata;
-    printf("\nTotal Faces %d\n", appFaceData->number_of_faces);
-    for(int i = 0; i < appFaceData->number_of_faces; i++) {
+    appFaceData = *frame->facedata;
+    printf("\nTotal Faces %d\n", appFaceData.number_of_faces);
+    for(int i = 0; i < appFaceData.number_of_faces; i++) {
         printf("face %d\n    score %d, id %d, start %d,%d size %dx%d\n",i,
-            appFaceData->faces[i].score, appFaceData->faces[i].id,
-            appFaceData->faces[i].rect[0], appFaceData->faces[i].rect[1],
-            appFaceData->faces[i].rect[2], appFaceData->faces[i].rect[3]);
+            appFaceData.faces[i].score, appFaceData.faces[i].id,
+            appFaceData.faces[i].rect[0], appFaceData.faces[i].rect[1],
+            appFaceData.faces[i].rect[2], appFaceData.faces[i].rect[3]);
         printf("    left eye %d,%d  right eye %d,%d mouth %d,%d\n",
-            appFaceData->faces[i].left_eye[0],
-            appFaceData->faces[i].left_eye[1],
-            appFaceData->faces[i].right_eye[0],
-            appFaceData->faces[i].right_eye[1],
-            appFaceData->faces[i].mouth[0],
-            appFaceData->faces[i].mouth[1]);
+            appFaceData.faces[i].left_eye[0],
+            appFaceData.faces[i].left_eye[1],
+            appFaceData.faces[i].right_eye[0],
+            appFaceData.faces[i].right_eye[1],
+            appFaceData.faces[i].mouth[0],
+            appFaceData.faces[i].mouth[1]);
         printf("    smile_degree %d, smile_score %d, blink_detected %d, face_recognised %d\n",
-            appFaceData->faces[i].smile_degree,
-            appFaceData->faces[i].smile_score,
-            appFaceData->faces[i].blink_detected,
-            appFaceData->faces[i].face_recognised);
+            appFaceData.faces[i].smile_degree,
+            appFaceData.faces[i].smile_score,
+            appFaceData.faces[i].blink_detected,
+            appFaceData.faces[i].face_recognised);
         printf("    gaze_angle %d, updown_dir %d, leftright_dir %d, roll_dir %d\n",
-            appFaceData->faces[i].gaze_angle,
-            appFaceData->faces[i].updown_dir,
-            appFaceData->faces[i].leftright_dir,
-            appFaceData->faces[i].roll_dir);
+            appFaceData.faces[i].gaze_angle,
+            appFaceData.faces[i].updown_dir,
+            appFaceData.faces[i].leftright_dir,
+            appFaceData.faces[i].roll_dir);
         printf("    left_right_gaze %d, top_bottom_gaze %d, leye_blink %d, reye_blink %d\n",
-            appFaceData->faces[i].left_right_gaze,
-            appFaceData->faces[i].top_bottom_gaze,
-            appFaceData->faces[i].leye_blink,
-            appFaceData->faces[i].reye_blink);
+            appFaceData.faces[i].left_right_gaze,
+            appFaceData.faces[i].top_bottom_gaze,
+            appFaceData.faces[i].leye_blink,
+            appFaceData.faces[i].reye_blink);
     }
     delete frame->facedata;
 }
@@ -576,6 +616,11 @@ void CameraTest::onMetadataFrame(ICameraFrame *frame)
  */
 void CameraTest::onVideoFrame(ICameraFrame* frame)
 {
+    if ((appFaceData.number_of_faces > 0) && (appFaceData.number_of_faces < 6))
+      for(int i = 0; i < appFaceData.number_of_faces; i++)
+        drawSquare(frame->data, vSize_.width, vSize_.height, appFaceData.faces[i].rect[0], appFaceData.faces[i].rect[1],
+            appFaceData.faces[i].rect[2], appFaceData.faces[i].rect[3]);
+
     if (vFrameCount_ > 0 && vFrameCount_ % 30 == 0) {
         char name[50];
         if(config_.storagePath ==1){
