@@ -167,6 +167,8 @@ public:
             metadata_buffer_t *reprocParam, uint32_t snapshotStreamId);
     int translateToHalMetadata(const camera3_capture_request_t *request,
             metadata_buffer_t *parm, uint32_t snapshotStreamId);
+    int initialTranslateToHalMetadata(const camera3_capture_request_t *request,
+                                   metadata_buffer_t *hal_metadata);
     camera_metadata_t* translateCbUrgentMetadataToResultMetadata (
                              metadata_buffer_t *metadata);
     camera_metadata_t* translateFromHalMetadata(metadata_buffer_t *metadata,

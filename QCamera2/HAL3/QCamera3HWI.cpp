@@ -2490,6 +2490,15 @@ int QCamera3HardwareInterface::processCaptureRequest(
             }
         }
 
+        initialTranslateToHalMetadata(request, mParameters);
+        rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                mParameters);
+        if (rc < 0) {
+            ALOGE("%s: set_parms for unconfigure failed", __func__);
+            pthread_mutex_unlock(&mMutex);
+            return rc;
+        }
+
         /* get eis information for stream configuration */
         cam_is_type_t is_type;
         char is_type_value[PROPERTY_VALUE_MAX];
@@ -7957,6 +7966,50 @@ int QCamera3HardwareInterface::translateToHalMetadata
     if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_EV_STEP,
             gCamCapability[mCameraId]->exp_compensation_step)) {
         rc = BAD_VALUE;
+    }
+
+    return rc;
+}
+
+/*===========================================================================
+ * FUNCTION   : initialTranslateToHalMetadata
+ *
+ * DESCRIPTION: read initial params from the camera_metadata_t and
+ *              change to parm_type_t
+ *
+ *
+ * PARAMETERS :
+ *   @request  : request sent from framework
+ *
+ *
+ * RETURN     : success: NO_ERROR
+ *              failure:
+ *==========================================================================*/
+int QCamera3HardwareInterface::initialTranslateToHalMetadata
+                                  (const camera3_capture_request_t *request,
+                                   metadata_buffer_t *hal_metadata)
+{
+    int rc = 0;
+    CameraMetadata frame_settings;
+    frame_settings = request->settings;
+
+    // IR mode
+    if (frame_settings.exists(QCAMERA3_IR_MODE)) {
+        int32_t fwk_irMode =
+                frame_settings.find(QCAMERA3_IR_MODE).data.i32[0];
+        int irMode = lookupHalName(IR_MODES_MAP,
+                METADATA_MAP_SIZE(IR_MODES_MAP), fwk_irMode);
+
+        if (NAME_NOT_FOUND != irMode) {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata,
+                    CAM_INTF_PARM_IR_CAMERA_MODE,
+                    (cam_ir_camera_modes_t)irMode)) {
+                rc = BAD_VALUE;
+            }
+        } else {
+            ALOGE("%s: Invalid ir mode %d", __func__,
+                    fwk_irMode);
+        }
     }
 
     return rc;
