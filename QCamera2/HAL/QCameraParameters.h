@@ -181,6 +181,7 @@ public:
     static const char KEY_QC_MEMORY_COLOR_ENHANCEMENT[];
     static const char KEY_QC_SUPPORTED_MEM_COLOR_ENHANCE_MODES[];
     static const char KEY_QC_DIS[];
+    static const char KEY_QC_MOBICAT[];
     static const char KEY_QC_SUPPORTED_DIS_MODES[];
 
     static const char KEY_QC_ZSL[];

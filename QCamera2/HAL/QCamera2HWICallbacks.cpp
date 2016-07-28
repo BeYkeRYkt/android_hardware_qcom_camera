@@ -866,9 +866,9 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
 }
 
 /*===========================================================================
- * FUNCTION   : snapshot_stream_cb_routine
+ * FUNCTION   : snapshot_channel_cb_routine
  *
- * DESCRIPTION: helper function to handle snapshot frame from snapshot stream
+ * DESCRIPTION: helper function to handle snapshot frame from snapshot channel
  *
  * PARAMETERS :
  *   @super_frame : received super buffer
@@ -877,15 +877,12 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
  *
  * RETURN    : None
  *
- * NOTE      : caller passes the ownership of super_frame, it's our
- *             responsibility to free super_frame once it's done. For
- *             snapshot, it need to send to postprocessor for jpeg
- *             encoding, therefore the ownership of super_frame will be
- *             hand to postprocessor.
+ * NOTE      : recvd_frame will be released after this call by caller, so if
+ *             async operation needed for recvd_frame, it's our responsibility
+ *             to save a copy for this variable to be used later.
  *==========================================================================*/
-void QCamera2HardwareInterface::snapshot_stream_cb_routine(mm_camera_super_buf_t *super_frame,
-                                                           QCameraStream * /*stream*/,
-                                                           void *userdata)
+void QCamera2HardwareInterface::snapshot_channel_cb_routine(mm_camera_super_buf_t *super_frame,
+       void *userdata)
 {
     char value[PROPERTY_VALUE_MAX];
 
@@ -897,6 +894,12 @@ void QCamera2HardwareInterface::snapshot_stream_cb_routine(mm_camera_super_buf_t
         ALOGE("%s: camera obj not valid", __func__);
         // simply free super frame
         free(super_frame);
+        return;
+    }
+
+    QCameraChannel *pChannel = pme->m_channels[QCAMERA_CH_TYPE_SNAPSHOT];
+    if ((pChannel == NULL) || (pChannel->getMyHandle() != super_frame->ch_id)) {
+        ALOGE("%s: Snapshot channel doesn't exist, return here", __func__);
         return;
     }
 
@@ -926,7 +929,17 @@ void QCamera2HardwareInterface::snapshot_stream_cb_routine(mm_camera_super_buf_t
         }
     }
 
-    pme->m_postprocessor.processData(super_frame);
+    // save a copy for the superbuf
+    mm_camera_super_buf_t* frame = (mm_camera_super_buf_t *)malloc(sizeof(mm_camera_super_buf_t));
+    if (frame == NULL) {
+        ALOGE("%s: Error allocating memory to save received_frame structure.",
+                __func__);
+        pChannel->bufDone(super_frame);
+        return;
+    }
+    *frame = *super_frame;
+
+    pme->m_postprocessor.processData(frame);
 
     ALOGD("[KPI Perf] %s: X", __func__);
 }
@@ -1115,6 +1128,9 @@ void QCamera2HardwareInterface::metadata_stream_cb_routine(mm_camera_super_buf_t
 
     mm_camera_buf_def_t *frame = super_frame->bufs[0];
     cam_metadata_info_t *pMetaData = (cam_metadata_info_t *)frame->buffer;
+
+    pMetaData->is_mobicat_enabled = pme->mParameters.isMobicatEnabled();
+    ALOGV("%s : pMetaData->is_mobicat_enabled=%d",__func__,pMetaData->is_mobicat_enabled);
 
     if(pme->m_stateMachine.isNonZSLCaptureRunning()&&
        (pMetaData->is_meta_valid == 1) &&

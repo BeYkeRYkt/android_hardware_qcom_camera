@@ -33,6 +33,8 @@
 #include <hardware/camera.h>
 #include "QCameraStream.h"
 
+#include "utils/Vector.h"
+
 extern "C" {
 #include <mm_camera_interface.h>
 }
@@ -58,6 +60,8 @@ public:
                               void *userdata,
                               bool bDynAllocBuf,
                               bool bDeffAlloc = false);
+    virtual int32_t linkStream(QCameraChannel *ch, QCameraStream *stream);
+
     virtual int32_t start();
     virtual int32_t stop();
     virtual int32_t bufDone(mm_camera_super_buf_t *recvd_frame);
@@ -66,8 +70,8 @@ public:
     int32_t config();
     QCameraStream *getStreamByHandle(uint32_t streamHandle);
     uint32_t getMyHandle() const {return m_handle;};
-    uint8_t getNumOfStreams() const {return m_numStreams;};
-    QCameraStream *getStreamByIndex(uint8_t index);
+    uint32_t getNumOfStreams() const {return mStreams.size();};
+    QCameraStream *getStreamByIndex(uint32_t index);
     QCameraStream *getStreamByServerID(uint32_t serverID);
     int32_t UpdateStreamBasedParameters(QCameraParameters &param);
     void deleteChannel();
@@ -81,8 +85,7 @@ protected:
     bool m_bAllowDynBufAlloc; // if buf allocation can be in two steps
 
     uint32_t m_handle;
-    uint8_t m_numStreams;
-    QCameraStream *mStreams[MAX_STREAM_NUM_IN_BUNDLE];
+    Vector<QCameraStream *> mStreams;
     mm_camera_buf_notify_t mDataCB;
     void *mUserData;
 };

@@ -957,6 +957,8 @@ typedef  struct {
 
     uint8_t is_chromatix_lite_af_stats_valid;
     cam_chromatix_lite_af_stats_t chromatix_lite_af_stats_data;
+
+    uint8_t is_mobicat_enabled;
 } cam_metadata_info_t;
 
 typedef enum {

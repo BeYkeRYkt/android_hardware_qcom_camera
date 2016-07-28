@@ -136,6 +136,7 @@ const char QCameraParameters::KEY_QC_SUPPORTED_OPTI_ZOOM_MODES[] = "opti-zoom-va
 const char QCameraParameters::KEY_QC_WB_MANUAL_CCT[] = "wb-manual-cct";
 const char QCameraParameters::KEY_QC_MIN_WB_CCT[] = "min-wb-cct";
 const char QCameraParameters::KEY_QC_MAX_WB_CCT[] = "max-wb-cct";
+const char QCameraParameters::KEY_QC_MOBICAT[] = "mobicat";
 
 // Values for effect settings.
 const char QCameraParameters::EFFECT_EMBOSS[] = "emboss";
@@ -3757,14 +3758,27 @@ int32_t QCameraParameters::setSnapshotFDReq(const QCameraParameters& params)
  *              NO_ERROR  -- success
  *              none-zero failure code
  *==========================================================================*/
-int32_t QCameraParameters::setMobicat(const QCameraParameters& )
+int32_t QCameraParameters::setMobicat(const QCameraParameters& params)
 {
     char value [PROPERTY_VALUE_MAX];
     property_get("persist.camera.mobicat", value, "0");
     bool enableMobi = atoi(value) > 0 ? true : false;
+    bool app_enableMobi = false;
     int32_t ret = NO_ERROR;;
 
-    if (enableMobi) {
+    const char *str = params.get(KEY_QC_MOBICAT);
+    if(str != NULL){
+        if ( strcmp(str, VALUE_ENABLE) == 0) {
+            app_enableMobi = true;
+        }else{
+            app_enableMobi = false;
+        }
+    }
+
+    ALOGD("%s: enableMobi=%d app_enableMobi=%d \n", __func__,enableMobi,app_enableMobi);
+
+    if (enableMobi || app_enableMobi) {
+        m_bMobiEnabled=true;
         tune_cmd_t tune_cmd;
         tune_cmd.type = 2;
         tune_cmd.module = 0;
@@ -3783,8 +3797,10 @@ int32_t QCameraParameters::setMobicat(const QCameraParameters& )
                                 CAM_INTF_PARM_SET_PP_COMMAND,
                                 sizeof(tune_cmd_t),
                                 &tune_cmd);
+    }else{
+        m_bMobiEnabled = false;
     }
-    m_bMobiEnabled = enableMobi;
+    ALOGD("%s: m_bMobiEnabled=%d \n", __func__,m_bMobiEnabled);
     return ret;
 }
 

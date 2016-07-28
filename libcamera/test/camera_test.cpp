@@ -196,6 +196,7 @@ struct TestConfig
     int focusModeIdx;
     bool faceDetect;
     string disMode;
+    int mobicat;
 };
 void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1)
 {
@@ -788,6 +789,9 @@ const char usageStr[] =
     "  -P              picture storage path\n"
     "                    0: default path\n"
     "                    1: Customization storage path\n"
+    "  -m              mobicat mode\n"
+    "                    0: disable mobicat(default)\n"
+    "                    1: enable mobicat\n"
     "  -h              print this message\n"
 ;
 
@@ -977,6 +981,14 @@ int CameraTest::setParameters()
 
     params_.setStatsLoggingMask(config_.statsLogMask);
 
+    if (config_.mobicat == 1) {
+       printf("enable mibicat\n");
+       params_.set("mobicat", "enable");
+    } else {
+       printf("disable mobiact mode\n");
+       params_.set("mobicat", "disable");
+    }
+
     return params_.commit();
 }
 
@@ -1157,6 +1169,7 @@ static int setDefaultConfig(TestConfig &cfg) {
     cfg.storagePath = 0;
     cfg.faceDetect = 0;
     cfg.disMode = "disable";
+    cfg.mobicat= 0;
 
     switch (cfg.func) {
     case CAM_FUNC_OPTIC_FLOW:
@@ -1204,7 +1217,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     int exposureValueInt = 0;
     int gainValueInt = 0;
 
-    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:")) != -1) {
+    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
         switch (c) {
         case 'f':
             {
@@ -1229,7 +1242,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     setDefaultConfig(cfg);
 
     optind = 1;
-    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:")) != -1) {
+    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
         switch (c) {
         case 'F':
             cfg.faceDetect = 1;
@@ -1412,6 +1425,9 @@ static TestConfig parseCommandline(int argc, char* argv[])
                      cfg.storagePath = 0;
                      break;
             }
+            break;
+        case 'm':
+            cfg.mobicat= (int)atoi(optarg);
             break;
         case 'h':
         case '?':
