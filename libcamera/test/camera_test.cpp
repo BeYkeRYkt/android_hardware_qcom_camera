@@ -935,6 +935,12 @@ int CameraTest::setParameters()
                 params_.set("dis", config_.disMode.c_str());
             }
 
+			for (int i = 0; i < caps_.focusModes.size(); i++) {
+			       //printf("inside for loop:%d:%s \n",caps_.focusModes.size(),caps_.focusModes[i].c_str());
+			       if(!(strcmp(caps_.focusModes[i].c_str(),"fixed")))
+			       focusModeIdx=0;
+			}
+
 			printf("setting focus mode: %s\n",
 				 caps_.focusModes[focusModeIdx].c_str());
 			params_.setFocusMode(caps_.focusModes[focusModeIdx]);
