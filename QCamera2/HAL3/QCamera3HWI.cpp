@@ -4243,7 +4243,14 @@ QCamera3HardwareInterface::translateFromHalMetadata(
 
     // Video HDR
     IF_META_AVAILABLE(cam_intf_video_hdr_mode_t, vhdr, CAM_INTF_PARM_VIDEO_HDR, metadata) {
-        camMetadata.update(QCAMERA3_VIDEO_HDR_MODE, (int32_t *)&vhdr, 1);
+        int32_t fwk_vhdrMode = lookupFwkName(VIDEO_HDR_MODES_MAP,
+                METADATA_MAP_SIZE(VIDEO_HDR_MODES_MAP), *vhdr);
+        if (NAME_NOT_FOUND != fwk_vhdrMode) {
+            uint8_t meta_vhdrMode = (uint8_t)fwk_vhdrMode;
+            camMetadata.update(QCAMERA3_VIDEO_HDR_MODE, &meta_vhdrMode, 1);
+        } else {
+            CDBG_HIGH("%s: Metadata not found : QCAMERA3_VIDEO_HDR_MODE", __func__);
+        }
     }
 
     IF_META_AVAILABLE(int32_t, contrast, CAM_INTF_PARM_CONTRAST, metadata) {
@@ -4262,7 +4269,8 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         int32_t fwk_irMode = lookupFwkName(IR_MODES_MAP,
                 METADATA_MAP_SIZE(IR_MODES_MAP), *ir_mode);
         if (NAME_NOT_FOUND != fwk_irMode) {
-            camMetadata.update(QCAMERA3_IR_MODE, (int32_t *)&fwk_irMode, 1);
+            uint8_t meta_irMode = (uint8_t)fwk_irMode;
+            camMetadata.update(QCAMERA3_IR_MODE, &meta_irMode, 1);
         } else {
             CDBG_HIGH("%s: Metadata not found : QCAMERA3_IR_MODE", __func__);
         }
@@ -7767,14 +7775,20 @@ int QCamera3HardwareInterface::translateToHalMetadata
 
     // Video HDR
     if (frame_settings.exists(QCAMERA3_VIDEO_HDR_MODE)) {
-        cam_intf_video_hdr_mode_t vhdr = (cam_intf_video_hdr_mode_t)
-            frame_settings.find(QCAMERA3_VIDEO_HDR_MODE).data.i32[0];
-        if ((CAM_INTF_VIDEO_HDR_MODE_MAX <= (vhdr)) || (0 > (vhdr))) {
-            ALOGE("%s: Invalid Video HDR mode %d!", __func__, vhdr);
-        } else {
-            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_VIDEO_HDR, vhdr)) {
+        int32_t fwk_vhdrMode =
+                frame_settings.find(QCAMERA3_VIDEO_HDR_MODE).data.u8[0];
+        int vhdrMode = lookupHalName(VIDEO_HDR_MODES_MAP,
+                METADATA_MAP_SIZE(VIDEO_HDR_MODES_MAP), fwk_vhdrMode);
+
+        if (NAME_NOT_FOUND != vhdrMode) {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_VIDEO_HDR,
+                    (cam_intf_video_hdr_mode_t)vhdrMode)) {
                 rc = BAD_VALUE;
             }
+        } else {
+            ALOGE("%s: Invalid vhdr mode %d", __func__,
+                    fwk_vhdrMode);
         }
     }
 
@@ -7935,7 +7949,7 @@ int QCamera3HardwareInterface::translateToHalMetadata
 
     if (frame_settings.exists(QCAMERA3_IR_MODE)) {
         int32_t fwk_irMode =
-                frame_settings.find(QCAMERA3_IR_MODE).data.i32[0];
+                frame_settings.find(QCAMERA3_IR_MODE).data.u8[0];
         int irMode = lookupHalName(IR_MODES_MAP,
                 METADATA_MAP_SIZE(IR_MODES_MAP), fwk_irMode);
 
@@ -7996,7 +8010,7 @@ int QCamera3HardwareInterface::initialTranslateToHalMetadata
     // IR mode
     if (frame_settings.exists(QCAMERA3_IR_MODE)) {
         int32_t fwk_irMode =
-                frame_settings.find(QCAMERA3_IR_MODE).data.i32[0];
+                frame_settings.find(QCAMERA3_IR_MODE).data.u8[0];
         int irMode = lookupHalName(IR_MODES_MAP,
                 METADATA_MAP_SIZE(IR_MODES_MAP), fwk_irMode);
 
