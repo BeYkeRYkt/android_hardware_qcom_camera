@@ -4254,15 +4254,15 @@ QCamera3HardwareInterface::translateFromHalMetadata(
     }
 
     IF_META_AVAILABLE(int32_t, contrast, CAM_INTF_PARM_CONTRAST, metadata) {
-        camMetadata.update(QCAMERA3_CONTRAST, (int32_t *)&contrast, 1);
+        camMetadata.update(QCAMERA3_CONTRAST, (int32_t *)contrast, 1);
     }
 
     IF_META_AVAILABLE(int32_t, brightness, CAM_INTF_PARM_BRIGHTNESS, metadata) {
-        camMetadata.update(CAM_INTF_PARM_BRIGHTNESS, (int32_t *)&brightness, 1);
+        camMetadata.update(CAM_INTF_PARM_BRIGHTNESS, (int32_t *)brightness, 1);
     }
 
     IF_META_AVAILABLE(int32_t, saturation, CAM_INTF_PARM_SATURATION, metadata) {
-        camMetadata.update(CAM_INTF_PARM_SATURATION, (int32_t *)&saturation, 1);
+        camMetadata.update(CAM_INTF_PARM_SATURATION, (int32_t *)saturation, 1);
     }
 
     IF_META_AVAILABLE(cam_ir_camera_modes_t, ir_mode, CAM_INTF_PARM_IR_CAMERA_MODE, metadata) {
