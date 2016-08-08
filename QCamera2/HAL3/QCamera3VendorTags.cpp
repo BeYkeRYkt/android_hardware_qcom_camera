@@ -51,7 +51,8 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_VIDEO_HDR_END,
         QCAMERA3_ADJUST_END,
         QCAMERA3_LIVESNAPSHOT_END,
-        QCAMERA3_MODE_END
+        QCAMERA3_MODE_END,
+        QCAMERA3_BG_STATS_END
 } ;
 
 typedef struct vendor_tag_info {
@@ -71,6 +72,7 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.adjust",
     "org.codeaurora.qcamera3.livesnapshot",
     "org.codeaurora.qcamera3.mode",
+    "org.codeaurora.qcamera3.bg_stats",
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -135,6 +137,28 @@ vendor_tag_info_t qcamera3_mode[QCAMERA3_MODE_END -
     { "ir_mode", TYPE_BYTE },
 };
 
+vendor_tag_info_t qcamera3_bg_stats[QCAMERA3_BG_STATS_END -
+        QCAMERA3_BG_STATS_START] = {
+    { "enable", TYPE_INT32},
+    { "region_h_num", TYPE_INT32},
+    { "region_v_num", TYPE_INT32},
+    { "region_pixel_cnt", TYPE_INT32},
+    { "region_height", TYPE_INT32},
+    { "region_width", TYPE_INT32},
+    { "rmax", TYPE_INT32},
+    { "bmax", TYPE_INT32},
+    { "grmax", TYPE_INT32},
+    { "gbmax", TYPE_INT32},
+    { "r_sum", TYPE_INT32},
+    { "b_sum", TYPE_INT32},
+    { "gr_sum", TYPE_INT32},
+    { "gb_sum", TYPE_INT32},
+    { "r_num", TYPE_INT32},
+    { "b_num", TYPE_INT32},
+    { "gr_num", TYPE_INT32},
+    { "gb_num", TYPE_INT32},
+};
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -147,6 +171,7 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_adjust,
     qcamera3_livesnapshot,
     qcamera3_mode,
+    qcamera3_bg_stats,
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -194,6 +219,26 @@ uint32_t qcamera3_all_tags[] = {
     // QCAMERA3_MODE_START
     (uint32_t)QCAMERA3_AVAILABLE_IR_MODES,
     (uint32_t)QCAMERA3_IR_MODE,
+
+    // QCAMERA3_BG_STATS_START
+    (uint32_t)QCAMERA3_BG_STATS_ENABLE,
+    (uint32_t)QCAMERA3_BG_STATS_REGION_H_NUM,
+    (uint32_t)QCAMERA3_BG_STATS_REGION_V_NUM,
+    (uint32_t)QCAMERA3_BG_STATS_REGION_PIXEL_CNT,
+    (uint32_t)QCAMERA3_BG_STATS_REGION_HEIGHT,
+    (uint32_t)QCAMERA3_BG_STATS_REGION_WIDTH,
+    (uint32_t)QCAMERA3_BG_STATS_RMAX,
+    (uint32_t)QCAMERA3_BG_STATS_BMAX,
+    (uint32_t)QCAMERA3_BG_STATS_GRMAX,
+    (uint32_t)QCAMERA3_BG_STATS_GBMAX,
+    (uint32_t)QCAMERA3_BG_STATS_R_SUM,
+    (uint32_t)QCAMERA3_BG_STATS_B_SUM,
+    (uint32_t)QCAMERA3_BG_STATS_GR_SUM,
+    (uint32_t)QCAMERA3_BG_STATS_GB_SUM,
+    (uint32_t)QCAMERA3_BG_STATS_R_NUM,
+    (uint32_t)QCAMERA3_BG_STATS_B_NUM,
+    (uint32_t)QCAMERA3_BG_STATS_GR_NUM,
+    (uint32_t)QCAMERA3_BG_STATS_GB_NUM,
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;

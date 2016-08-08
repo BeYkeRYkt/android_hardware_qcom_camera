@@ -388,6 +388,8 @@ private:
             cam_intf_video_hdr_mode_t> VIDEO_HDR_MODES_MAP[];
     static const QCameraMap<camera_metadata_enum_android_ir_mode_t,
             cam_ir_camera_modes_t> IR_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_android_bg_stats_t,
+            cam_bg_stats_enb_t> BG_STATS_MAP[];
     static const QCameraMap<camera_metadata_enum_android_sensor_reference_illuminant1_t,
             cam_illuminat_t> REFERENCE_ILLUMINANT_MAP[];
 

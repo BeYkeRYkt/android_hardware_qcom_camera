@@ -909,6 +909,7 @@ typedef struct {
     INCLUDE(CAM_INTF_AF_STATE_TRANSITION,               uint8_t,                     1);
     INCLUDE(CAM_INTF_NOISE_REDUCTION_MODE,              cam_noise_reduction_mode_t,  1);
     INCLUDE(CAM_INTF_PARM_IR_CAMERA_MODE,               cam_ir_camera_modes_t,       1);
+    INCLUDE(CAM_INTF_PARM_BG_STATS,                     cam_bg_stats_data_t,         1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to

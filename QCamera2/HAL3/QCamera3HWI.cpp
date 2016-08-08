@@ -260,6 +260,13 @@ const QCamera3HardwareInterface::QCameraMap<
     { ANDROID_IR_MODE_AUTO, CAM_IR_CAMERA_MODE_AUTO }
 };
 
+const QCamera3HardwareInterface::QCameraMap<
+        camera_metadata_enum_android_bg_stats_t,
+        cam_bg_stats_enb_t> QCamera3HardwareInterface::BG_STATS_MAP[] = {
+    { ANDROID_BG_STATS_OFF,  CAM_BG_STATS_OFF },
+    { ANDROID_BG_STATS_ON,   CAM_BG_STATS_ON }
+};
+
 /* Since there is no mapping for all the options some Android enum are not listed.
  * Also, the order in this list is important because while mapping from HAL to Android it will
  * traverse from lower to higher index which means that for HAL values that are map to different
@@ -4268,6 +4275,45 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         }
     }
 
+    IF_META_AVAILABLE(cam_bg_stats_data_t, bg_stats, CAM_INTF_PARM_BG_STATS, metadata) {
+        camMetadata.update(QCAMERA3_BG_STATS_ENABLE,
+            (int32_t *)&(bg_stats->enable), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_REGION_H_NUM,
+            (int32_t *)&(bg_stats->bg_region_h_num), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_REGION_V_NUM,
+            (int32_t *)&(bg_stats->bg_region_v_num), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_REGION_PIXEL_CNT,
+            (int32_t *)&(bg_stats->region_pixel_cnt), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_REGION_HEIGHT,
+            (int32_t *)&(bg_stats->bg_region_height), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_REGION_WIDTH,
+            (int32_t *)&(bg_stats->bg_region_width), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_RMAX,
+            (int32_t *)&(bg_stats->rMax), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_BMAX,
+            (int32_t *)&(bg_stats->bMax), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_GRMAX,
+            (int32_t *)&(bg_stats->grMax), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_GBMAX,
+            (int32_t *)&(bg_stats->gbMax), 1);
+        camMetadata.update(QCAMERA3_BG_STATS_R_SUM,
+            (int32_t *)&(bg_stats->bg_r_sum), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_B_SUM,
+            (int32_t *)&(bg_stats->bg_b_sum), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_GR_SUM,
+            (int32_t *)&(bg_stats->bg_gr_sum), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_GB_SUM,
+            (int32_t *)&(bg_stats->bg_gb_sum), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_R_NUM,
+            (int32_t *)&(bg_stats->bg_r_num), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_B_NUM,
+            (int32_t *)&(bg_stats->bg_b_num), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_GR_NUM,
+            (int32_t *)&(bg_stats->bg_gr_num), STATS_MAX_BG_STATS_NUM);
+        camMetadata.update(QCAMERA3_BG_STATS_GB_NUM,
+            (int32_t *)&(bg_stats->bg_gb_num), STATS_MAX_BG_STATS_NUM);
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -6218,6 +6264,10 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
                       availIrModes,
                       size);
 
+    int32_t enable[] = {ANDROID_BG_STATS_OFF, ANDROID_BG_STATS_ON};
+    size = sizeof(enable) / sizeof (enable[0]);
+    staticInfo.update(QCAMERA3_BG_STATS_ENABLE, enable, size);
+
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
 }
@@ -7948,6 +7998,18 @@ int QCamera3HardwareInterface::translateToHalMetadata
         } else {
             ALOGE("%s: Invalid ir mode %d", __func__,
                     fwk_irMode);
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_BG_STATS_ENABLE)) {
+        cam_bg_stats_data_t bg_stats_data;
+        bg_stats_data.enable = (cam_bg_stats_enb_t)lookupHalName(BG_STATS_MAP,
+                METADATA_MAP_SIZE(BG_STATS_MAP),
+                frame_settings.find(QCAMERA3_BG_STATS_ENABLE).data.i32[0]);
+
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_BG_STATS,
+                (cam_bg_stats_data_t)bg_stats_data)) {
+            rc = BAD_VALUE;
         }
     }
 
