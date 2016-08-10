@@ -8026,6 +8026,24 @@ int QCamera3HardwareInterface::initialTranslateToHalMetadata
         }
     }
 
+    // Video HDR
+    if (frame_settings.exists(QCAMERA3_VIDEO_HDR_MODE)) {
+        int32_t fwk_vhdrMode =
+                frame_settings.find(QCAMERA3_VIDEO_HDR_MODE).data.u8[0];
+        int vhdrMode = lookupHalName(VIDEO_HDR_MODES_MAP,
+                METADATA_MAP_SIZE(VIDEO_HDR_MODES_MAP), fwk_vhdrMode);
+
+        if (NAME_NOT_FOUND != vhdrMode) {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_VIDEO_HDR,
+                    (cam_intf_video_hdr_mode_t)vhdrMode)) {
+                rc = BAD_VALUE;
+            }
+        } else {
+            ALOGE("%s: Invalid vhdr mode %d", __func__, fwk_vhdrMode);
+        }
+    }
+
     return rc;
 }
 
