@@ -43,6 +43,7 @@
 #define AF_STATS_DEBUG_DATA_SIZE          (40000)
 #define ASD_DEBUG_DATA_SIZE               (100)
 #define STATS_BUFFER_DEBUG_DATA_SIZE      (75000)
+#define STATS_MAX_BG_STATS_NUM            (3888)
 
 #define CEILING64(X) (((X) + 0x0003F) & 0xFFFFFFC0)
 #define CEILING32(X) (((X) + 0x0001F) & 0xFFFFFFE0)
@@ -1856,7 +1857,9 @@ typedef enum {
     /* bayer proc reprocess debug section */
     CAM_INTF_META_BAYER_PROC, /* cam_intf_meta_bayer_proc_t */
     /* IR mode camera parameter */
-    CAM_INTF_PARM_IR_CAMERA_MODE,
+    CAM_INTF_PARM_IR_CAMERA_MODE, /* cam_ir_camera_modes_t */
+    /* IR mode camera parameter */
+    CAM_INTF_PARM_BG_STATS, /* cam_bg_stats_data_t */
 
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
@@ -2390,6 +2393,32 @@ typedef enum {
     CAM_IR_CAMERA_MODE_AUTO,
     CAM_IR_CAMERA_MODE_MAX
 } cam_ir_camera_modes_t;
+
+typedef enum {
+    CAM_BG_STATS_OFF,
+    CAM_BG_STATS_ON,
+} cam_bg_stats_enb_t;
+
+typedef struct {
+    cam_bg_stats_enb_t enable;
+    uint32_t bg_region_h_num;
+    uint32_t bg_region_v_num;
+    uint32_t region_pixel_cnt;
+    uint32_t bg_region_height;
+    uint32_t bg_region_width;
+    uint32_t rMax;
+    uint32_t bMax;
+    uint32_t grMax;
+    uint32_t gbMax;
+    uint32_t bg_r_sum[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_b_sum[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_gr_sum[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_gb_sum[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_r_num[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_b_num[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_gr_num[STATS_MAX_BG_STATS_NUM];
+    uint32_t bg_gb_num[STATS_MAX_BG_STATS_NUM];
+} cam_bg_stats_data_t;
 
 /***********************************
 * ENUM definition for custom parameter type
