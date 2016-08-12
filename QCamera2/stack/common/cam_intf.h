@@ -202,6 +202,8 @@ typedef struct{
     cam_control_range_t saturation_ctrl;  /* saturation */
     cam_control_range_t sce_ctrl;         /* skintone enhancement factor */
 
+    cam_tnr_tuning_t tnr_tuning_ctrl;     /* tnr tuning */
+
     /* QCOM HDR specific control. Indicates number of frames and exposure needs for the frames */
     cam_hdr_bracketing_info_t hdr_bracketing_setting;
 
@@ -910,6 +912,9 @@ typedef struct {
     INCLUDE(CAM_INTF_NOISE_REDUCTION_MODE,              cam_noise_reduction_mode_t,  1);
     INCLUDE(CAM_INTF_PARM_IR_CAMERA_MODE,               cam_ir_camera_modes_t,       1);
     INCLUDE(CAM_INTF_PARM_BG_STATS,                     cam_bg_stats_data_t,         1);
+    INCLUDE(CAM_INTF_PARM_TNR_INTENSITY,                float,                       1);
+    INCLUDE(CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY, float,                       1);
+
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to
