@@ -1860,6 +1860,10 @@ typedef enum {
     CAM_INTF_PARM_IR_CAMERA_MODE, /* cam_ir_camera_modes_t */
     /* IR mode camera parameter */
     CAM_INTF_PARM_BG_STATS, /* cam_bg_stats_data_t */
+    /* TNR intensity */
+    CAM_INTF_PARM_TNR_INTENSITY,
+    /* Motion detection sensitivity */
+    CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY,
 
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
@@ -2133,6 +2137,13 @@ typedef struct {
     uint8_t flash_bracketing[CAM_MAX_FLASH_BRACKETING];
     uint8_t metadata_index;
 } cam_chroma_flash_t;
+
+typedef struct {
+  float max;
+  float min;
+  float def_tnr_intensity;
+  float def_md_sensitivity;
+} cam_tnr_tuning_t;
 
 typedef enum {
     CAM_HDR_MODE_SINGLEFRAME,    /* Single frame HDR mode which does only tone mapping */

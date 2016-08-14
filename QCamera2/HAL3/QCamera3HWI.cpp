@@ -4322,6 +4322,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
             (int32_t *)&(bg_stats->bg_gb_num), STATS_MAX_BG_STATS_NUM);
     }
 
+    IF_META_AVAILABLE(float, tnr_intensity, CAM_INTF_PARM_TNR_INTENSITY, metadata) {
+        camMetadata.update(QCAMERA3_TNR_INTENSITY, tnr_intensity, 1);
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -6233,6 +6237,18 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(QCAMERA3_AVAILABLE_SATURATION_CONTROL, control,
                   sizeof(control)/sizeof(control[0]));
 
+    staticInfo.update(QCAMERA3_TNR_TUNING_RANGE_MIN,
+            &gCamCapability[cameraId]->tnr_tuning_ctrl.min, 1);
+
+    staticInfo.update(QCAMERA3_TNR_TUNING_RANGE_MAX,
+            &gCamCapability[cameraId]->tnr_tuning_ctrl.max, 1);
+
+    staticInfo.update(QCAMERA3_TNR_INTENSITY,
+            &gCamCapability[cameraId]->tnr_tuning_ctrl.def_tnr_intensity, 1);
+
+    staticInfo.update(QCAMERA3_MOTION_DETECTION_SENSITIVITY,
+            &gCamCapability[cameraId]->tnr_tuning_ctrl.def_md_sensitivity, 1);
+
     int32_t available_sizes_tbl[MAX_SIZES_CNT * 2];
     int32_t uhd_present = 0;
     for (size_t i = 0; i < gCamCapability[cameraId]->livesnapshot_sizes_tbl_cnt; i++) {
@@ -7861,6 +7877,34 @@ int QCamera3HardwareInterface::translateToHalMetadata
             ALOGE("%s: Invalid brightness value %d!", __func__, value);
         } else {
             if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_BRIGHTNESS, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_TNR_INTENSITY)) {
+        float value = frame_settings.find(QCAMERA3_TNR_INTENSITY).data.f[0];
+        if ((gCamCapability[mCameraId]->tnr_tuning_ctrl.max < value) ||
+                (gCamCapability[mCameraId]->tnr_tuning_ctrl.min > value)) {
+            ALOGE("%s: Invalid TNR sensitivity value %f!", __func__, value);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_TNR_INTENSITY, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_MOTION_DETECTION_SENSITIVITY)) {
+        float value = frame_settings.find(
+                QCAMERA3_MOTION_DETECTION_SENSITIVITY).data.f[0];
+        if ((gCamCapability[mCameraId]->tnr_tuning_ctrl.max < value) ||
+                (gCamCapability[mCameraId]->tnr_tuning_ctrl.min > value)) {
+            ALOGE("%s: Invalid motion detection sensitivity value %f!",
+                    __func__, value);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY, value)) {
                 rc = BAD_VALUE;
             }
         }
