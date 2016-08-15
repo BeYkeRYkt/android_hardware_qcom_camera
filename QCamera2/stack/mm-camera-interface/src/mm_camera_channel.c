@@ -1327,8 +1327,10 @@ int32_t mm_channel_stop(mm_channel_t *my_obj)
         /* deinit superbuf queue */
         mm_channel_superbuf_queue_deinit(&my_obj->bundle.superbuf_queue);
 
-        /* memset bundle info */
-        memset(&my_obj->bundle, 0, sizeof(mm_channel_bundle_t));
+        /* reset few fields in the bundle info */
+        my_obj->bundle.is_active = 0;
+        my_obj->bundle.superbuf_queue.expected_frame_id = 0;
+        my_obj->bundle.superbuf_queue.match_cnt = 0;
     }
 
     /* since all streams are stopped, we are safe to
