@@ -133,7 +133,7 @@
 
 const int SNAPSHOT_WIDTH_ALIGN = 64;
 const int SNAPSHOT_HEIGHT_ALIGN = 64;
-const int TAKEPICTURE_TIMEOUT_MS = 2000;
+const int TAKEPICTURE_TIMEOUT_MS = 3000;
 
 using namespace std;
 using namespace camera;
@@ -196,6 +196,7 @@ struct TestConfig
     int focusModeIdx;
     bool faceDetect;
     string disMode;
+    bool hdrEnabled;
     int mobicat;
 };
 void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1)
@@ -277,7 +278,7 @@ private:
     CameraCaps caps_;
     TestConfig config_;
 
-    uint32_t vFrameCount_, pFrameCount_;
+    uint32_t vFrameCount_, pFrameCount_, sFrameCount_;
     float vFpsAvg_, pFpsAvg_;
 
     uint64_t vTimeTotal_, pTimeTotal_;
@@ -297,6 +298,7 @@ private:
 CameraTest::CameraTest() :
     vFrameCount_(0),
     pFrameCount_(0),
+    sFrameCount_(0),
     vFpsAvg_(0.0f),
     pFpsAvg_(0.0f),
     vTimeTotal_(0),
@@ -312,6 +314,7 @@ CameraTest::CameraTest() :
 CameraTest::CameraTest(TestConfig config) :
     vFrameCount_(0),
     pFrameCount_(0),
+    sFrameCount_(0),
     vFpsAvg_(0.0f),
     pFpsAvg_(0.0f),
     vTimeStampPrev_(0),
@@ -553,17 +556,30 @@ void CameraTest::onPictureFrame(ICameraFrame* frame)
         dumpToFile(frame->data, frame->size, rawName, frame->timeStamp);
     } else {
         if(config_.storagePath ==1){
+            if(!config_.hdrEnabled){
                 snprintf(jpgName, 128, QCAMERA_DUMP_LOCATION "snapshot_%dx%d.jpg",
                       picSize_.width, picSize_.height);
-        }else
+            }else{
+                snprintf(jpgName, 128, QCAMERA_DUMP_LOCATION "snapshot_%dx%d_%d.jpg",
+                      picSize_.width, picSize_.height, sFrameCount_);
+            }
+        }else{
+            if(!config_.hdrEnabled){
                 snprintf(jpgName, 128, "snapshot_%dx%d.jpg", picSize_.width, picSize_.height);
-                dumpToFile(frame->data, frame->size, jpgName, frame->timeStamp);
+            }else{
+                snprintf(jpgName, 128, "snapshot_%dx%d_%d.jpg",
+                    picSize_.width, picSize_.height, sFrameCount_);
+            }
+        }
+        dumpToFile(frame->data, frame->size, jpgName, frame->timeStamp);
     }
     /* notify the waiting thread about picture done */
     pthread_mutex_lock(&mutexPicDone);
     isPicDone = true;
     pthread_cond_signal(&cvPicDone);
     pthread_mutex_unlock(&mutexPicDone);
+
+    sFrameCount_++;
     printf("%s:%d\n", __func__, __LINE__);
 }
 
@@ -786,6 +802,7 @@ const char usageStr[] =
     "                    3: continuous-video\n"
     "                    4: continuous-picture\n"
     "                    5: manual\n"
+    "  -W              enable HDR\n"
     "  -P              picture storage path\n"
     "                    0: default path\n"
     "                    1: Customization storage path\n"
@@ -953,6 +970,12 @@ int CameraTest::setParameters()
 			printf("setting ISO mode: %s\n", caps_.isoModes[isoModeIdx].c_str());
 			params_.setISO(caps_.isoModes[isoModeIdx]);
 
+            if (config_.hdrEnabled) {
+                params_.set("scene-mode", "hdr");
+                params_.set("hdr-need-1x", "true");
+                printf("enable hdr scene mode\n");
+            }
+
 			printf("setting preview format: %s\n",
 				 caps_.previewFormats[prevFmtIdx].c_str());
 			params_.setPreviewFormat(caps_.previewFormats[prevFmtIdx]);
@@ -1052,6 +1075,7 @@ int CameraTest::run()
     vTimeTotal_ = 0;
     vFrameCount_ = 0;
     pFrameCount_ = 0;
+    sFrameCount_ = 0;
     vFpsAvg_ = 0.0f;
     pFpsAvg_ = 0.0f;
 
@@ -1169,6 +1193,7 @@ static int setDefaultConfig(TestConfig &cfg) {
     cfg.storagePath = 0;
     cfg.faceDetect = 0;
     cfg.disMode = "disable";
+    cfg.hdrEnabled = false;
     cfg.mobicat= 0;
 
     switch (cfg.func) {
@@ -1217,7 +1242,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     int exposureValueInt = 0;
     int gainValueInt = 0;
 
-    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
+    while ((c = getopt(argc, argv, "hFWdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
         switch (c) {
         case 'f':
             {
@@ -1242,7 +1267,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     setDefaultConfig(cfg);
 
     optind = 1;
-    while ((c = getopt(argc, argv, "hFdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
+    while ((c = getopt(argc, argv, "hFWdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
         switch (c) {
         case 'F':
             cfg.faceDetect = 1;
@@ -1426,6 +1451,9 @@ static TestConfig parseCommandline(int argc, char* argv[])
                      break;
             }
             break;
+        case 'W':
+            cfg.hdrEnabled = true;
+            break;
         case 'm':
             cfg.mobicat= (int)atoi(optarg);
             break;
@@ -1437,8 +1465,14 @@ static TestConfig parseCommandline(int argc, char* argv[])
         }
     }
 
+    if (cfg.testVideo) {
+        cfg.hdrEnabled = false;
+        printf("Do not support multi-frame HDR during recording\n");
+    }
+
     if (cfg.snapshotFormat == RAW_FORMAT) {
         cfg.testVideo = false;
+        cfg.hdrEnabled = false;
     }
 
     return cfg;
