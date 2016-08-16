@@ -981,6 +981,12 @@ int CameraTest::setParameters()
 
     params_.setStatsLoggingMask(config_.statsLogMask);
 
+    if (config_.testVideo) {
+        params_.set("recording-hint", "true");
+    }else{
+        params_.set("recording-hint", "false");
+    }
+
     if (config_.mobicat == 1) {
        printf("enable mibicat\n");
        params_.set("mobicat", "enable");
