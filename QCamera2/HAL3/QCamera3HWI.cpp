@@ -4326,6 +4326,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_TNR_INTENSITY, tnr_intensity, 1);
     }
 
+    IF_META_AVAILABLE(int32_t, custom_Tuning, CAM_INTF_PARM_CUSTOM_TUNING, metadata) {
+        camMetadata.update(QCAMERA3_CUSTOM_TUNING, custom_Tuning, 1);
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -6237,6 +6241,12 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(QCAMERA3_AVAILABLE_SATURATION_CONTROL, control,
                   sizeof(control)/sizeof(control[0]));
 
+    staticInfo.update(QCAMERA3_CUSTOM_TUNING_RANGE_MIN,
+            &gCamCapability[cameraId]->custom_tuning_ctrl.min_idx, 1);
+
+    staticInfo.update(QCAMERA3_CUSTOM_TUNING_RANGE_MAX,
+            &gCamCapability[cameraId]->custom_tuning_ctrl.max_idx, 1);
+
     staticInfo.update(QCAMERA3_TNR_TUNING_RANGE_MIN,
             &gCamCapability[cameraId]->tnr_tuning_ctrl.min, 1);
 
@@ -7877,6 +7887,19 @@ int QCamera3HardwareInterface::translateToHalMetadata
             ALOGE("%s: Invalid brightness value %d!", __func__, value);
         } else {
             if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_BRIGHTNESS, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_CUSTOM_TUNING)) {
+        int32_t value = frame_settings.find(QCAMERA3_CUSTOM_TUNING).data.i32[0];
+        if ((gCamCapability[mCameraId]->custom_tuning_ctrl.max_idx < value) ||
+                (gCamCapability[mCameraId]->custom_tuning_ctrl.min_idx > value)) {
+            ALOGE("%s: Custom tuning idx value %d!", __func__, value);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_CUSTOM_TUNING, value)) {
                 rc = BAD_VALUE;
             }
         }

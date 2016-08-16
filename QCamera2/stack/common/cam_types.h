@@ -1864,6 +1864,8 @@ typedef enum {
     CAM_INTF_PARM_TNR_INTENSITY,
     /* Motion detection sensitivity */
     CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY,
+    /* Custom tuning */
+    CAM_INTF_PARM_CUSTOM_TUNING,
 
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
@@ -2144,6 +2146,11 @@ typedef struct {
   float def_tnr_intensity;
   float def_md_sensitivity;
 } cam_tnr_tuning_t;
+
+typedef struct {
+  int32_t min_idx;
+  int32_t max_idx;
+} cam_custom_tuning_t;
 
 typedef enum {
     CAM_HDR_MODE_SINGLEFRAME,    /* Single frame HDR mode which does only tone mapping */

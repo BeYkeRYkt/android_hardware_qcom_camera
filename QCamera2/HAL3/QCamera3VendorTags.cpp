@@ -138,6 +138,9 @@ vendor_tag_info_t qcamera3_mode[QCAMERA3_MODE_END -
         QCAMERA3_MODE_START] = {
     { "available_ir_modes", TYPE_BYTE },
     { "ir_mode", TYPE_BYTE },
+    { "custom_tuning", TYPE_INT32 },
+    { "custom_tuning_min", TYPE_INT32 },
+    { "custom_tuning_max", TYPE_INT32 },
 };
 
 vendor_tag_info_t qcamera3_bg_stats[QCAMERA3_BG_STATS_END -
@@ -231,6 +234,9 @@ uint32_t qcamera3_all_tags[] = {
     // QCAMERA3_MODE_START
     (uint32_t)QCAMERA3_AVAILABLE_IR_MODES,
     (uint32_t)QCAMERA3_IR_MODE,
+    (uint32_t)QCAMERA3_CUSTOM_TUNING,
+    (uint32_t)QCAMERA3_CUSTOM_TUNING_RANGE_MIN,
+    (uint32_t)QCAMERA3_CUSTOM_TUNING_RANGE_MAX,
 
     // QCAMERA3_BG_STATS_START
     (uint32_t)QCAMERA3_BG_STATS_ENABLE,

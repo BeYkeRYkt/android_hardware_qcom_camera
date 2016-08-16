@@ -204,6 +204,8 @@ typedef struct{
 
     cam_tnr_tuning_t tnr_tuning_ctrl;     /* tnr tuning */
 
+    cam_custom_tuning_t custom_tuning_ctrl; /* custom tuning */
+
     /* QCOM HDR specific control. Indicates number of frames and exposure needs for the frames */
     cam_hdr_bracketing_info_t hdr_bracketing_setting;
 
@@ -911,6 +913,7 @@ typedef struct {
     INCLUDE(CAM_INTF_AF_STATE_TRANSITION,               uint8_t,                     1);
     INCLUDE(CAM_INTF_NOISE_REDUCTION_MODE,              cam_noise_reduction_mode_t,  1);
     INCLUDE(CAM_INTF_PARM_IR_CAMERA_MODE,               cam_ir_camera_modes_t,       1);
+    INCLUDE(CAM_INTF_PARM_CUSTOM_TUNING,                int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_BG_STATS,                     cam_bg_stats_data_t,         1);
     INCLUDE(CAM_INTF_PARM_TNR_INTENSITY,                float,                       1);
     INCLUDE(CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY, float,                       1);
