@@ -2197,6 +2197,9 @@ int QCamera2HardwareInterface::releasePreviewFrame(const void * opaque)
     int32_t rc = UNKNOWN_ERROR;
     QCameraChannel *pChannel =
         (QCameraChannel *)m_channels[QCAMERA_CH_TYPE_PREVIEW];
+    if(isZSLMode()) {
+        pChannel = (QCameraChannel *)m_channels[QCAMERA_CH_TYPE_ZSL];
+    }
     ALOGD("%s: opaque data = %p", __func__,opaque);
     if(pChannel != NULL) {
         rc = pChannel->releaseFrame(opaque, mStoreMetaDataInFrame > 0);
