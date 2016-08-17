@@ -52,6 +52,10 @@ typedef enum camera_metadata_enum_android_bg_stats {
     ANDROID_BG_STATS_ON,
 } camera_metadata_enum_android_bg_stats_t;
 
+// QCAMERA3_CUSTOM_AE
+static const uint32_t camera_metadata_num_custom_ae_input_params = 5;
+static const uint32_t camera_metadata_num_custom_ae_output_params = 5;
+
 enum qcamera3_ext_section {
     QCAMERA3_PRIVATEDATA = VENDOR_SECTION,
     QCAMERA3_CDS,
@@ -65,6 +69,7 @@ enum qcamera3_ext_section {
     QCAMERA3_MODE,
     QCAMERA3_BG_STATS,
     QCAMERA3_TNR,
+    QCAMERA3_CUSTOM_AE,
     QCAMERA3_SECTIONS_END
 };
 
@@ -81,6 +86,7 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_MODE_START = QCAMERA3_MODE << 16,
     QCAMERA3_BG_STATS_START = QCAMERA3_BG_STATS << 16,
     QCAMERA3_TNR_TUNING_START = QCAMERA3_TNR << 16,
+    QCAMERA3_CUSTOM_AE_START = QCAMERA3_CUSTOM_AE << 16
 };
 
 enum qcamera3_ext_tags {
@@ -204,6 +210,10 @@ enum qcamera3_ext_tags {
     QCAMERA3_TNR_TUNING_RANGE_MIN,
     QCAMERA3_TNR_TUNING_RANGE_MAX,
     QCAMERA3_TNR_TUNING_END,
+
+    QCAMERA3_CUSTOM_AE_INPUT = QCAMERA3_CUSTOM_AE_START,
+    QCAMERA3_CUSTOM_AE_OUTPUT,
+    QCAMERA3_CUSTOM_AE_END,
 
 };
 

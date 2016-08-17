@@ -4330,6 +4330,28 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_CUSTOM_TUNING, custom_Tuning, 1);
     }
 
+    IF_META_AVAILABLE(cam_custom_ae_input_t, custom_ae_input, CAM_INTF_PARM_CUSTOM_AE_INPUT, metadata) {
+        if (camera_metadata_num_custom_ae_input_params == NUM_CUSTOM_AE_INPUT_PARAMS) {
+            camMetadata.update(QCAMERA3_CUSTOM_AE_INPUT, custom_ae_input->values,
+                    camera_metadata_num_custom_ae_input_params);
+        } else {
+            ALOGE("%s: Invalid custom AE input data holders: fwk %d meta %d",
+                    __func__, camera_metadata_num_custom_ae_input_params,
+                    NUM_CUSTOM_AE_INPUT_PARAMS);
+        }
+    }
+
+    IF_META_AVAILABLE(cam_custom_ae_output_t, custom_ae_output, CAM_INTF_PARM_CUSTOM_AE_OUTPUT, metadata) {
+        if (camera_metadata_num_custom_ae_output_params == NUM_CUSTOM_AE_OUTPUT_PARAMS) {
+            camMetadata.update(QCAMERA3_CUSTOM_AE_OUTPUT, custom_ae_output->values,
+                    camera_metadata_num_custom_ae_output_params);
+        } else {
+            ALOGE("%s: Invalid custom AE output data holders: fwk %d meta %d",
+                    __func__, camera_metadata_num_custom_ae_output_params,
+                    NUM_CUSTOM_AE_OUTPUT_PARAMS);
+        }
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -7928,6 +7950,42 @@ int QCamera3HardwareInterface::translateToHalMetadata
         } else {
             if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_CUSTOM_AE_INPUT)) {
+        if (camera_metadata_num_custom_ae_input_params != NUM_CUSTOM_AE_INPUT_PARAMS) {
+            ALOGE("%s: Invalid custom AE input data holders: fwk %d meta %d",
+                    __func__, camera_metadata_num_custom_ae_input_params,
+                    NUM_CUSTOM_AE_INPUT_PARAMS);
+        } else {
+            cam_custom_ae_input_t custom_ae_input;
+            for (uint32_t i = 0; i < NUM_CUSTOM_AE_INPUT_PARAMS; i++) {
+                custom_ae_input.values[i] = frame_settings.find(
+                        QCAMERA3_CUSTOM_AE_INPUT).data.i32[i];
+            }
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_CUSTOM_AE_INPUT, custom_ae_input)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_CUSTOM_AE_OUTPUT)) {
+        if (camera_metadata_num_custom_ae_output_params != NUM_CUSTOM_AE_OUTPUT_PARAMS) {
+            ALOGE("%s: Invalid custom AE output data holders: fwk %d meta %d",
+                    __func__, camera_metadata_num_custom_ae_output_params,
+                    NUM_CUSTOM_AE_OUTPUT_PARAMS);
+        } else {
+            cam_custom_ae_output_t custom_ae_output;
+            for (uint32_t i = 0; i < NUM_CUSTOM_AE_OUTPUT_PARAMS; i++) {
+                custom_ae_output.values[i] = frame_settings.find(
+                        QCAMERA3_CUSTOM_AE_OUTPUT).data.i32[i];
+            }
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_PARM_CUSTOM_AE_OUTPUT, custom_ae_output)) {
                 rc = BAD_VALUE;
             }
         }

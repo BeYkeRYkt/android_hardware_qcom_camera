@@ -54,7 +54,7 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_MODE_END,
         QCAMERA3_BG_STATS_END,
         QCAMERA3_TNR_TUNING_END,
-
+        QCAMERA3_CUSTOM_AE_END,
 };
 
 typedef struct vendor_tag_info {
@@ -76,6 +76,7 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.mode",
     "org.codeaurora.qcamera3.bg_stats",
     "org.codeaurora.qcamera3.tnr_tuning",
+    "org.codeaurora.qcamera3.custom_ae",
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -171,8 +172,14 @@ vendor_tag_info_t qcamera3_tnr_tuning[QCAMERA3_TNR_TUNING_END -
     { "motion_detection_sensitivity", TYPE_FLOAT },
     { "tnr_tuning_range_min", TYPE_FLOAT },
     { "tnr_tuning_range_max", TYPE_FLOAT },
-
 };
+
+vendor_tag_info_t qcamera3_custom_ae[QCAMERA3_CUSTOM_AE_END -
+        QCAMERA3_CUSTOM_AE_START] = {
+    { "qcamera3_custom_ae_input", TYPE_INT32 },
+    { "qcamera3_custom_ae_output", TYPE_INT32 },
+};
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -187,6 +194,7 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_mode,
     qcamera3_bg_stats,
     qcamera3_tnr_tuning,
+    qcamera3_custom_ae,
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -264,6 +272,9 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_TNR_TUNING_RANGE_MIN,
     (uint32_t)QCAMERA3_TNR_TUNING_RANGE_MAX,
 
+    //QCAMERA3_CUSTOM_AE_START
+    (uint32_t)QCAMERA3_CUSTOM_AE_INPUT,
+    (uint32_t)QCAMERA3_CUSTOM_AE_OUTPUT,
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;

@@ -917,7 +917,8 @@ typedef struct {
     INCLUDE(CAM_INTF_PARM_BG_STATS,                     cam_bg_stats_data_t,         1);
     INCLUDE(CAM_INTF_PARM_TNR_INTENSITY,                float,                       1);
     INCLUDE(CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY, float,                       1);
-
+    INCLUDE(CAM_INTF_PARM_CUSTOM_AE_INPUT,              cam_custom_ae_input_t,       1);
+    INCLUDE(CAM_INTF_PARM_CUSTOM_AE_OUTPUT,             cam_custom_ae_output_t,      1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to

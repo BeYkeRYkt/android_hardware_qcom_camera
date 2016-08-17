@@ -119,6 +119,9 @@
 #define EXTRA_FRAME_SYNC_BUFFERS     4 /* Extra frame sync buffers in dc mode*/
 #define MM_CAMERA_FRAME_SYNC_NODES   EXTRA_FRAME_SYNC_BUFFERS
 
+#define NUM_CUSTOM_AE_INPUT_PARAMS   5
+#define NUM_CUSTOM_AE_OUTPUT_PARAMS  5
+
 typedef enum {
     CAM_HAL_V1 = 1,
     CAM_HAL_V3 = 3
@@ -1866,6 +1869,10 @@ typedef enum {
     CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY,
     /* Custom tuning */
     CAM_INTF_PARM_CUSTOM_TUNING,
+    /* Custom AE input */
+    CAM_INTF_PARM_CUSTOM_AE_INPUT,
+    /* Custom AE output */
+    CAM_INTF_PARM_CUSTOM_AE_OUTPUT,
 
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
@@ -2437,6 +2444,14 @@ typedef struct {
     uint32_t bg_gr_num[STATS_MAX_BG_STATS_NUM];
     uint32_t bg_gb_num[STATS_MAX_BG_STATS_NUM];
 } cam_bg_stats_data_t;
+
+typedef struct {
+    int32_t values[NUM_CUSTOM_AE_INPUT_PARAMS];
+} cam_custom_ae_input_t;
+
+typedef struct {
+    int32_t values[NUM_CUSTOM_AE_OUTPUT_PARAMS];
+} cam_custom_ae_output_t;
 
 /***********************************
 * ENUM definition for custom parameter type
