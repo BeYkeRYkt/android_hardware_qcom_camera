@@ -2466,7 +2466,9 @@ int32_t QCamera2HardwareInterface::configureZSLHDRBracketing()
     memset(&aeBracket, 0, sizeof(cam_exp_bracketing_t));
     aeBracket.mode =
         gCamCapability[mCameraId]->hdr_bracketing_setting.exp_val.mode;
-#ifndef _ANDROID_
+#ifdef _ANDROID_
+    String8 tmp;
+#else
     ostringstream str_stream;
 #endif
     for ( unsigned int i = 0; i < hdrFrameCount ; i++ ) {
@@ -2475,7 +2477,7 @@ int32_t QCamera2HardwareInterface::configureZSLHDRBracketing()
             (int8_t) gCamCapability[mCameraId]->hdr_bracketing_setting.exp_val.values[i]);
         tmp.append(",");
 #else
-        str_stream << (int8_t) gCamCapability[mCameraId]->
+        str_stream << (int) (int8_t) gCamCapability[mCameraId]->
             hdr_bracketing_setting.exp_val.values[i] << ",";
 #endif
     }
@@ -2489,7 +2491,9 @@ int32_t QCamera2HardwareInterface::configureZSLHDRBracketing()
 #endif
     }
 
+#ifndef _ANDROID_
     string tmp = str_stream.str();
+#endif
 
     if( !tmp.empty() &&
         ( MAX_EXP_BRACKETING_LENGTH > tmp.length() ) ) {

@@ -1061,10 +1061,6 @@ int32_t QCameraReprocessChannel::doReprocess(mm_camera_super_buf_t *frame)
     for (int i = 0; i < frame->num_bufs; i++) {
         QCameraStream *pStream = getStreamBySrouceHandle(frame->bufs[i]->stream_id);
         if ((pStream != NULL) && (m_handle == pStream->getChannelHandle())) {
-            //if (mParameter.getofflineRAW() &&
-            if (!pStream->isOrignalTypeOf(CAM_STREAM_TYPE_RAW)) {
-                continue;
-            }
             if (pStream->isTypeOf(CAM_STREAM_TYPE_METADATA)) {
                 // Skip metadata for reprocess now because PP module cannot handle meta data
                 // May need furthur discussion if Imaginglib need meta data
