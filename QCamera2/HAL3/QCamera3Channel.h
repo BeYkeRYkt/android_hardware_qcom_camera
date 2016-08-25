@@ -44,7 +44,7 @@ extern "C" {
 
 using namespace android;
 
-#define MIN_STREAMING_BUFFER_NUM 7+11
+#define MIN_STREAMING_BUFFER_NUM ((MAX_INFLIGHT_REQUESTS) + 2)
 
 #define QCAMERA_DUMP_FRM_PREVIEW       1
 #define QCAMERA_DUMP_FRM_VIDEO         (1<<1)
