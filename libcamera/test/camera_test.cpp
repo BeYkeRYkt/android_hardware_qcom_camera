@@ -197,6 +197,7 @@ struct TestConfig
     bool faceDetect;
     string disMode;
     bool hdrEnabled;
+    bool zslEnabled;
     int mobicat;
 };
 void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1)
@@ -803,6 +804,7 @@ const char usageStr[] =
     "                    4: continuous-picture\n"
     "                    5: manual\n"
     "  -W              enable HDR\n"
+    "  -Z              enable ZSL\n"
     "  -P              picture storage path\n"
     "                    0: default path\n"
     "                    1: Customization storage path\n"
@@ -973,6 +975,11 @@ int CameraTest::setParameters()
             if (config_.hdrEnabled) {
                 params_.set("scene-mode", "hdr");
                 params_.set("hdr-need-1x", "true");
+                printf("enable hdr scene mode\n");
+            }
+
+            if (config_.zslEnabled) {
+                params_.set("zsl", "on");
                 printf("enable hdr scene mode\n");
             }
 
@@ -1194,6 +1201,7 @@ static int setDefaultConfig(TestConfig &cfg) {
     cfg.faceDetect = 0;
     cfg.disMode = "disable";
     cfg.hdrEnabled = false;
+    cfg.zslEnabled = false;
     cfg.mobicat= 0;
 
     switch (cfg.func) {
@@ -1242,7 +1250,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     int exposureValueInt = 0;
     int gainValueInt = 0;
 
-    while ((c = getopt(argc, argv, "hFWdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
+    while ((c = getopt(argc, argv, "hFWZdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
         switch (c) {
         case 'f':
             {
@@ -1267,7 +1275,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
     setDefaultConfig(cfg);
 
     optind = 1;
-    while ((c = getopt(argc, argv, "hFWdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
+    while ((c = getopt(argc, argv, "hFWZdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
         switch (c) {
         case 'F':
             cfg.faceDetect = 1;
@@ -1454,6 +1462,9 @@ static TestConfig parseCommandline(int argc, char* argv[])
         case 'W':
             cfg.hdrEnabled = true;
             break;
+        case 'Z':
+            cfg.zslEnabled = true;
+            break;
         case 'm':
             cfg.mobicat= (int)atoi(optarg);
             break;
@@ -1468,6 +1479,9 @@ static TestConfig parseCommandline(int argc, char* argv[])
     if (cfg.testVideo) {
         cfg.hdrEnabled = false;
         printf("Do not support multi-frame HDR during recording\n");
+
+        cfg.zslEnabled = false;
+        printf("Do not support ZSL during recording\n");
     }
 
     if (cfg.snapshotFormat == RAW_FORMAT) {
