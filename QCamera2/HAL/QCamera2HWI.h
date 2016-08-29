@@ -668,7 +668,6 @@ private:
     bool TsMakeupProcess_Snapshot(mm_camera_buf_def_t *pFrame,QCameraStream * pStream);
     bool TsMakeupProcess(mm_camera_buf_def_t *frame,QCameraStream * stream,unsigned char *makeupOutBuf,TSRect& faceRect);
 #endif
-    QCameraVideoMemory *mVideoMem;
 };
 
 }; // namespace qcamera
