@@ -583,6 +583,11 @@ void QCamera2HardwareInterface::nodisplay_preview_stream_cb_routine(
         pme->debugShowPreviewFPS();
     }
 
+    if(pme->m_bPreviewStarted) {
+       ALOGE("[KPI Perf] %s : PROFILE_FIRST_PREVIEW_FRAME", __func__);
+       pme->m_bPreviewStarted = false ;
+    }
+
     QCameraMemory *previewMemObj = (QCameraMemory *)frame->mem_info;
     camera_memory_t *preview_mem = NULL;
     if (previewMemObj != NULL) {
