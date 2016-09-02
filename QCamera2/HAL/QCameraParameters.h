@@ -487,6 +487,7 @@ public:
     static const char IS_MODE_EIS_1_0[];
     static const char IS_MODE_EIS_2_0[];
     static const char IS_MODE_MVDG[];
+    static const char IS_MODE_MVDG_HIGH[];
 
     static const char KEY_SELECTED_AUTO_SCENE[];
 
