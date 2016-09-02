@@ -79,7 +79,7 @@ else ifeq ($(call is-chipset-prefix-in-board-platform,msm8660),true)
         LOCAL_CFLAGS += -DCAMERA_ION_FALLBACK_HEAP_ID=ION_IOMMU_HEAP_ID # EBI
         LOCAL_CFLAGS += -DCAMERA_GRALLOC_CACHING_ID=0
         LOCAL_CFLAGS += -DNUM_RECORDING_BUFFERS=5
-else ifeq ($(call is-board-platform,msm8909),true)
+else ifeq ($(call is-board-platform,msm8909,msm8909w),true)
         LOCAL_CFLAGS += -DCAMERA_GRALLOC_HEAP_ID=GRALLOC_USAGE_PRIVATE_MM_HEAP
         LOCAL_CFLAGS += -DCAMERA_GRALLOC_FALLBACK_HEAP_ID=GRALLOC_USAGE_PRIVATE_IOMMU_HEAP
         LOCAL_CFLAGS += -DCAMERA_ION_FALLBACK_HEAP_ID=ION_IOMMU_HEAP_ID
@@ -183,7 +183,7 @@ else ifeq ($(call is-chipset-prefix-in-board-platform,msm8660),true)
         LOCAL_CFLAGS += -DCAMERA_ION_FALLBACK_HEAP_ID=ION_IOMMU_HEAP_ID # EBI
         LOCAL_CFLAGS += -DCAMERA_GRALLOC_CACHING_ID=0
         LOCAL_CFLAGS += -DNUM_RECORDING_BUFFERS=5
-else ifeq ($(call is-board-platform,msm8909),true)
+else ifeq ($(call is-board-platform,msm8909,msm8909w),true)
         LOCAL_CFLAGS += -DCAMERA_GRALLOC_HEAP_ID=GRALLOC_USAGE_PRIVATE_MM_HEAP
         LOCAL_CFLAGS += -DCAMERA_GRALLOC_FALLBACK_HEAP_ID=GRALLOC_USAGE_PRIVATE_IOMMU_HEAP
         LOCAL_CFLAGS += -DCAMERA_ION_FALLBACK_HEAP_ID=ION_IOMMU_HEAP_ID

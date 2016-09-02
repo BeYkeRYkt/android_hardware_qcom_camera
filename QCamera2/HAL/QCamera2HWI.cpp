@@ -1300,7 +1300,7 @@ int QCamera2HardwareInterface::openCamera()
     if (atoi(value) == 1) {
         pthread_mutex_lock(&gCamLock);
         if (gNumCameraSessions++ == 0) {
-            setCameraLaunchStatus(true);
+            //setCameraLaunchStatus(true);
         }
         pthread_mutex_unlock(&gCamLock);
     }
@@ -1381,7 +1381,7 @@ int QCamera2HardwareInterface::closeCamera()
     if (atoi(value) == 1) {
         pthread_mutex_lock(&gCamLock);
         if (--gNumCameraSessions == 0) {
-            setCameraLaunchStatus(false);
+            //setCameraLaunchStatus(false);
         }
         pthread_mutex_unlock(&gCamLock);
     }

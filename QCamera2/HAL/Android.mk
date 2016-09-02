@@ -42,8 +42,8 @@ endif
 LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/../stack/common \
         frameworks/native/include/media/openmax \
-        hardware/qcom/display/libgralloc \
-        hardware/qcom/display/libqdutils \
+        hardware/qcom/display/msm8909/libgralloc \
+        hardware/qcom/display/msm8909/libqdutils \
         hardware/qcom/media/libstagefrighthw \
         system/media/camera/include \
         $(LOCAL_PATH)/../../mm-image-codec/qexif \
@@ -60,12 +60,12 @@ endif
 LOCAL_C_INCLUDES += \
         $(TARGET_OUT_HEADERS)/qcom/display
 LOCAL_C_INCLUDES += \
-        hardware/qcom/display/libqservice
+        hardware/qcom/display/msm8909/libqservice
 
 #ifeq ($(TARGET_USE_VENDOR_CAMERA_EXT),true)
 #LOCAL_C_INCLUDES += hardware/qcom/display/msm8974/libgralloc
 #else
-LOCAL_C_INCLUDES += hardware/qcom/display/libgralloc
+LOCAL_C_INCLUDES += hardware/qcom/display/msm8909/libgralloc
 #endif
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include/media
