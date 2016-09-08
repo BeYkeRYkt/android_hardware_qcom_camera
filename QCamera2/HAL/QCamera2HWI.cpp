@@ -1094,7 +1094,10 @@ int QCamera2HardwareInterface::openCamera(struct hw_device_t **hw_device)
         *hw_device = NULL;
         return PERMISSION_DENIED;
     }
-    ALOGE("[KPI Perf] %s: E PROFILE_OPEN_CAMERA camera id %d", __func__,mCameraId);
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    fprintf(stderr, "[KPI Perf %10d] %s: E PROFILE_OPEN_CAMERA camera id %d\n",  (tv.tv_sec*1000) + (tv.tv_usec/1000), __func__, mCameraId);
     rc = openCamera();
     if (rc == NO_ERROR){
         *hw_device = &mCameraDevice.common;

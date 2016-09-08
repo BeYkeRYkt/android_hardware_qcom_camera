@@ -444,8 +444,10 @@ void QCamera2HardwareInterface::preview_stream_cb_routine(mm_camera_super_buf_t 
     pme->dumpFrameToFile(stream, frame, QCAMERA_DUMP_FRM_PREVIEW);
 
     if(pme->m_bPreviewStarted) {
-       ALOGE("[KPI Perf] %s : PROFILE_FIRST_PREVIEW_FRAME", __func__);
-       pme->m_bPreviewStarted = false ;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        fprintf(stderr, "[KPI Perf %10d] %s : PROFILE_FIRST_PREVIEW_FRAME\n", (tv.tv_sec*1000) + (tv.tv_usec/1000), __func__);
+        pme->m_bPreviewStarted = false ;
     }
 
     // Display the buffer.
@@ -584,8 +586,10 @@ void QCamera2HardwareInterface::nodisplay_preview_stream_cb_routine(
     }
 
     if(pme->m_bPreviewStarted) {
-       ALOGE("[KPI Perf] %s : PROFILE_FIRST_PREVIEW_FRAME", __func__);
-       pme->m_bPreviewStarted = false ;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        fprintf(stderr, "[KPI Perf %10d] %s : PROFILE_FIRST_PREVIEW_FRAME\n", (tv.tv_sec*1000) + (tv.tv_usec/1000), __func__);
+        pme->m_bPreviewStarted = false ;
     }
 
     QCameraMemory *previewMemObj = (QCameraMemory *)frame->mem_info;
@@ -829,14 +833,11 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
         pme->debugShowVideoFPS();
     }
     if(pme->m_bRecordStarted) {
-       ALOGE("[KPI Perf] %s : PROFILE_FIRST_RECORD_FRAME", __func__);
-       pme->m_bRecordStarted = false ;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        fprintf(stderr, "[KPI Perf %10d] %s : PROFILE_FIRST_RECORD_FRAME\n", (tv.tv_sec*1000) + (tv.tv_usec/1000), __func__);
+        pme->m_bRecordStarted = false ;
     }
-    ALOGE("%s: Stream(%d), Timestamp: %ld %ld",
-          __func__,
-          frame->stream_id,
-          frame->ts.tv_sec,
-          frame->ts.tv_nsec);
     nsecs_t timeStamp;
     if(pme->mParameters.isAVTimerEnabled() == true) {
         timeStamp = (nsecs_t)((frame->ts.tv_sec * 1000000LL) + frame->ts.tv_nsec) * 1000;
