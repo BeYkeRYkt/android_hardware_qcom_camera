@@ -975,7 +975,7 @@ int CameraTest::setParameters()
             if (config_.hdrEnabled) {
                 params_.set("scene-mode", "hdr");
                 params_.set("hdr-need-1x", "true");
-                printf("enable hdr scene mode\n");
+                printf("enable hdr scene mode, need 1x\n");
             }
 
             if (config_.zslEnabled) {
@@ -1156,6 +1156,18 @@ int CameraTest::run()
         if (rc) {
             printf("takePicture failed\n");
             exit(EXIT_FAILURE);
+        }
+        if (config_.hdrEnabled && !config_.zslEnabled) {
+            /* In viewfinder-capture mode,
+               Android camera application will restart preview explicitly.
+               In normal mode, HAL will also restart preview after taking picture;
+               But hdr mode, if enable "hdr-need-1x", HAL will not do this.
+               Therefore, it's the limit of current HAL and here we follow the
+               application call rules. */
+            sleep(2);
+            printf("restart preview ...\n");
+            camera_->stopPreview();
+            camera_->startPreview();
         }
     }
 
@@ -1483,11 +1495,15 @@ static TestConfig parseCommandline(int argc, char* argv[])
     }
 
     if (cfg.testVideo) {
-        cfg.hdrEnabled = false;
-        printf("Do not support multi-frame HDR during recording\n");
+        if (cfg.hdrEnabled) {
+            cfg.hdrEnabled = false;
+            printf("Not support multi-frame HDR during recording\n");
+        }
 
-        cfg.zslEnabled = false;
-        printf("Do not support ZSL during recording\n");
+        if (cfg.zslEnabled) {
+            cfg.zslEnabled = false;
+            printf("Not support ZSL during recording\n");
+        }
     }
 
     if (cfg.snapshotFormat == RAW_FORMAT) {
