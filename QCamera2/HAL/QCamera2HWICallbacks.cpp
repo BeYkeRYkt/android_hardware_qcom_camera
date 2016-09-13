@@ -1383,9 +1383,13 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
     if (frame->buf_type == CAM_STREAM_BUF_TYPE_MPLANE) {
         nsecs_t timeStamp;
         timeStamp = nsecs_t(frame->ts.tv_sec) * 1000000000LL + frame->ts.tv_nsec;
-        // Convert Boottime from camera to Monotime for video if needed.
-        // Otherwise, mBootToMonoTimestampOffset value will be 0.
-        timeStamp = timeStamp - pme->mBootToMonoTimestampOffset;
+        // For VT usecase, ISP uses AVtimer not CLOCK_BOOTTIME as time source.
+        // So do not change video timestamp.
+        if (!pme->mParameters.isAVTimerEnabled()) {
+            // Convert Boottime from camera to Monotime for video if needed.
+            // Otherwise, mBootToMonoTimestampOffset value will be 0.
+            timeStamp = timeStamp - pme->mBootToMonoTimestampOffset;
+        }
         CDBG("Send Video frame to services/encoder TimeStamp : %lld",
             timeStamp);
         QCameraMemory *videoMemObj = (QCameraMemory *)frame->mem_info;
@@ -1469,9 +1473,13 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
                 cbArg.msg_type = CAMERA_MSG_VIDEO_FRAME;
                 cbArg.data = video_mem;
 
-                // Convert Boottime from camera to Monotime for video if needed.
-                // Otherwise, mBootToMonoTimestampOffset value will be 0.
-                timeStamp = timeStamp - pme->mBootToMonoTimestampOffset;
+                // For VT usecase, ISP uses AVtimer not CLOCK_BOOTTIME as time source.
+                // So do not change video timestamp.
+                if (!pme->mParameters.isAVTimerEnabled()) {
+                    // Convert Boottime from camera to Monotime for video if needed.
+                    // Otherwise, mBootToMonoTimestampOffset value will be 0.
+                    timeStamp = timeStamp - pme->mBootToMonoTimestampOffset;
+                }
                 CDBG("Final video buffer TimeStamp : %lld ", timeStamp);
                 cbArg.timestamp = timeStamp;
                 int32_t rc = pme->m_cbNotifier.notifyCallback(cbArg);
