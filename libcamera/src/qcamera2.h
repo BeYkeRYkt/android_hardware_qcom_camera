@@ -118,8 +118,8 @@ public:
     virtual int startRecording();
     virtual void stopRecording();
 
-    virtual int startAutoFocus() { return dev_->ops->auto_focus(dev_); }
-    virtual void stopAutoFocus() { dev_->ops->cancel_auto_focus(dev_); }
+    virtual int startAutoFocus();
+    virtual void stopAutoFocus();
 
     virtual void cancelPicture() { dev_->ops->cancel_picture(dev_); }
 

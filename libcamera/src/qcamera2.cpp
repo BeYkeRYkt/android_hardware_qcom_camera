@@ -529,6 +529,19 @@ void QCamera2::stopRecording()
     }
 }
 
+int QCamera2::startAutoFocus()
+{
+    dev_->ops->enable_msg_type(dev_, CAMERA_MSG_FOCUS);
+    return dev_->ops->auto_focus(dev_);
+}
+
+void QCamera2::stopAutoFocus()
+{
+    dev_->ops->disable_msg_type(dev_, CAMERA_MSG_FOCUS);
+    dev_->ops->cancel_auto_focus(dev_);
+}
+
+
 int ICameraDevice::createInstance(int index, ICameraDevice** device)
 {
     int rc = 0;

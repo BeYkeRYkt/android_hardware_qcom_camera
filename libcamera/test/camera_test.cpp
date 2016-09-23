@@ -130,10 +130,13 @@
 #define MS_PER_SEC 1000
 #define NS_PER_MS 1000000
 #define NS_PER_US 1000
+#define US_PER_SEC 1000000
 
 const int SNAPSHOT_WIDTH_ALIGN = 64;
 const int SNAPSHOT_HEIGHT_ALIGN = 64;
 const int TAKEPICTURE_TIMEOUT_MS = 3000;
+const int AUTOFOCUS_TIMEOUT_MS = 1000;
+
 
 using namespace std;
 using namespace camera;
@@ -200,6 +203,7 @@ struct TestConfig
     bool zslEnabled;
     int mobicat;
 };
+
 void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1)
 {
   int i,j, ful_x, ful_y, flr_x, flr_y, f_w, f_h;
@@ -241,6 +245,7 @@ void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1
     ptr+= width;
   }
 }
+
 /**
  * CLASS  CameraTest
  *
@@ -267,6 +272,7 @@ public:
 
     /* listener methods */
     virtual void onError();
+    virtual void onControl(const ControlEvent& control);
     virtual void onPreviewFrame(ICameraFrame* frame);
     virtual void onVideoFrame(ICameraFrame* frame);
     virtual void onPictureFrame(ICameraFrame* frame);
@@ -289,6 +295,10 @@ private:
     pthread_mutex_t mutexPicDone;
     bool isPicDone;
 
+    pthread_cond_t cvAutoFocusDone;
+    pthread_mutex_t mutexAutoFocusDone;
+    bool isAutoFocusDone;
+
     int printCapabilities();
     int setParameters();
     int compressJpegAndSave(ICameraFrame *frame, char *name);
@@ -310,6 +320,9 @@ CameraTest::CameraTest() :
 {
     pthread_cond_init(&cvPicDone, NULL);
     pthread_mutex_init(&mutexPicDone, NULL);
+
+    pthread_cond_init(&cvAutoFocusDone, NULL);
+    pthread_mutex_init(&mutexAutoFocusDone, NULL);
 }
 
 CameraTest::CameraTest(TestConfig config) :
@@ -324,6 +337,8 @@ CameraTest::CameraTest(TestConfig config) :
     config_ = config;
     pthread_cond_init(&cvPicDone, NULL);
     pthread_mutex_init(&mutexPicDone, NULL);
+    pthread_cond_init(&cvAutoFocusDone, NULL);
+    pthread_mutex_init(&mutexAutoFocusDone, NULL);
 }
 
 int CameraTest::initialize(int camId)
@@ -384,6 +399,38 @@ static inline uint32_t align_size(uint32_t size, uint32_t align)
 int CameraTest::takePicture()
 {
     int rc;
+    struct timespec waitTime;
+    struct timeval now, now1;
+
+    if (config_.testVideo)
+        goto TAKEPIC;
+
+    pthread_mutex_lock(&mutexAutoFocusDone);
+    isAutoFocusDone = false;
+    printf("auto focus\n");
+    rc = camera_->startAutoFocus();
+    if (rc) {
+        printf("autoFocus failed\n");
+        pthread_mutex_unlock(&mutexAutoFocusDone);
+        goto TAKEPIC;
+    }
+
+    gettimeofday(&now, NULL);
+    waitTime.tv_sec = now.tv_sec + AUTOFOCUS_TIMEOUT_MS / MS_PER_SEC;
+    waitTime.tv_nsec = now.tv_usec * NS_PER_US + (AUTOFOCUS_TIMEOUT_MS % MS_PER_SEC) * NS_PER_MS;
+
+    rc = pthread_cond_timedwait(&cvAutoFocusDone, &mutexAutoFocusDone, &waitTime);
+    if (rc == ETIMEDOUT) {
+        printf("error: autoFocus timed out\n");
+    } else {
+        gettimeofday(&now1, NULL);
+        printf("auto focus time: %gms\n",
+            (now1.tv_sec + (double) now1.tv_usec / US_PER_SEC
+            - now.tv_sec - (double) now.tv_usec / US_PER_SEC) * MS_PER_SEC);
+    }
+    pthread_mutex_unlock(&mutexAutoFocusDone);
+
+TAKEPIC:
     pthread_mutex_lock(&mutexPicDone);
     isPicDone = false;
     printf("take picture\n");
@@ -394,8 +441,8 @@ int CameraTest::takePicture()
         return rc;
     }
 
-    struct timespec waitTime;
-    struct timeval now;
+    //struct timespec waitTime;
+    //struct timeval now;
 
     gettimeofday(&now, NULL);
     waitTime.tv_sec = now.tv_sec + TAKEPICTURE_TIMEOUT_MS/MS_PER_SEC;
@@ -409,6 +456,9 @@ int CameraTest::takePicture()
         }
     }
     pthread_mutex_unlock(&mutexPicDone);
+
+    if (!config_.testVideo)
+        camera_->stopAutoFocus();
     return 0;
 }
 
@@ -496,6 +546,22 @@ void CameraTest::onError()
     exit(EXIT_FAILURE);
 }
 
+void CameraTest::onControl(const ControlEvent& control)
+{
+    if (control.type == CAMERA_EVT_FOCUS) {
+        if (control.ext1 == true) {
+            printf("auto focus done\n");
+            pthread_mutex_lock(&mutexAutoFocusDone);
+            isAutoFocusDone = true;
+            pthread_cond_signal(&cvAutoFocusDone);
+            pthread_mutex_unlock(&mutexAutoFocusDone);
+        } else {
+            printf("auto focus failed\n");
+            isAutoFocusDone = false;
+        }
+    }
+}
+
 /**
  *
  * FUNCTION: onPreviewFrame
@@ -576,8 +642,11 @@ void CameraTest::onPictureFrame(ICameraFrame* frame)
     }
     /* notify the waiting thread about picture done */
     pthread_mutex_lock(&mutexPicDone);
-    isPicDone = true;
-    pthread_cond_signal(&cvPicDone);
+    if(!config_.hdrEnabled ||
+        (config_.hdrEnabled && (sFrameCount_ == 1))){
+        isPicDone = true;
+        pthread_cond_signal(&cvPicDone);
+    }
     pthread_mutex_unlock(&mutexPicDone);
 
     sFrameCount_++;
@@ -882,6 +951,7 @@ int CameraTest::setFPSindex(int fps, int &pFpsIdx, int &vFpsIdx)
     }
     return rc;
 }
+
 /**
  *  FUNCTION : setParameters
  *
@@ -967,6 +1037,7 @@ int CameraTest::setParameters()
 			printf("setting focus mode: %s\n",
 				 caps_.focusModes[focusModeIdx].c_str());
 			params_.setFocusMode(caps_.focusModes[focusModeIdx]);
+
 			printf("setting WB mode: %s\n", caps_.wbModes[wbModeIdx].c_str());
 			params_.setWhiteBalance(caps_.wbModes[wbModeIdx]);
 			printf("setting ISO mode: %s\n", caps_.isoModes[isoModeIdx].c_str());
@@ -1158,7 +1229,7 @@ int CameraTest::run()
                But hdr mode, if enable "hdr-need-1x", HAL will not do this.
                Therefore, it's the limit of current HAL and here we follow the
                application call rules. */
-            sleep(2);
+            sleep(1);
             printf("restart preview ...\n");
             camera_->stopPreview();
             camera_->startPreview();
@@ -1341,6 +1412,7 @@ static TestConfig parseCommandline(int argc, char* argv[])
                     cfg.testVideo = true;
                 } else if (str == "disable"){
                     cfg.testVideo = false;
+                    cfg.focusModeIdx = 4;   /* continuous-picture */
                 }
                 break;
             }
@@ -1443,9 +1515,9 @@ static TestConfig parseCommandline(int argc, char* argv[])
             break;
         case 'f':
             break;
-	case 'u':
+        case 'u':
             cfg.focusModeIdx = atoi(optarg); // 2: MACRO 1: INFINITY ;//3: CONTINOUS VIDEO; 5: manual
-	    break;
+            break;
         case 'P':
             cfg.storagePath = (int)atoi(optarg);
             switch (cfg.storagePath) {
@@ -1503,6 +1575,10 @@ static TestConfig parseCommandline(int argc, char* argv[])
     if (cfg.snapshotFormat == RAW_FORMAT) {
         cfg.testVideo = false;
         cfg.hdrEnabled = false;
+    }
+
+    if (cfg.zslEnabled) {
+        cfg.focusModeIdx = 4;    /* continuous-picture */
     }
 
     return cfg;
