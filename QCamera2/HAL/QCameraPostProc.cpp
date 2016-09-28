@@ -735,6 +735,7 @@ int32_t QCameraPostProcessor::processJpegEvt(qcamera_jpeg_evt_payload_t *evt)
     int32_t rc = NO_ERROR;
     camera_memory_t *jpeg_mem = NULL;
     omx_jpeg_ouput_buf_t *jpeg_out = NULL;
+    struct timeval tv;
 
     if (mUseSaveProc && m_parent->isLongshotEnabled()) {
         qcamera_jpeg_evt_payload_t *saveData = ( qcamera_jpeg_evt_payload_t * ) malloc(sizeof(qcamera_jpeg_evt_payload_t));
@@ -804,6 +805,8 @@ int32_t QCameraPostProcessor::processJpegEvt(qcamera_jpeg_evt_payload_t *evt)
         memset(&release_data, 0, sizeof(qcamera_release_data_t));
         release_data.data = jpeg_mem;
         ALOGE("[KPI Perf] %s: PROFILE_JPEG_CB ",__func__);
+        gettimeofday(&tv, NULL);
+        fprintf(stderr, "%d.%d [KPI Perf] %s: PROFILE_JPEG_CB ", (int)tv.tv_sec, (int)tv.tv_usec, __func__);
         rc = sendDataNotify(CAMERA_MSG_COMPRESSED_IMAGE,
                             jpeg_mem,
                             0,
@@ -1864,6 +1867,7 @@ void *QCameraPostProcessor::dataSaveRoutine(void *data)
     QCameraPostProcessor *pme = (QCameraPostProcessor *)data;
     QCameraCmdThread *cmdThread = &pme->m_saveProcTh;
     char saveName[PROPERTY_VALUE_MAX];
+    struct timeval tv;
 
     ALOGV("%s: E", __func__);
     do {
@@ -1953,6 +1957,8 @@ void *QCameraPostProcessor::dataSaveRoutine(void *data)
                     release_data.data = jpeg_mem;
                     release_data.unlinkFile = true;
                     ALOGE("[KPI Perf] %s: PROFILE_JPEG_CB ",__func__);
+                    gettimeofday(&tv, NULL);
+                    fprintf(stderr, "%d.%d [KPI Perf] %s: PROFILE_JPEG_CB ", (int)tv.tv_sec, (int)tv.tv_usec, __func__);
                     ret = pme->sendDataNotify(CAMERA_MSG_COMPRESSED_IMAGE,
                                         jpeg_mem,
                                         0,

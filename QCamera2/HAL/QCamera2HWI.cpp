@@ -610,6 +610,7 @@ int QCamera2HardwareInterface::cancel_auto_focus(struct camera_device *device)
 int QCamera2HardwareInterface::take_picture(struct camera_device *device)
 {
     int ret = NO_ERROR;
+    struct timeval tv;
     QCamera2HardwareInterface *hw =
         reinterpret_cast<QCamera2HardwareInterface *>(device->priv);
     if (!hw) {
@@ -617,6 +618,9 @@ int QCamera2HardwareInterface::take_picture(struct camera_device *device)
         return BAD_VALUE;
     }
     ALOGE("[KPI Perf] %s: E PROFILE_TAKE_PICTURE", __func__);
+    gettimeofday(&tv, NULL);
+    fprintf(stderr, "%d.%d [KPI Perf] %s: E PROFILE_TAKE_PICTURE\n",
+         (int)tv.tv_sec, (int)tv.tv_usec, __func__);
     hw->lockAPI();
     qcamera_api_result_t apiResult;
 
