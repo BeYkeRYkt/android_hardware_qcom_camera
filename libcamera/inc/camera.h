@@ -372,6 +372,18 @@ public:
      */
     virtual int takePicture() = 0;
 
+    /**
+     * Do auto focus
+     *
+     * @return int : 0 on success
+     */
+    virtual int startAutoFocus() = 0;
+
+    /**
+     * cancel auto focus
+     */
+    virtual void stopAutoFocus() = 0;
+
     virtual void sendFaceDetectCommand(bool turn_on) {};
 
 };
