@@ -103,5 +103,6 @@ AC_OUTPUT([ \
   mm-image-codec/Makefile \
   qcamlib/Makefile \
   libcamera/Makefile \
+  cameraserver/Makefile \
 ])
 

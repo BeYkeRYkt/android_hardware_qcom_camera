@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,53 +26,15 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#ifndef __CAMERA_MEMORY_H__
-#define __CAMERA_MEMORY_H__
+#ifndef __CAMERA_CLIENT_UTIL_H__
+#define __CAMERA_CLIENT_UTIL_H__
 #include <stdint.h>
-#include <hardware/camera.h>
-#include "qcamera2.h"
-#include <QComOMXMetadata.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <unistd.h>
+int socket_sendmsg(int fd, void *msg, uint32_t buf_size, int sendfd);
+int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd);
 
-namespace camera
-{
-
-enum MemType
-{
-    MEM_MAPPED,
-    MEM_ALLOCATED,
-    MEM_INVALID,
-};
-
-const int NH_NUM_FDS = 1;
-const int NH_NUM_INTS = 2;
-
-class CameraMemory
-{
-
- public:
-    /* create a new memory object and map/allocate the buffer */
-    CameraMemory(int fd, uint32_t size);
-
-    /* unmap/free the buffer and destroy the memory object */
-    ~CameraMemory();
-
-    /* function to serve the request_memory_callback from camera HAL */
-    static camera_memory_t* requestMemory(int fd, size_t buf_size,
-                                          unsigned int num_bufs,
-                                          void* user);
-    /* function to serve the release_memory_callback from camera HAL */
-    static void releaseMemory(struct camera_memory* mem);
-
-    QCamera2Frame frame;
- private:
-    bool valid_;
-    android::encoder_media_buffer_type metadata_;
-    /* pre-allocated memory for native_handle_t with data */
-    uint8_t nh_mem_[sizeof(native_handle_t) +
-        (NH_NUM_FDS + NH_NUM_INTS) * sizeof(int)];
-    camera_memory_t* mem_;
-    MemType type_;
-};
-
-} /* namespace camera */
-#endif //__CAMERA_MEMORY_H__
+#endif // __CAMERA_CLIENT_UTIL_H__

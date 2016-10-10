@@ -8,6 +8,7 @@ dirs += QCamera2/stack
 dirs += QCamera2/HAL
 dirs += qcamlib
 dirs += libcamera
+dirs += cameraserver
 
 SUBDIRS = $(dirs)
 

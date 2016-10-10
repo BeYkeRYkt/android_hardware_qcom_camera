@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -168,6 +168,12 @@ int CameraParams::writeObject(std::ostream& ps) const
 
 {
     ps << params_cast(priv_)->flatten().c_str();
+    return 0;
+}
+
+int CameraParams::readObject(char *paramString)
+{
+    params_cast(priv_)->unflatten((const char *)paramString);
     return 0;
 }
 
