@@ -26,15 +26,17 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#include <sys/signal.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sstream>
 #include "camera.h"
 #include "CameraServer.hpp"
 #include "CameraClientUtil.hpp"
-#include "CameraClient.hpp"
 #include <algorithm>
 
 #define CAM_SERVER_SOCKET "/root/cam_srv_sock"
@@ -42,8 +44,29 @@
 #define XNO_ERROR 0 //REPLACE
 using namespace camera;
 
+ClientDescriptor::ClientDescriptor(int cFd):
+                mClientFD(cFd),
+                mNumFrameFd(0),
+                mState(CLIENT_INACTIVE),
+                mExpPicture(false)
+{
+    pthread_mutex_init(&mClientLock, NULL);
+    // Create internal communication pipe
+    if(pipe(mIntCommPipeFd) < 0) {
+        fprintf(stderr, "Error creating pipe\n");
+    }
+}
 
-CameraObject::CameraObject()
+ClientDescriptor::~ClientDescriptor()
+{
+    close(mIntCommPipeFd[0]);
+    close(mIntCommPipeFd[1]);
+    pthread_mutex_destroy(&mClientLock);
+}
+
+CameraObject::CameraObject():
+            mOpenInstances(0),
+            mStartedPreviews(0)
 {
     return;
 }
@@ -78,47 +101,39 @@ void CameraObject::onMetadataFrame(ICameraFrame *frame)
     return;
 }
 
-SrvCameraObject::SrvCameraObject(CameraServer *srv, int camId)
+SrvCameraObject::SrvCameraObject(CameraServer *srv, int camId):
+            mServer(srv),
+            mCamId(camId)
 {
-    mCamId = camId;
-    mServer = srv;
-    mOpenInstances = 0;
-    return;
 }
 
 SrvCameraObject::~SrvCameraObject()
 {
-    return;
 }
 
 
 void SrvCameraObject::onError()
 {
-    return;
 }
 
 void SrvCameraObject::onPreviewFrame(ICameraFrame* frame)
 {
     mServer->dispatchFrame(mCamId, NEW_PREVIEW_FRAME, frame);
-    return;
 }
 
 void SrvCameraObject::onVideoFrame(ICameraFrame* frame)
 {
     mServer->dispatchFrame(mCamId, NEW_VIDEO_FRAME, frame);
-    return;
 }
 
 void SrvCameraObject::onPictureFrame(ICameraFrame* frame)
 {
     mServer->dispatchFrame(mCamId, NEW_SNAPSHOT_FRAME, frame);
-    return;
 }
 
 void SrvCameraObject::onMetadataFrame(ICameraFrame *frame)
 {
     mServer->dispatchFrame(mCamId, NEW_META_FRAME, frame);
-    return;
 }
 
 struct ThreadData {
@@ -138,64 +153,152 @@ void *cleanup_thread(void *arg)
         cliDesc = (ClientDescriptor*) buf;
 
         if (cliDesc) {
-            fprintf(stderr, "destroying thread %p\n", &cliDesc->mThread);
             pthread_join(cliDesc->mThread, NULL);
-
-            pthread_mutex_destroy(&cliDesc->mClientLock);
+            close(cliDesc->mClientFD);
             delete(cliDesc);
-            fprintf(stderr, "destroyed \n");
         } else {
+            // Signal for completion
             activeFlag = 0;
         }
     }
     return NULL;
 }
 
-void *listen_thread(void *arg)
+void *client_thread(void *arg)
 {
     ThreadData data = *(ThreadData*)arg;
     bool activeFlag = true;
     ICameraCommandType inc_command;
     ICameraCommandType out_command;
+    ICameraCommandType err_command;
     void *payload = NULL;
     void *out_payload = NULL;
-    int fd = 0, error = XNO_ERROR;
+    int fd = 0, err_no = 0, nfds;
+    ClientThreadState threadState = WAIT_RECV_COMMAND;
+    int intCmd;
+    ErrorType error = NO_ERROR;
+
+    err_command.payload_size = sizeof(error);
+    err_command.type = SERVER_NOTIFICATION;
 
     while (activeFlag) {
-        // Receive cmd msg from client
-        socket_recvmsg(data.client->mClientFD, &inc_command,
-                sizeof(inc_command), &fd);
-        if (inc_command.payload_size) {
+        int readyFds;
+        fd_set fdSetRead;
+        fd_set fdSetWrite;
+        int nfds = (data.client->mClientFD > data.client->mIntCommPipeFd[0]) ?
+                data.client->mClientFD:data.client->mIntCommPipeFd[0];
+
+        FD_ZERO(&fdSetRead);
+        FD_ZERO(&fdSetWrite);
+        if (threadState == WAIT_RECV_COMMAND || threadState == WAIT_RECV_PAYLOAD) {
+            FD_SET(data.client->mClientFD, &fdSetRead);
+        } else {
+            FD_SET(data.client->mClientFD, &fdSetWrite);
+        }
+
+        FD_SET(data.client->mIntCommPipeFd[0], &fdSetRead);
+        readyFds = select (nfds + 1, &fdSetRead, &fdSetWrite, NULL, NULL);
+        if (readyFds <= 0) {
+            continue;
+        }
+        if (FD_ISSET(data.client->mIntCommPipeFd[0], &fdSetRead)) {
+            // Server notification received
+            read(data.client->mIntCommPipeFd[0], &intCmd, sizeof(intCmd));
+            error = ERROR_SERVER_DIED;
+            socket_sendmsg(data.client->mClientFD, &err_command,
+                    sizeof(err_command), fd, &err_no);
+            socket_sendmsg(data.client->mClientFD, &error,
+                    sizeof(error), fd, &err_no);
+            break;
+        }
+        if (!FD_ISSET(data.client->mClientFD, &fdSetRead) && !FD_ISSET(data.client->mClientFD, &fdSetWrite)) {
+            // Continue waiting for client request
+            continue;
+        }
+
+        switch (threadState) {
+        case WAIT_RECV_COMMAND: {
+            // Receive cmd msg from client
+            socket_recvmsg(data.client->mClientFD, &inc_command,
+                    sizeof(inc_command), &fd, &err_no);
+            if (inc_command.payload_size) {
+                threadState = WAIT_RECV_PAYLOAD;
+            } else {
+                threadState = WAIT_SEND_COMMAND;
+            }
+        }
+            break;
+        case WAIT_RECV_PAYLOAD: {
             payload = malloc(inc_command.payload_size);
             socket_recvmsg(data.client->mClientFD, payload,
-                    inc_command.payload_size, &fd);
+                    inc_command.payload_size, &fd, &err_no);
+            threadState = WAIT_SEND_COMMAND;
+
         }
-        // process command
-        error = data.server->processCommand(*data.client, inc_command, payload,
-                out_command, &out_payload);
-        if (error == XNO_ERROR && out_command.type == STOP_SESSION_DONE) {
-            // We just stopped camera. Stop listening and proceed to cleanup
+            break;
+        case WAIT_SEND_COMMAND: {
+            // send acknowledge
+            pthread_mutex_lock(&data.client->mClientLock);
+            socket_sendmsg(data.client->mClientFD, &out_command,
+                    sizeof(out_command), fd, &err_no);
+            if (out_command.payload_size) {
+                threadState = WAIT_SEND_PAYLOAD;
+            } else {
+                threadState = WAIT_RECV_COMMAND;
+                pthread_mutex_unlock(&data.client->mClientLock);
+            }
+        }
+            break;
+        case WAIT_SEND_PAYLOAD: {
+            socket_sendmsg(data.client->mClientFD, out_payload,
+                    out_command.payload_size, fd, &err_no);
+            threadState = WAIT_RECV_COMMAND;
+            pthread_mutex_unlock(&data.client->mClientLock);
+        }
+            break;
+        default:
+            break;
+        }
+
+
+        if (out_command.type == STOP_SESSION_DONE &&
+                threadState == WAIT_RECV_COMMAND) {
+            // We'd just acknowledged "stop session".
+            // Now stop listening and proceed to cleanup
             activeFlag = false;
         }
 
-        // send acknowledge
-        pthread_mutex_lock(&data.client->mClientLock);
-        socket_sendmsg(data.client->mClientFD, &out_command,
-                sizeof(out_command), fd);
-        if (out_command.payload_size) {
-            socket_sendmsg(data.client->mClientFD, out_payload,
-                    out_command.payload_size, fd);
-        }
-        pthread_mutex_unlock(&data.client->mClientLock);
-        if (payload) {
-            free(payload);
-            payload = NULL;
-        }
-        if (out_payload) {
-            free(out_payload);
-            out_payload = NULL;
+        if (err_no != 0) {
+            fprintf(stderr, "Client communication broken, terminating...\n");
+            if (threadState == WAIT_SEND_PAYLOAD) {
+                pthread_mutex_unlock(&data.client->mClientLock);
+            }
+            activeFlag = false;
         }
 
+        if (!err_no && threadState == WAIT_SEND_COMMAND) {
+            // process command
+            error = data.server->processCommand(*data.client, inc_command, payload,
+                    out_command, &out_payload);
+            if (error != NO_ERROR) {
+                socket_sendmsg(data.client->mClientFD, &err_command,
+                        sizeof(err_command), fd, &err_no);
+                socket_sendmsg(data.client->mClientFD, &error,
+                        sizeof(error), fd, &err_no);
+            }
+
+        }
+
+        if (payload && threadState == WAIT_SEND_COMMAND) {
+            free(payload);
+            payload = NULL;
+            inc_command.payload_size = 0;
+        }
+        if (out_payload && threadState == WAIT_RECV_COMMAND) {
+            free(out_payload);
+            out_payload = NULL;
+            out_command.payload_size = 0;
+        }
     }
 
     data.server->delClientByFD(data.client->mClientFD);
@@ -203,7 +306,7 @@ void *listen_thread(void *arg)
     return NULL;
 }
 
-CameraServer::CameraServer ()
+CameraServer::CameraServer () : mSocket(-1)
 {
     // Collect camera info
     mNumberOfCameras = getNumberOfCameras();
@@ -217,6 +320,8 @@ CameraServer::CameraServer ()
         getCameraInfo(i, mCameraInfo[i]);
         pCamObjects[i] = NULL;
     }
+    mCleanupPipeFd[0] = -1;
+    mCleanupPipeFd[1] = -1;
 }
 
 CameraServer::~CameraServer()
@@ -254,13 +359,27 @@ int  CameraServer::openCamera(int camId, int &isMaster)
 int  CameraServer::startPreview(int camId)
 {
     int error;
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
     error = pCamObjects[camId]->mCamera->startPreview();
+    pCamObjects[camId]->mStartedPreviews++;
     return error;
 }
 
 int  CameraServer::stopPreview(int camId)
 {
     int error;
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
+    if (pCamObjects[camId]->mStartedPreviews) {
+        pCamObjects[camId]->mStartedPreviews--;
+    } else {
+        // Error - preview is stopped
+        /*return*/
+    }
+
     pCamObjects[camId]->mCamera->stopPreview();
     return error;
 }
@@ -268,6 +387,9 @@ int  CameraServer::stopPreview(int camId)
 int  CameraServer::startRecording(int camId)
 {
     int error;
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
     error = pCamObjects[camId]->mCamera->startRecording();
     return error;
 }
@@ -275,6 +397,9 @@ int  CameraServer::startRecording(int camId)
 int  CameraServer::stopRecording(int camId)
 {
     int error;
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
     pCamObjects[camId]->mCamera->stopRecording();
     return error;
 }
@@ -283,7 +408,12 @@ int  CameraServer::closeCamera(int camId)
 {
 
 
-    pCamObjects[camId]->mOpenInstances--;
+    if (pCamObjects[camId]->mOpenInstances) {
+        pCamObjects[camId]->mOpenInstances--;
+    } else {
+        // Error - camera is closed
+        /*return*/
+    }
     if (pCamObjects[camId]->mOpenInstances == 0) {
         pCamObjects[camId]->mCamera->removeListener(pCamObjects[camId]);
         ICameraDevice::deleteInstance(&pCamObjects[camId]->mCamera);
@@ -293,39 +423,80 @@ int  CameraServer::closeCamera(int camId)
     return XNO_ERROR;
 }
 
-int  CameraServer::getParameters(int camId)
+int  CameraServer::getParameters(int camId, int *paramSize, char **paramString)
 {
-    return XNO_ERROR;
+    int error = 0;
+
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
+    error = pCamObjects[camId]->mCamera->getParameters(0, 0, paramSize);
+
+    if (!error) {
+      *paramString = (char *)calloc(*paramSize+1, 1);
+      if (NULL == *paramString) {
+          error = -1;
+      }
+    }
+
+    if (!error) {
+      error = pCamObjects[camId]->mCamera->getParameters((uint8_t*)*paramString, *paramSize);
+    }
+    if (error) {
+        free(*paramString);
+        *paramString = NULL;
+        *paramSize = 0;
+    }
+
+    return error;
 }
 
-int  CameraServer::setParameters(int camId)
+int  CameraServer::setParameters(int camId,  char *paramString)
 {
+    int error = 0;
+
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
+    pCamObjects[camId]->mParams.readObject(paramString);
+    error = pCamObjects[camId]->mCamera->setParameters(pCamObjects[camId]->mParams);
+    pCamObjects[camId]->mParams.commit();
     return XNO_ERROR;
 }
 
 int  CameraServer::takePicture(int camId)
 {
     int error;
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
     error = pCamObjects[camId]->mCamera->takePicture();
     return XNO_ERROR;
 }
 
 int  CameraServer::cancelPicture(int camId)
 {
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
     return XNO_ERROR;
 }
 
 int  CameraServer::enableFaceDetect(int camId, bool enable)
 {
+    if (!pCamObjects[camId]->mOpenInstances) {
+        return -1;
+    }
     pCamObjects[camId]->mCamera->sendFaceDetectCommand(enable);
     return XNO_ERROR;
 }
 
-int  CameraServer::processCommand(ClientDescriptor &client,
+ErrorType CameraServer::processCommand(ClientDescriptor &client,
         const ICameraCommandType &cmd, void* payload,
         ICameraCommandType &ack, void **ack_payload)
 {
     int error = XNO_ERROR;
+    ErrorType res = NO_ERROR;
     *ack_payload = NULL;
     ack.payload_size = 0;
     switch (cmd.type) {
@@ -355,74 +526,137 @@ int  CameraServer::processCommand(ClientDescriptor &client,
             int *camId = (int*)payload;
             int *isMaster;
             client.mCameraId = *camId;
-            openCamera(client.mCameraId, client.mMaster);
-            ack.type = OPEN_CAMERA_DONE;
-            ack.payload_size = sizeof(int);
-            *ack_payload = malloc(ack.payload_size);
-            isMaster = (int*)(*ack_payload);
-            *isMaster = client.mMaster;
+            error = openCamera(client.mCameraId, client.mMaster);
+            if (!error) {
+                client.mState = CLIENT_OPEN;
+                ack.type = OPEN_CAMERA_DONE;
+                ack.payload_size = sizeof(int);
+                *ack_payload = malloc(ack.payload_size);
+                isMaster = (int*)(*ack_payload);
+                *isMaster = client.mMaster;
+            } else {
+                res = ERROR_OPEN_CAMERA;
+            }
         }
             break;
 
         case CLOSE_CAMERA: {
-            closeCamera(client.mCameraId);
-            ack.type = CLOSE_CAMERA_DONE;
+            error = closeCamera(client.mCameraId);
+            if (!error) {
+                client.mState = CLIENT_INACTIVE;
+                ack.type = CLOSE_CAMERA_DONE;
+            } else {
+                res = ERROR_CLOSE_CAMERA;
+            }
         }
             break;
 
         case GET_PARAMETERS: {
-            // TBD
-            ack.type = GET_PARAMETERS_DONE;
+            char *paramStr;
+            error = getParameters(client.mCameraId, &ack.payload_size, &paramStr);
+            if (!error) {
+                *ack_payload = paramStr;
+                ack.type = GET_PARAMETERS_DONE;
+            } else {
+                res = ERROR_GET_PARAMS;
+            }
         }
             break;
 
         case SET_PARAMETERS: {
-            // TBD
-            ack.type = SET_PARAMETERS_DONE;
+            char *paramStr = (char*)payload;
+            if (cmd.payload_size) {
+                error = setParameters(client.mCameraId, paramStr);
+            } else {
+                error = -1;
+            }
+            if (!error) {
+                ack.type = SET_PARAMETERS_DONE;
+            } else {
+                res = ERROR_COMMIT_PARAMS;
+            }
+
         }
             break;
 
         case ENABLE_FACE_DETECT: {
-            bool enable = false;
+            bool enable = (0 != *(int *)payload);
             // extract enable from command
-            enableFaceDetect(client.mCameraId, enable);
-            ack.type = ENABLE_FACE_DETECT_DONE;
+            error = enableFaceDetect(client.mCameraId, enable);
+            if (!error) {
+                ack.type = ENABLE_FACE_DETECT_DONE;
+            } else {
+                res = ERROR_FACE_DETECT;
+            }
         }
             break;
 
         case START_PREVIEW: {
             error = startPreview(client.mCameraId);
-            ack.type = START_PREVIEW_DONE;
+            if (!error) {
+                client.mState = CLIENT_PREVIEW;
+                ack.type = START_PREVIEW_DONE;
+            } else {
+                res = ERROR_START_PREVIEW;
+            }
         }
             break;
 
         case STOP_PREVIEW: {
             error = stopPreview(client.mCameraId);
-            ack.type = STOP_PREVIEW_DONE;
+            if (!error) {
+                client.mState = CLIENT_OPEN;
+                ack.type = STOP_PREVIEW_DONE;
+            } else {
+                res = ERROR_STOP_PREVIEW;
+            }
         }
             break;
 
         case START_RECORDING: {
             error = startRecording(client.mCameraId);
-            ack.type = START_RECORDING_DONE;
+            if (!error) {
+                ack.type = START_RECORDING_DONE;
+            } else {
+                res = ERROR_START_RECORDING;
+            }
         }
             break;
 
         case STOP_RECORDING: {
             error = stopRecording(client.mCameraId);
-            ack.type = STOP_PRECORDING_DONE;
+            if (!error) {
+                ack.type = STOP_RECORDING_DONE;
+            } else {
+                res = ERROR_STOP_RECORDING;
+            }
         }
             break;
 
         case TAKE_PICTURE: {
-            takePicture(client.mCameraId);
-            ack.type = TAKE_PICTURE_DONE;
+            client.mExpPicture = true;
+            error = takePicture(client.mCameraId);
+            if (!error) {
+                ack.type = TAKE_PICTURE_DONE;
+            } else {
+                res = ERROR_TAKE_PICTURE;
+            }
         }
             break;
 
         case CANCEL_PICTURE: {
-            // TBD
-            ack.type = CANCEL_PICTURE_DONE;
+            if (!error) {
+                ack.type = CANCEL_PICTURE_DONE;
+            } else {
+                res = ERROR_CANCEL_PICTURE;
+            }
+        }
+            break;
+
+        case RELEASE_FRAME: {
+            int index = *(int*)payload;
+            client.mClFrames[index].mFrame->releaseRef();
+            ack.type = RELEASE_FRAME_DONE;
         }
             break;
 
@@ -432,100 +666,180 @@ int  CameraServer::processCommand(ClientDescriptor &client,
             break;
 
         default:
-            // Unexpected command Report error.
+            fprintf(stderr, "Unexpected command %d received from client!\n", cmd.type);
             break;
     }
-    return error;
+    return res;
 }
 
 int  CameraServer::dispatchFrame(int camId, ICameraCommand cmd,
-        const ICameraFrame *frame)
+        ICameraFrame *frame)
 {
     int i;
     int currentFd;
     std::list<ClientDescriptor *>::iterator it;
     ICameraCommandType out_command;
     ICameraCommandFrameType commandFrame;
+    int err_no = 0;
 
     out_command.type = cmd;
-    out_command.payload_size = sizeof(ICameraCommandFrameType);
+
+    if (cmd == NEW_META_FRAME) {
+        out_command.payload_size = sizeof(FaceRoi);
+    } else if (frame->fd == -1) {
+        out_command.payload_size = frame->size;
+    } else {
+        out_command.payload_size = sizeof(ICameraCommandFrameType);
+    }
 
     // Iterate over clients
     for(it = pClDescriptors.begin(); it != pClDescriptors.end(); it++) {
-      /*fprintf(stderr, "camid %d Descriptor %d frame %d\n", (*it)->mCameraId, (*it)->mClientFD, frame->fd);*/
         if ((*it)->mCameraId == camId) {
+            if (cmd == NEW_SNAPSHOT_FRAME) {
+                if((*it)->mExpPicture) {
+                    (*it)->mExpPicture = false;
+                } else {
+                    continue;
+                }
+            }
             // Send frame data to client
             for (i = 0; i < (*it)->mNumFrameFd; i++) {
-                if ((*it)->mFrameFds[i] == frame->fd) {
+                if ((*it)->mClFrames[i].mFrameFd == frame->fd) {
                     break;
                 }
             }
-
-            pthread_mutex_lock(&(*it)->mClientLock);
-            socket_sendmsg((*it)->mClientFD, &out_command, sizeof(out_command), 0);
-            if (i == (*it)->mNumFrameFd) {
-                (*it)->mNumFrameFd++;
-                (*it)->mFrameFds[i] = frame->fd;
-                currentFd = frame->fd;
-            } else {
-                currentFd = 0;
+            if (cmd != NEW_META_FRAME && frame->fd != -1) {
+                if (i == (*it)->mNumFrameFd) {
+                    (*it)->mNumFrameFd++;
+                    (*it)->mClFrames[i].mFrameFd = frame->fd;
+                    currentFd = frame->fd;
+                } else {
+                    currentFd = 0;
+                }
+                (*it)->mClFrames[i].mFrame = frame;
+                (*it)->mClFrames[i].mFrame->acquireRef();
             }
-            commandFrame.index = i;
-            commandFrame.bufSize = frame->size;
-            commandFrame.timestamp = frame->timeStamp;
-            socket_sendmsg((*it)->mClientFD, &commandFrame,
-                    sizeof(ICameraCommandFrameType), currentFd);
+            pthread_mutex_lock(&(*it)->mClientLock);
+            socket_sendmsg((*it)->mClientFD, &out_command, sizeof(out_command), 0, &err_no);
+
+            if (cmd == NEW_META_FRAME) {
+                socket_sendmsg((*it)->mClientFD, frame->facedata,
+                        sizeof(FaceRoi), 0, &err_no);
+            } else if (frame->fd != -1) {
+                commandFrame.index = i;
+                commandFrame.bufSize = frame->size;
+                commandFrame.timestamp = frame->timeStamp;
+                socket_sendmsg((*it)->mClientFD, &commandFrame,
+                        sizeof(ICameraCommandFrameType), currentFd, &err_no);
+            } else {
+                int sendBytes, totalBytes = 0;
+                do {
+                    sendBytes = socket_sendmsg((*it)->mClientFD, ((char*)frame->data) + totalBytes,
+                            frame->size - totalBytes, 0, &err_no);
+                    totalBytes += sendBytes;
+                } while (sendBytes > 0 && totalBytes < frame->size);
+            }
             pthread_mutex_unlock(&(*it)->mClientLock);
         }
     }
     return XNO_ERROR;
 }
+void CameraServer::delClient(std::list<ClientDescriptor *>::iterator it)
+{
+    void *cliDesc;
+    // Stop and close if active
+    if ((*it)->mState == CLIENT_PREVIEW) {
+        stopPreview((*it)->mCameraId);
+        (*it)->mState = CLIENT_OPEN;
+    }
+    if ((*it)->mState == CLIENT_OPEN) {
+        closeCamera((*it)->mCameraId);
+        (*it)->mState = CLIENT_INACTIVE;
+    }
+    // Report completion to server
+    cliDesc = (void*)(*it);
+    write(mCleanupPipeFd[1], &cliDesc, sizeof(cliDesc));
+    pClDescriptors.erase(it);
+    fprintf(stderr, "Active clients %d\n", pClDescriptors.size());
+}
 
 bool CameraServer::delClientByFD(int fd)
 {
+    bool res = false;
     std::list<ClientDescriptor *>::iterator it;
+    std::list<ClientDescriptor *>::iterator itdel;
     it = pClDescriptors.begin();
-    void *cliDesc;
     while (it != pClDescriptors.end()) {
-        if ((*it)->mClientFD == fd) {
-    // Report completion to server
-        fprintf(stderr, "found %d\n", fd);
-            cliDesc = (void*)(*it);
-            write(mCleanupPipeFd[1], &cliDesc, sizeof(cliDesc));
+        itdel = it;
+        it++;
+        if ((*itdel)->mClientFD == fd) {
+            res = true;
+            delClient(itdel);
             break;
         }
-        it++;
     }
 
-    if (it != pClDescriptors.end())
-        pClDescriptors.erase(it);
-
-    return (it != pClDescriptors.end());
+    return res;
 }
 
-void CameraServer::start()
+void CameraServer::delAllClients()
+{
+    std::list<ClientDescriptor *>::iterator it;
+    std::list<ClientDescriptor *>::iterator itdel;
+    int intMsg = 0;
+    it = pClDescriptors.begin();
+    while (it != pClDescriptors.end()) {
+        itdel = it;
+        it++;
+        write((*itdel)->mIntCommPipeFd[1], &intMsg, sizeof(intMsg));
+    }
+}
+
+static int listening = 1;
+static void sigterm_handler (int sig)
+{
+    listening = 0;
+}
+
+int CameraServer::start()
 {
 
     int connect_fd;
     struct sockaddr_un srv_addr, peer_addr;
     socklen_t peer_addr_size;
-    bool listening = true;
     pthread_t cleanupThread;
+    struct sigaction sigAction;
+    sigset_t stMask, oldMask;
+    memset (&sigAction, 0, sizeof(sigAction));
+    sigAction.sa_handler = sigterm_handler;
+
+    if (sigaction(SIGTERM, &sigAction, 0)) {
+        fprintf(stderr, "Error setting SIGTERM handler\n");
+        return -1;
+    }
+
+    sigemptyset (&stMask);
+    sigaddset (&stMask, SIGTERM);
+
+    if (sigprocmask(SIG_BLOCK, &stMask, &oldMask)) {
+        fprintf(stderr, "Error setting SIGTERM handler\n");
+        return -1;
+    }
 
     // Create cleanup pipe
     if(pipe(mCleanupPipeFd) < 0) {
         fprintf(stderr, "Error creating pipe\n");
-        // TODO HANDLE ERROR
+        return -1;
     }
 
     pthread_create(&cleanupThread, NULL, cleanup_thread, (void*)&mCleanupPipeFd);
 
-    // Create socket 
+    // Create socket
     unlink(CAM_SERVER_SOCKET);
     mSocket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (mSocket == -1) {
         fprintf(stderr, "Error creating socket\n");
-        // TODO HANDLE ERROR
+        return -1;
     }
 
     memset(&srv_addr, 0, sizeof(struct sockaddr_un));
@@ -536,46 +850,67 @@ void CameraServer::start()
     if (bind(mSocket, (struct sockaddr *) &srv_addr,
             sizeof(struct sockaddr_un)) == -1) {
         fprintf(stderr, "Error binding socket\n");
-        // TODO HANDLE ERROR
+        return -1;
     }
 
-   if (listen(mSocket, 5) == -1)
+   if (listen(mSocket, 5) == -1) {
         fprintf(stderr, "Error while listen");
+        return -1;
+   }
 
     peer_addr_size = sizeof(struct sockaddr_un);
     while (listening) {
-        ClientDescriptor *cliDesc = new ClientDescriptor;
-        cliDesc->mNumFrameFd = 0;
-        ThreadData data;
-        pClDescriptors.push_back(cliDesc);
-        cliDesc->mClientFD = accept(mSocket, (struct sockaddr *) &peer_addr,
-                     &peer_addr_size);
+        fd_set fdSet;
+        int readyFds;
 
-        pthread_mutex_init(&cliDesc->mClientLock, NULL);
-        fprintf(stderr, "Connect %d\n", cliDesc->mClientFD );
-        data.client = cliDesc;
-        data.server = this;
-        if (cliDesc->mClientFD == -1)
-            fprintf(stderr, "Error accepting connection\n");
-        pthread_create(&cliDesc->mThread, NULL, listen_thread, (void*)&data);
-        fprintf(stderr, "creating thread %p\n", &cliDesc->mThread);
+        FD_ZERO(&fdSet);
+        FD_SET(mSocket, &fdSet);
+
+        readyFds = pselect (mSocket + 1, &fdSet, NULL, NULL, NULL, &oldMask);
+        if (readyFds > 0) {
+            int newFd;
+            newFd = accept(mSocket, (struct sockaddr *) &peer_addr,
+                         &peer_addr_size);
+            if (newFd == -1) {
+                fprintf(stderr, "Error accepting connection\n");
+                continue;
+            }
+
+            ClientDescriptor *cliDesc = new ClientDescriptor(newFd);
+            pClDescriptors.push_back(cliDesc);
+
+            ThreadData data;
+            data.client = cliDesc;
+            data.server = this;
+
+            pthread_create(&cliDesc->mThread, NULL, client_thread, (void*)&data);
+        }
     }
 
-    // Check if all cameras are closed
+    // Cleanup remaining clients if any
+    delAllClients();
 
     // Stop and destroy cleanup thread
-    void *thread = NULL;
-    write(mCleanupPipeFd[1], thread, sizeof(thread));
-    pthread_join(cleanupThread, NULL);
-    close(mCleanupPipeFd[0]);
-    close(mCleanupPipeFd[1]);
+    int thread = 0;
+    if (mCleanupPipeFd[1] != -1) {
+        write(mCleanupPipeFd[1], &thread, sizeof(thread));
+        pthread_join(cleanupThread, NULL);
+        close(mCleanupPipeFd[0]);
+        close(mCleanupPipeFd[1]);
+    }
+    if (mSocket != -1) {
+        close(mSocket);
+    }
+    unlink(CAM_SERVER_SOCKET);
+
 }
 
 int main ()
 {
+  int res = 0;
   CameraServer server;
 
-  server.start();
+  res = server.start();
 
-  return 0;
+  return res;
 }

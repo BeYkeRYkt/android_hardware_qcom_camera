@@ -37,6 +37,40 @@
 
 using namespace camera;
 
+class ICameraClient;
+
+enum CamFunction {
+    CAM_FUNC_HIRES = 0,
+    CAM_FUNC_OPTIC_FLOW = 1,
+    CAM_FUNC_RIGHT_SENSOR = 2,
+    CAM_FUNC_STEREO = 3,
+};
+
+typedef enum _ClientModeType {
+    MASTER_CLIENT,
+    SLAVE_CLIENT,
+} ClientModeType;
+
+typedef enum _ErrorType {
+    NO_ERROR,
+    ERROR_SERVER_DIED,
+    ERROR_SEND_COMMAND,
+    ERROR_NOT_SUPPORTED_CAMERA,
+    ERROR_OPEN_CAMERA,
+    ERROR_CLOSE_CAMERA,
+    ERROR_START_PREVIEW,
+    ERROR_STOP_PREVIEW,
+    ERROR_START_RECORDING,
+    ERROR_STOP_RECORDING,
+    ERROR_TAKE_PICTURE,
+    ERROR_CANCEL_PICTURE,
+    ERROR_START_AUTOFOCUS,
+    ERROR_STOP_AUTOFOCUS,
+    ERROR_FACE_DETECT,
+    ERROR_COMMIT_PARAMS,
+    ERROR_GET_PARAMS,
+} ErrorType;
+
 typedef struct _CameraFuncType {
     int camera_func[4];
 } CameraFuncType;
@@ -47,7 +81,12 @@ private:
 
 public:
     ICameraClientFrame( int64_t timestamp,
-            QCamera2Frame *frame, int index, int SocketFD);
+            QCamera2Frame *frame, int index, int SocketFD,
+            pthread_mutex_t *pAPIlock);
+    ICameraClientFrame( int64_t timestamp,
+            int fd, int bufsize, void *data, void *metadata,
+            int index, int SocketFD,
+            pthread_mutex_t *pAPIlock);
     virtual ~ICameraClientFrame();
 
     virtual uint32_t acquireRef();
@@ -57,8 +96,9 @@ public:
     void setSocketFD(int mSocketFD);
 private:
     uint32_t refs_;
-    uint32_t index_;
+    int32_t index_;
     int mSocketFD;
+    pthread_mutex_t *mAPIlock;
 };
 
 class ICameraClientParams : public CameraParams
@@ -69,12 +109,14 @@ public:
     virtual int init(ICameraDevice* device = NULL);
     virtual int commit();
     void InitComm(int socketFD, pthread_mutex_t *mAPIlock);
-    void SetSlaveDevice(bool SlaveDevice);
+    void SetSlaveMode(bool SlaveMode);
+    void SetDevice(ICameraClient *dev);
 
 private:
     int mSocketFD;
     pthread_mutex_t *mAPIlock;
-    bool mSlaveDevice;
+    bool mSlaveMode;
+    ICameraClient *dev;
 
 public:
     pthread_cond_t mAPIcond;
@@ -93,8 +135,9 @@ public:
     ~ICameraClient();
 
     /* Initialize API. It should be called first after creating CameraClient object */
-
     int Init();
+    /* Deinitialize API. It should be called before client object is deleted */
+    int deInit();
 
     int OpenCamera(int camID);
     int CloseCamera(int camID);
@@ -111,9 +154,6 @@ public:
     void AddListener(ICameraListener* listener);
     void RemoveListener(ICameraListener* listener);
 
-    int setParameters();
-    int getParameters();
-
     int startAutoFocus() {};
     int stopAutoFocus()  {};
 
@@ -126,11 +166,15 @@ public:
     void GetCameraInfo( int idx, struct CameraInfo  *info);
 
     int GetIsActive() { return mIsActive;}
-
     void SetIsActive(int isActive) { mIsActive = isActive;}
 
-    /* Deinitialize API. It should be called before client object is deleted */
-    int deInit();
+    ClientModeType GetClientMode() { return mClientMode;}
+    void SetClientMode(ClientModeType ClientMode);
+
+    ErrorType GetError() { return mError;}
+    void SetError(ErrorType Error) { mError = Error;}
+
+    pthread_mutex_t * GetLock() { return &mAPIlock; }
 
 private:
     void ThreadLoop();
@@ -142,13 +186,14 @@ private:
     CameraFuncType mCameraFunc;
     int mNumCameras;
     int mIsActive;
+    ClientModeType mClientMode;
+    ErrorType  mError;
 
 public:
     std::vector <CameraMemory *> pMem;
     int mSocketFD;
     ICameraClientParams params;
     pthread_cond_t mAPIcond;
-    int  mError;
     ICameraListener *mCamListner;
 
 };

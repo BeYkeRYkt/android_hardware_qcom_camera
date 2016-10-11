@@ -34,17 +34,42 @@
 #include "../libcamera/inc/camera.h"
 #include "camera_parameters.h"
 #include "CameraClientCommand.h"
+#include "CameraClient.hpp"
 
+#define MAX_FDS_FOR_CLIENT (20)
 using namespace camera;
-struct ClientDescriptor {
+
+enum ClientState {
+  CLIENT_INACTIVE,
+  CLIENT_OPEN,
+  CLIENT_PREVIEW,
+};
+
+enum ClientThreadState {
+    WAIT_RECV_COMMAND,
+    WAIT_RECV_PAYLOAD,
+    WAIT_SEND_COMMAND,
+    WAIT_SEND_PAYLOAD,
+};
+struct ClientFrame {
+    ICameraFrame* mFrame;
+    int mFrameFd;
+};
+class ClientDescriptor {
+public:
+    ClientDescriptor(int cFd);
+    ~ClientDescriptor();
+    int mIntCommPipeFd[2];
     int mCameraId;
     int mClientFD;
     int mMaster;
     pthread_mutex_t mClientLock;
     pthread_t mThread;
-    int mFrameFds[20];
+    ClientFrame mClFrames[MAX_FDS_FOR_CLIENT];
     int mNumFrameFd;
-} ;
+    ClientState mState;
+    bool mExpPicture;
+};
 
 class CameraObject : public ICameraListener {
 public:
@@ -61,6 +86,7 @@ public:
     ICameraDevice* mCamera;                                 // ICameraDevice instance
     CameraParams mParams;                                   // ICameraParameters instance used to hold camera parameters received from Camera
     int mOpenInstances;
+    int mStartedPreviews;
 };
 
 
@@ -69,12 +95,12 @@ class CameraServer
 public:
     CameraServer();                          // The constructor will initialize class properties. It will open a socket and
     ~CameraServer();                         // The destructor will terminate socket thread and close the socket
-    void start();
+    int start();
     bool delClientByFD(int fd);
-    int  processCommand(ClientDescriptor &client,
+    ErrorType  processCommand(ClientDescriptor &client,
             const ICameraCommandType &cmd, void* payload,
             ICameraCommandType &ack, void **ack_payload);
-    int  dispatchFrame(int camId, ICameraCommand cmd, const ICameraFrame *frame);
+    int  dispatchFrame(int camId, ICameraCommand cmd, ICameraFrame *frame);
 private:
     int  openCamera(int camId, int &isMaster);
     int  closeCamera(int camId);
@@ -82,22 +108,24 @@ private:
     int  stopPreview(int camId);
     int  startRecording(int camId);
     int  stopRecording(int camId);
-    int  getParameters(int camId);
-    int  setParameters(int camId);
+    int  getParameters(int camId, int *paramSize, char **paramString);
+    int  setParameters(int camId, char *paramString);
     int  takePicture(int camId);
     int  cancelPicture(int camId);
     int  enableFaceDetect(int camId, bool enable);
+    void delClient(std::list<ClientDescriptor *>::iterator it);
+    void delAllClients();
     int mNumberOfCameras;                          // Number of cameras on the device
-    int mSocket;                                   // S
+    int mSocket;                                   // Socket
     int mCleanupPipeFd[2];
     std::vector<struct CameraInfo> mCameraInfo;    // Vector of camera info for every camera
-    std::vector<CameraObject *> pCamObjects;        // Vector of camera objects allocated according number of cameras
-    std::list<ClientDescriptor *> pClDescriptors; // Vector to keep data specific for every Client.
+    std::vector<CameraObject *> pCamObjects;       // Vector of camera objects allocated according number of cameras
+    std::list<ClientDescriptor *> pClDescriptors;  // Vector to keep data specific for every Client.
 };
 
 class SrvCameraObject: public CameraObject {
 public:
-    SrvCameraObject(CameraServer *srv, int camId);                                   // Constructor of Camera Object
+    SrvCameraObject(CameraServer *srv, int camId);       // Constructor of Camera Object
     virtual ~SrvCameraObject();                          // Destructor of Camera Object
     virtual void onError();
     virtual void onPreviewFrame(ICameraFrame* frame);

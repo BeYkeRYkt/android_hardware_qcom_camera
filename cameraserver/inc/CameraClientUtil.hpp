@@ -34,7 +34,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <unistd.h>
-int socket_sendmsg(int fd, void *msg, uint32_t buf_size, int sendfd);
-int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd);
+int socket_sendmsg(int fd, void *msg, uint32_t buf_size, int sendfd, int *err_no);
+int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd, int *err_no);
 
 #endif // __CAMERA_CLIENT_UTIL_H__

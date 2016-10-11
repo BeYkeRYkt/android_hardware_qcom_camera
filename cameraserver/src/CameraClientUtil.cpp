@@ -26,14 +26,18 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#include <errno.h>
 #include "CameraClientUtil.hpp"
-int socket_sendmsg(int fd, void *msg, uint32_t buf_size, int sendfd)
+int socket_sendmsg (int fd, void *msg, uint32_t buf_size, int sendfd,
+        int *err_no)
 {
     struct msghdr msgh;
     struct iovec iov[1];
     struct cmsghdr * cmsghp = NULL;
     char control[CMSG_SPACE(sizeof(int))];
+    int send_len = 0;
 
+    *err_no = 0;
     if (msg == NULL) {
       fprintf(stderr,"%s: msg is NULL", __func__);
       return -1;
@@ -69,10 +73,13 @@ int socket_sendmsg(int fd, void *msg, uint32_t buf_size, int sendfd)
       }
     }
 
-    return sendmsg(fd, &(msgh), 0);
+    send_len = sendmsg(fd, &(msgh), 0);
+    *err_no = errno;
+    return send_len;
 }
 
-int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd)
+int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd,
+        int *err_no)
 {
     struct msghdr msgh;
     struct iovec iov[1];
@@ -81,6 +88,7 @@ int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd)
     int rcvd_fd = -1;
     int rcvd_len = 0;
 
+    *err_no = 0;
     if ( (msg == NULL) || (buf_size <= 0) ) {
       fprintf(stderr," %s: msg buf is NULL", __func__);
       return -1;
@@ -97,8 +105,10 @@ int socket_recvmsg(int fd, void *msg, uint32_t buf_size, int *rcvdfd)
     msgh.msg_iov = iov;
     msgh.msg_iovlen = 1;
 
-    if ( (rcvd_len = recvmsg(fd, &(msgh), 0)) <= 0) {
-      fprintf(stderr," %s: recvmsg failed\n", __func__);
+    rcvd_len = recvmsg(fd, &(msgh), 0);
+    *err_no = errno;
+    if (rcvd_len <= 0) {
+      fprintf(stderr," %s: recvmsg failed %d\n", __func__, errno);
       return rcvd_len;
     }
 

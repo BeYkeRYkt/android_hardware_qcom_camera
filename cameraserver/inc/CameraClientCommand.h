@@ -29,6 +29,11 @@
 #ifndef __CAMERA_CLIENT_COMMAND_HPP__
 #define __CAMERA_CLIENT_COMMAND_HPP__
 
+#include "camera.h"
+
+namespace camera
+{
+
 enum ICameraCommand {
     GET_NUM_CAMERAS = 1,
     GET_NUM_CAMERAS_DONE,
@@ -51,7 +56,7 @@ enum ICameraCommand {
     START_RECORDING,
     START_RECORDING_DONE,
     STOP_RECORDING,
-    STOP_PRECORDING_DONE,
+    STOP_RECORDING_DONE,
     TAKE_PICTURE,
     TAKE_PICTURE_DONE,
     CANCEL_PICTURE,
@@ -59,22 +64,26 @@ enum ICameraCommand {
     NEW_PREVIEW_FRAME,
     NEW_VIDEO_FRAME,
     NEW_SNAPSHOT_FRAME,
-
     NEW_META_FRAME,
     RELEASE_FRAME,
+    RELEASE_FRAME_DONE,
     STOP_SESSION,
     STOP_SESSION_DONE,
+    SERVER_NOTIFICATION,
 };
 
 typedef struct _ICameraCommandFrameType{
     int index;
     int bufSize;
     uint64_t timestamp;
+    FaceRoi faceROI;
 } ICameraCommandFrameType;
     
 typedef struct _ICameraCommandType{
     int type;
     int payload_size;
 } ICameraCommandType;
+
+}
 #endif //__CAMERA_CLIENT_COMMAND_HPP__
 
