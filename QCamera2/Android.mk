@@ -1,3 +1,9 @@
+ifeq ($(BRILLO),)
+  BASEPORT_PATH := hardware/qcom
+else
+  BASEPORT_PATH := hardware/bsp/qcom
+endif
+
 ifneq (,$(filter $(TARGET_ARCH), arm arm64))
 
 LOCAL_PATH:= $(call my-dir)
@@ -44,17 +50,17 @@ LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/stack/common \
         frameworks/native/include/media/hardware \
         frameworks/native/include/media/openmax \
-        hardware/bsp/qcom/media/libstagefrighthw \
+        $(BASEPORT_PATH)/media/libstagefrighthw \
         system/media/camera/include \
         $(LOCAL_PATH)/../mm-image-codec/qexif \
         $(LOCAL_PATH)/../mm-image-codec/qomx_core \
         $(LOCAL_PATH)/util \
-        hardware/bsp/qcom/media/mm-core/inc \
+        $(BASEPORT_PATH)/media/mm-core/inc \
 
 #HAL 1.0 Include paths
 LOCAL_C_INCLUDES += \
         frameworks/native/include/media/hardware \
-        hardware/bsp/qcom/camera/QCamera2/HAL
+        $(BASEPORT_PATH)/camera/QCamera2/HAL
 
 LOCAL_C_INCLUDES+= $(kernel_includes)
 LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps)
@@ -79,7 +85,7 @@ endif
 LOCAL_C_INCLUDES += \
         $(TARGET_OUT_HEADERS)/qcom/display
 LOCAL_C_INCLUDES += \
-        hardware/bsp/qcom/display/libqservice
+        $(BASEPORT_PATH)/display/libqservice
 LOCAL_SHARED_LIBRARIES := libcamera_client liblog libhardware libutils libcutils libdl
 LOCAL_SHARED_LIBRARIES += libmmcamera_interface libmmjpeg_interface libui libcamera_metadata
 LOCAL_SHARED_LIBRARIES += libqdMetaData libqservice libbinder

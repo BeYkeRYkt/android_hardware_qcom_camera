@@ -1,3 +1,9 @@
+ifeq ($(BRILLO),)
+  BASEPORT_PATH := hardware/qcom
+else
+  BASEPORT_PATH := hardware/bsp/qcom
+endif
+
 LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
@@ -37,7 +43,7 @@ LOCAL_C_INCLUDES += \
     external/skia/include/core \
     external/skia/include/images \
     $(TARGET_OUT_HEADERS)/qcom/display \
-    hardware/bsp/qcom/camera/QCamera2/stack/common \
+    $(BASEPORT_PATH)/camera/QCamera2/stack/common \
     frameworks/av/include/media/stagefright \
     frameworks/native/include/media/openmax \
     $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
