@@ -6307,7 +6307,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     uint8_t availIrModes[CAM_IR_CAMERA_MODE_MAX];
     size = 0;
     count = MIN(gCamCapability[cameraId]->ir_camera_modes_count,
-            CAM_IR_CAMERA_MODE_MAX);
+            (uint8_t)CAM_IR_CAMERA_MODE_MAX);
     for (size_t i = 0; i < count; i++) {
         int irMode = lookupFwkName(IR_MODES_MAP, METADATA_MAP_SIZE(IR_MODES_MAP),
                 gCamCapability[cameraId]->ir_camera_modes[i]);
