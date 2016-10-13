@@ -1717,6 +1717,7 @@ typedef struct {
     uint32_t dt[MAX_NUM_STREAMS];
     uint32_t vc[MAX_NUM_STREAMS];
     cam_sub_format_type_t sub_format_type[MAX_NUM_STREAMS];
+    int32_t sensor_vendor_mode;
 } cam_stream_size_info_t;
 
 typedef enum {
@@ -2286,6 +2287,7 @@ typedef enum {
     CAM_INTF_META_SPOT_LIGHT_DETECT,
     /* HAL based HDR*/
     CAM_INTF_PARM_HAL_BRACKETING_HDR,
+    CAM_INTF_META_VENDOR_SENSOR_MODE,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2886,5 +2888,10 @@ typedef enum {
     CAM_STREAM_CACHE_OPS_HONOUR_FLAGS,
     CAM_STREAM_CACHE_OPS_DISABLED
 } cam_stream_cache_ops_t;
+
+typedef struct {
+    int32_t max;
+    int32_t id;
+} cam_sensor_mode_t;
 
 #endif /* __QCAMERA_TYPES_H__ */

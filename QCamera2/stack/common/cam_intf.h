@@ -605,6 +605,7 @@ typedef struct cam_capability{
     struct cam_capability *main_cam_cap;
     struct cam_capability *aux_cam_cap;
     cam_sync_type_t cam_sensor_mode;
+    cam_sensor_mode_t sensor_mode;
 } cam_capability_t;
 
 typedef enum {
@@ -1080,6 +1081,7 @@ typedef struct {
     INCLUDE(CAM_INTF_PARM_JPEG_SCALE_DIMENSION,         cam_dimension_t,             1);
     INCLUDE(CAM_INTF_META_FOCUS_DEPTH_INFO,             uint8_t,                     1);
     INCLUDE(CAM_INTF_PARM_HAL_BRACKETING_HDR,           cam_hdr_param_t,             1);
+    INCLUDE(CAM_INTF_META_VENDOR_SENSOR_MODE,           int32_t,                     1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to
