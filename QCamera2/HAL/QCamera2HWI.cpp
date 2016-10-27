@@ -2990,32 +2990,34 @@ int QCamera2HardwareInterface::takeLiveSnapshot_internal()
     }
     // start snapshot channel
     if ((rc == NO_ERROR) && (NULL != pChannel)) {
-       // Find and try to link a metadata stream from preview channel
-       QCameraChannel *pMetaChannel = NULL;
-       QCameraStream *pMetaStream = NULL;
+        // Find and try to link a metadata stream from preview channel
+        QCameraChannel *pMetaChannel = NULL;
+        QCameraStream *pMetaStream = NULL;
 
-       if (m_channels[QCAMERA_CH_TYPE_PREVIEW] != NULL) {
-           pMetaChannel = m_channels[QCAMERA_CH_TYPE_PREVIEW];
-           uint32_t streamNum = pMetaChannel->getNumOfStreams();
-           QCameraStream *pStream = NULL;
-           for (uint32_t i = 0 ; i < streamNum ; i++ ) {
-               pStream = pMetaChannel->getStreamByIndex(i);
-               if ((NULL != pStream) &&
-                       (CAM_STREAM_TYPE_METADATA == pStream->getMyType())) {
-                   pMetaStream = pStream;
-                   break;
-               }
-           }
-       }
+        if (m_channels[QCAMERA_CH_TYPE_PREVIEW] != NULL) {
+            pMetaChannel = m_channels[QCAMERA_CH_TYPE_PREVIEW];
+            uint32_t streamNum = pMetaChannel->getNumOfStreams();
+            QCameraStream *pStream = NULL;
+            for (uint32_t i = 0 ; i < streamNum ; i++ ) {
+                pStream = pMetaChannel->getStreamByIndex(i);
+                if ((NULL != pStream) &&
+                    (CAM_STREAM_TYPE_METADATA == pStream->getMyType())) {
+                    pMetaStream = pStream;
+                    break;
+                }
+            }
+        }
 
-       if ((NULL != pMetaChannel) && (NULL != pMetaStream)) {
-           rc = pChannel->linkStream(pMetaChannel, pMetaStream);
-           if (NO_ERROR != rc) {
-               ALOGE("%s : Metadata stream link failed %d", __func__, rc);
-           }
-       }
+        if ((NULL != pMetaChannel) && (NULL != pMetaStream)) {
+            if (mParameters.isMobicatEnabled()) {
+                rc = pChannel->linkStream(pMetaChannel, pMetaStream);
+                if (NO_ERROR != rc) {
+                    ALOGE("%s : Metadata stream link failed %d", __func__, rc);
+                }
+            }
+        }
 
-       rc = pChannel->start();
+        rc = pChannel->start();
     }
 
 end:
