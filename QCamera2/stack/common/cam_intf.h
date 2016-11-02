@@ -185,7 +185,7 @@ typedef struct{
     cam_format_t supported_raw_fmts[CAM_FORMAT_MAX];
 
     cam_channel_info_t supported_channel_info[MAX_CID];
-    size_t supported_channel_info_cnt;
+    uint32_t supported_channel_info_cnt;
 
     /* The minimum frame duration that is supported for above
        raw resolution */
@@ -666,7 +666,7 @@ typedef struct {
             ((sizeof(TABLE_PTR->data.member_variable_##META_ID) / \
             sizeof(TABLE_PTR->data.member_variable_##META_ID[ 0 ])) \
             >= COUNT))  { \
-        for (size_t _i = 0; _i < COUNT ; _i++) { \
+        for (uint32_t _i = 0; _i < COUNT ; _i++) { \
             TABLE_PTR->data.member_variable_##META_ID[ _i ] = PDATA [ _i ]; \
         } \
         TABLE_PTR->is_valid[META_ID] = 1; \
@@ -726,6 +726,7 @@ typedef struct {
  *  ID from (cam_intf_metadata_type_t)                DATATYPE                     COUNT
  **************************************************************************************/
     /* common between HAL1 and HAL3 */
+    INCLUDE(CAM_INTF_PARM_RDI_CID,                      cam_intf_parm_rdi_cid_t,        1);
     INCLUDE(CAM_INTF_META_HISTOGRAM,                    cam_hist_stats_t,               1);
     INCLUDE(CAM_INTF_META_FACE_DETECTION,               cam_face_detection_data_t,      1);
     INCLUDE(CAM_INTF_META_AUTOFOCUS_DATA,               cam_auto_focus_data_t,          1);
@@ -936,7 +937,6 @@ typedef struct {
     INCLUDE(CAM_INTF_META_IMG_DYN_FEAT,                 cam_dyn_img_data_t,          1);
     INCLUDE(CAM_INTF_PARM_MANUAL_CAPTURE_TYPE,          cam_manual_capture_type,     1);
     INCLUDE(CAM_INTF_AF_STATE_TRANSITION,               uint8_t,                     1);
-    INCLUDE(CAM_INTF_PARM_RDI_CID,                      cam_intf_parm_rdi_cid_t,     1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to

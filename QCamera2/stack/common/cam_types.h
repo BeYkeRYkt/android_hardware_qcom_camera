@@ -1407,19 +1407,19 @@ typedef struct {
 
 typedef struct {
     uint32_t tuning_data_version;
-    size_t tuning_sensor_data_size;
-    size_t tuning_vfe_data_size;
-    size_t tuning_cpp_data_size;
-    size_t tuning_cac_data_size;
-    size_t tuning_cac_data_size2;
-    size_t tuning_mod3_data_size;
+    uint32_t tuning_sensor_data_size;
+    uint32_t tuning_vfe_data_size;
+    uint32_t tuning_cpp_data_size;
+    uint32_t tuning_cac_data_size;
+    uint32_t tuning_cac_data_size2;
+    uint32_t tuning_mod3_data_size;
     uint8_t  data[TUNING_DATA_MAX];
 }tuning_params_t;
 
 typedef struct {
     int32_t event_type;
     cam_dimension_t dim;
-    size_t size;
+    uint32_t size;
     char path[QCAMERA_MAX_FILEPATH_LENGTH];
     cam_format_t picture_format;
 } cam_int_evt_params_t;
@@ -2106,12 +2106,12 @@ typedef struct {
 } cam_tonemap_curve_t;
 
 typedef struct {
-   size_t tonemap_points_cnt;
+   uint32_t tonemap_points_cnt;
    cam_tonemap_curve_t curves[3];
 } cam_rgb_tonemap_curves;
 
 typedef struct {
-   size_t tonemap_points_cnt;
+   uint32_t tonemap_points_cnt;
    cam_tonemap_curve_t curve;
 } cam_profile_tone_curve;
 
