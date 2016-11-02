@@ -567,7 +567,6 @@ const QCameraParameters::QCameraMap<cam_scene_mode_type>
     { SCENE_MODE_BACKLIGHT,      CAM_SCENE_MODE_BACKLIGHT },
     { SCENE_MODE_FLOWERS,        CAM_SCENE_MODE_FLOWERS },
     { SCENE_MODE_AR,             CAM_SCENE_MODE_AR },
-    { SCENE_MODE_HDR,            CAM_SCENE_MODE_HDR },
 };
 
 const QCameraParameters::QCameraMap<cam_flash_mode_t>
@@ -4337,8 +4336,7 @@ int32_t QCameraParameters::initDefaultParameters()
     setFloat(KEY_HORIZONTAL_VIEW_ANGLE, m_pCapability->hor_view_angle);
     setFloat(KEY_VERTICAL_VIEW_ANGLE, m_pCapability->ver_view_angle);
     set(QCameraParameters::KEY_FOCUS_DISTANCES, "Infinity,Infinity,Infinity");
-    set(KEY_QC_AUTO_HDR_SUPPORTED,
-        (m_pCapability->auto_hdr_supported)? VALUE_TRUE : VALUE_FALSE);
+    set(KEY_QC_AUTO_HDR_SUPPORTED, VALUE_FALSE);
     // Set supported preview sizes
     if (m_pCapability->preview_sizes_tbl_cnt > 0 &&
         m_pCapability->preview_sizes_tbl_cnt <= MAX_SIZES_CNT) {
@@ -5032,8 +5030,9 @@ int32_t QCameraParameters::initDefaultParameters()
         m_bIsLowMemoryDevice = true;
         set(KEY_QC_ZSL_HDR_SUPPORTED, VALUE_FALSE);
     }
+    set(KEY_QC_ZSL_HDR_SUPPORTED, VALUE_FALSE);
     //Enable longshot by default
-    set(KEY_QC_LONGSHOT_SUPPORTED, VALUE_TRUE);
+    set(KEY_QC_LONGSHOT_SUPPORTED, VALUE_FALSE);
     // Livesnapshot is not supported for 4K2K video resolutions
     set(KEY_QC_4K2K_LIVESNAP_SUPPORTED, VALUE_FALSE);
     //Set video buffers as uncached by default
