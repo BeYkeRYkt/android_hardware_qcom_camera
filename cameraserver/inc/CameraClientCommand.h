@@ -35,41 +35,41 @@ namespace camera
 {
 
 enum ICameraCommand {
-    GET_NUM_CAMERAS = 1,
-    GET_NUM_CAMERAS_DONE,
-    GET_CAMERAS_INFO,
-    GET_CAMERAS_INFO_DONE,
-    OPEN_CAMERA,
-    OPEN_CAMERA_DONE,
-    CLOSE_CAMERA,
-    CLOSE_CAMERA_DONE,
-    GET_PARAMETERS,
-    GET_PARAMETERS_DONE,
-    SET_PARAMETERS,
-    SET_PARAMETERS_DONE,
-    ENABLE_FACE_DETECT,
-    ENABLE_FACE_DETECT_DONE,
-    START_PREVIEW,
-    START_PREVIEW_DONE,
-    STOP_PREVIEW,
-    STOP_PREVIEW_DONE,
-    START_RECORDING,
-    START_RECORDING_DONE,
-    STOP_RECORDING,
-    STOP_RECORDING_DONE,
-    TAKE_PICTURE,
-    TAKE_PICTURE_DONE,
-    CANCEL_PICTURE,
-    CANCEL_PICTURE_DONE,
-    NEW_PREVIEW_FRAME,
-    NEW_VIDEO_FRAME,
-    NEW_SNAPSHOT_FRAME,
-    NEW_META_FRAME,
-    RELEASE_FRAME,
-    RELEASE_FRAME_DONE,
-    STOP_SESSION,
-    STOP_SESSION_DONE,
-    SERVER_NOTIFICATION,
+    GET_NUM_CAMERAS = 1,      // 1
+    GET_NUM_CAMERAS_DONE,     // 2
+    GET_CAMERAS_INFO,         // 3
+    GET_CAMERAS_INFO_DONE,    // 4
+    OPEN_CAMERA,              // 5
+    OPEN_CAMERA_DONE,         // 6
+    CLOSE_CAMERA,             // 7
+    CLOSE_CAMERA_DONE,        // 8
+    GET_PARAMETERS,           // 9
+    GET_PARAMETERS_DONE,      // 10
+    SET_PARAMETERS,           // 11
+    SET_PARAMETERS_DONE,      // 12
+    ENABLE_FACE_DETECT,       // 13
+    ENABLE_FACE_DETECT_DONE,  // 14
+    START_PREVIEW,            // 15
+    START_PREVIEW_DONE,       // 16
+    STOP_PREVIEW,             // 17
+    STOP_PREVIEW_DONE,        // 18
+    START_RECORDING,          // 19
+    START_RECORDING_DONE,     // 20
+    STOP_RECORDING,           // 21
+    STOP_RECORDING_DONE,      // 22
+    TAKE_PICTURE,             // 23
+    TAKE_PICTURE_DONE,        // 24
+    CANCEL_PICTURE,           // 25
+    CANCEL_PICTURE_DONE,      // 26
+    NEW_PREVIEW_FRAME,        // 27
+    NEW_VIDEO_FRAME,          // 28
+    NEW_SNAPSHOT_FRAME,       // 29
+    NEW_META_FRAME,           // 30
+    RELEASE_FRAME,            // 31
+    RELEASE_FRAME_DONE,       // 32
+    STOP_SESSION,             // 33
+    STOP_SESSION_DONE,        // 34
+    SERVER_NOTIFICATION,      // 35
 };
 
 typedef struct _ICameraCommandFrameType{

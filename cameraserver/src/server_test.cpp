@@ -26,169 +26,1608 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+/*************************************************************************
+*
+*Application Notes:
+*
+*Camera selection:
+*  Each camera is given a unique function id in the sensor driver.
+*   HIRES = 0, OPTIC_FLOW = 1, LEFT SENSOR = 2, STEREO = 3
+*  getNumberOfCameras gives information on number of camera connected on target.
+*  getCameraInfo provides information on each camera loop.
+*  camid is obtained by looping through available cameras and matching info.func
+*  with the requested camera.
+*
+*Camera configuration:
+*
+* Optic flow:
+*   Do not set the following parameters :
+*    PictureSize
+*    focus mode
+*    white balance
+*    ISO
+*    preview format
+*
+*  The following parameters can be set only after starting preview :
+*    Manual exposure
+*    Manual gain
+*
+*  Notes:
+*    Snapshot is not supported for optic flow.
+*
+*  How to enable RAW mode for optic flow sensor ?
+*    RAW stream is only available for OV7251
+*    RAW stream currently returns images in the preview callback.
+*    When configuring RAW stream, video stream on the same sensor must not be enabled. Else you will not see preview callbacks.
+*    When configuration RAW, these parameters must be set  in addition to other parameters for optic flow
+*                params_.set("preview-format", "bayer-rggb");
+*                params_.set("picture-format", "bayer-mipi-10gbrg");
+*                params_.set("raw-size", "640x480");
+*
+*
+*  Stereo:
+*    Do not set the following parameters :
+*     PictureSize
+*     focus mode
+*     white balance
+*     ISO
+*     preview format
+*
+*   The following parameters can be set only after starting preview :
+*     Manual exposure
+*     Manual gain
+*     setVerticalFlip
+*     setHorizontalMirror
+*  left/right:
+*    code is written with reference to schematic but for end users the left and right sensor appears swapped.
+*    so for user experience in the current app left option is changed to right.
+*    right sensor with reference to schematic always goes in stereo mode, so no left option for end users.
+*
+* How to perform vertical flip and horizontal mirror on individual images in stereo ?
+*  In stereo since the image is merged,
+*  it makes it harder to perform these operation on individual images which may be required based on  senor  orientation on target.
+*  setVerticalFlip and setHorizontalMirror perform  perform these operation by changing the output configuration from the sensor.
+*
+*
+* How to set FPS
+*  Preview fps is set using the function : setPreviewFpsRange
+*  Video fps is set using the function : setVideoFPS
+*  setFPSindex scans through the supported fps values and returns index of requested fps in the array of supported fps.
+*
+* How to change the format to NV12
+*  To change the format to NV12 use the "preview-format" key.
+*  params.set(std::string("preview-format"), std::string("nv12"));
+*
+****************************************************************************/
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include <unistd.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <sys/stat.h>
+
+#include "turbojpeg.h"
+
 #include "stdio.h"
 #include "CameraClient.hpp"
+#include "camera_log.h"
 
-#define BUF_SIZE 462848
+#define DEFAULT_EXPOSURE_VALUE  250
+#define MIN_EXPOSURE_VALUE 0
+#define MAX_EXPOSURE_VALUE 65535
+#define DEFAULT_GAIN_VALUE  50
+#define MIN_GAIN_VALUE 0
+#define MAX_GAIN_VALUE 255
+#define QCAMERA_DUMP_LOCATION "/CAMdata/"
+#define MASTER_MODE "Master_"
+#define SLAVE_MODE "Slave__"
 
-class TestCameraObject : public ICameraListener {
-public:
-    TestCameraObject(char *s):
-            mFrameNo(0),
-            mVFrameNo(0),
-            mFilePrefix(s) {};                               // Constructor of Camera Object
-    virtual ~TestCameraObject() {};                          // Destructor of Camera Object
+#define DEFAULT_CAMERA_FPS 30
+#define MS_PER_SEC 1000
+#define NS_PER_MS 1000000
+#define NS_PER_US 1000
+#define US_PER_SEC 1000000
 
-    /* listener methods */
-    virtual void onError()
-    {
-        fprintf(stderr, "Server Died!!!\n");
-    };
-    virtual void onPreviewFrame(ICameraFrame* frame)
-    {
-      char name[50];
-      FILE *f;
-      if(mFrameNo%10 == 0) {
-        snprintf(name, 50, "/root/%s_frame_%05d.yuv", mFilePrefix, mFrameNo);
-        fprintf(stderr, "Frame size %d\n", frame->size);
-        f = fopen(name, "wb");
-        fwrite(frame->data, frame->size, 1, f);
-        fclose(f);
-      }
-      mFrameNo++;
+const int SNAPSHOT_WIDTH_ALIGN = 64;
+const int SNAPSHOT_HEIGHT_ALIGN = 64;
+const int TAKEPICTURE_TIMEOUT_MS = 3000;
+const int AUTOFOCUS_TIMEOUT_MS = 1000;
 
-      frame->releaseRef();
-    };
-    virtual void onVideoFrame(ICameraFrame* frame)     {
-      char name[50];
-      FILE *f;
-      if(mVFrameNo%10 == 0) {
-        snprintf(name, 50, "/root/%s_video_frame_%05d.yuv", mFilePrefix, mVFrameNo);
-        fprintf(stderr, "video Frame size %d\n", frame->size);
-        f = fopen(name, "wb");
-        fwrite(frame->data, frame->size, 1, f);
-        fclose(f);
-      }
-      mVFrameNo++;
 
-      frame->releaseRef();
-    };
-    virtual void onPictureFrame(ICameraFrame* frame) {
-        fprintf(stderr, "Picture size %d\n", frame->size);
-    };
-    virtual void onMetadataFrame(ICameraFrame *frame) {
-        FaceRoi *faces = frame->facedata;
-        fprintf(stderr, "Face %d\n", faces->number_of_faces);
-    };
-private:
-    int mFrameNo;
-    int mVFrameNo;
-    char *mFilePrefix;
-};
-
+using namespace std;
 using namespace camera;
 
-int main (int argc, char *argv[])
+struct CameraCaps
 {
-    ICameraClient *client = new ICameraClient;
-    TestCameraObject *testCam = new TestCameraObject(argv[1]);
-    struct CameraInfo  info;
-    ImageSize preview_size, picture_size, video_size;
-    int i;
-    int error = 0, rc = 0;
+    vector<ImageSize> pSizes, vSizes, picSizes;
+    vector<string> focusModes, wbModes, isoModes;
+    Range brightness, sharpness, contrast;
+    vector<Range> previewFpsRanges;
+    vector<VideoFPS> videoFpsValues;
+    vector<string> previewFormats;
+    string rawSize;
+};
 
-    preview_size.width = 0;
-    preview_size.height = 0;
-    fprintf(stderr, "Created\n");
+enum OutputFormatType{
+    YUV_FORMAT,
+    RAW_FORMAT,
+    JPEG_FORMAT
+};
+
+enum AppLoglevel {
+    CAM_LOG_SILENT = 0,
+    CAM_LOG_ERROR = 1,
+    CAM_LOG_INFO = 2,
+    CAM_LOG_DEBUG = 3,
+    CAM_LOG_MAX,
+};
+
+/**
+*  Helper class to store all parameter settings
+*/
+struct TestConfig
+{
+    bool dumpFrames;
+    bool infoMode;
+    bool testSnapshot;
+    bool testVideo;
+    int runTime;
+    int exposureValue;
+    int gainValue;
+    CamFunction func;
+    OutputFormatType outputFormat;
+    OutputFormatType snapshotFormat;
+    ImageSize pSize;
+    ImageSize vSize;
+    ImageSize picSize;
+    int picSizeIdx;
+    int fps;
+    AppLoglevel logLevel;
+    int storagePath;
+    int statsLogMask;
+    int focusModeIdx;
+    bool faceDetect;
+    string disMode;
+    bool hdrEnabled;
+    bool zslEnabled;
+    int mobicat;
+};
+
+void drawSquare(void *where, int width, int height, int x, int y, int x1, int y1)
+{
+  int i,j, ful_x, ful_y, flr_x, flr_y, f_w, f_h;
+  uint8_t *ptr = (uint8_t*)where;
+  ful_x = width/2 + x*width/2000;
+  if (ful_x < 0) ful_x = 0;
+  if (ful_x > width - 1) ful_x = width-1;
+  ful_y = height/2 + y*height/2000;
+  if (ful_y < 0) ful_y = 0;
+  if (ful_y > height - 1) ful_y = height-1;
+  flr_x = width/2 + x1*width/2000;
+  if (flr_x < 0) flr_x = 0;
+  if (flr_x > width - 1) flr_x = width-1;
+  flr_y = height/2 + y1*height/2000;
+  if (flr_y < 0) flr_y = 0;
+  if (flr_y > height - 1) flr_y = height-1;
+
+  f_w = flr_x - ful_x;
+  f_h = flr_y - ful_y;
+  if (f_w < 0) f_w = 0;
+  if (f_h < 0) f_h = 0;
+
+  ptr = (uint8_t*)where + ful_y*width+ful_x;
+  for (j = 0; j < f_w; j++) {
+    *ptr++ = 0xFF;
+  }
+  ptr+= width*(f_h-1) - f_w;
+  for (j = 0; j < f_w; j++) {
+    *ptr++ = 0xFF;
+  }
+  ptr = (uint8_t*)where + ful_y*width+ful_x;
+  for (j = 0; j < f_h; j++) {
+    *ptr = 0xFF;
+    ptr+= width;
+  }
+  ptr = (uint8_t*)where + ful_y*width+ful_x + f_w-1;
+  for (j = 0; j < f_h; j++) {
+    *ptr = 0xFF;
+    ptr+= width;
+  }
+}
+
+/**
+ * CLASS  CameraTest
+ *
+ * - inherits ICameraListers which provides core functionality
+ * - User must define onPreviewFrame (virtual) function. It is
+ *    the callback function for every preview frame.
+ * - If user is using VideoStream then the user must define
+ *    onVideoFrame (virtual) function. It is the callback
+ *    function for every video frame.
+ * - If any error occurs,  onError() callback function is
+ *    called. User must define onError if error handling is
+ *    required.
+ */
+class CameraTest : ICameraListener
+{
+public:
+
+    CameraTest();
+    CameraTest(TestConfig config);
+    ~CameraTest();
+    int run();
+
+    int initialize();
+
+    /* listener methods */
+    virtual void onError();
+    virtual void onControl(const ControlEvent& control);
+    virtual void onPreviewFrame(ICameraFrame* frame);
+    virtual void onVideoFrame(ICameraFrame* frame);
+    virtual void onPictureFrame(ICameraFrame* frame);
+    virtual void onMetadataFrame(ICameraFrame *frame);
+
+private:
+    ICameraClient *client;
+    ImageSize pSize_, vSize_, picSize_;
+    CameraCaps caps_;
+    TestConfig config_;
+
+    uint32_t vFrameCount_, pFrameCount_, sFrameCount_;
+    float vFpsAvg_, pFpsAvg_;
+
+    uint64_t vTimeTotal_, pTimeTotal_;
+    uint64_t vTimeStampPrev_, pTimeStampPrev_;
+
+    pthread_cond_t cvPicDone;
+    pthread_mutex_t mutexPicDone;
+    bool isPicDone;
+
+    pthread_cond_t cvAutoFocusDone;
+    pthread_mutex_t mutexAutoFocusDone;
+    bool isAutoFocusDone;
+
+    int printCapabilities();
+    int setParameters();
+    int compressJpegAndSave(ICameraFrame *frame, char *name);
+    int takePicture();
+    int setFPSindex(int fps, int &pFpsIdx, int &vFpsIdx);
+    char mode[8];
+};
+
+CameraTest::CameraTest() :
+    vFrameCount_(0),
+    pFrameCount_(0),
+    sFrameCount_(0),
+    vFpsAvg_(0.0f),
+    pFpsAvg_(0.0f),
+    vTimeTotal_(0),
+    pTimeTotal_(0),
+    vTimeStampPrev_(0),
+    pTimeStampPrev_(0),
+    client(NULL)
+{
+    pthread_cond_init(&cvPicDone, NULL);
+    pthread_mutex_init(&mutexPicDone, NULL);
+
+    pthread_cond_init(&cvAutoFocusDone, NULL);
+    pthread_mutex_init(&mutexAutoFocusDone, NULL);
+
+    memset(mode, 0, sizeof(mode));
+}
+
+CameraTest::CameraTest(TestConfig config) :
+    vFrameCount_(0),
+    pFrameCount_(0),
+    sFrameCount_(0),
+    vFpsAvg_(0.0f),
+    pFpsAvg_(0.0f),
+    vTimeStampPrev_(0),
+    pTimeStampPrev_(0)
+{
+    config_ = config;
+    pthread_cond_init(&cvPicDone, NULL);
+    pthread_mutex_init(&mutexPicDone, NULL);
+    pthread_cond_init(&cvAutoFocusDone, NULL);
+    pthread_mutex_init(&mutexAutoFocusDone, NULL);
+}
+
+int CameraTest::initialize()
+{
+    int rc;
+    client = new ICameraClient;
+
     client->Init();
-    fprintf(stderr, "Inited\n");
+    /* returns the number of camera-modules connected on the board */
+    int n = client->getNumberOfCameras();
 
-    for (i = 0; i < client->GetNumCameras(); i++) {
-        client->GetCameraInfo(i, &info);
-        fprintf(stderr, "Camera %d func %d\n", i, info.func);
-        if (info.func == CAM_FUNC_HIRES)
-            break;
+    if (n < 0) {
+        printf("getNumberOfCameras() failed, rc=%d\n", n);
+        return EXIT_FAILURE;
     }
 
-    client->AddListener(testCam);
+    printf("num_cameras = %d\n", n);
 
-    rc = client->OpenCamera(i);
-    fprintf(stderr, "Opened camera %d\n", i);
+    if (n < 1) {
+        printf("No cameras found.\n");
+        return EXIT_FAILURE;
+    }
 
+    /* The camID for sensor is not fixed. It depends on which drivers comes up first.
+       Hence loop throuch all modules to find camID based on the functionality. */
+    int camId=-1;
+
+    /* find camera based on function */
+    for (int i=0; i<n; i++) {
+         struct CameraInfo info;
+        client->getCameraInfo(i, &info);
+        printf(" i = %d , info.func = %d \n",i, info.func);
+        if (info.func == config_.func) {
+            camId = i;
+        }
+    }
+
+    if (camId == -1 )
+    {
+        printf("Camera not found \n");
+        exit(1);
+    }
+
+    printf("Testing camera id=%d\n", camId);
+
+    client->addListener(this);
+    rc = client->openCamera(camId);
     rc = client->params.init(NULL);
-    if (rc < 0)
-        error = client->GetError();
-    preview_size = client->params.getPreviewSize();
-    picture_size = client->params.getPictureSize();
-    video_size = client->params.getVideoSize();
+    if (rc != 0) {
+        printf("failed to init parameters\n");
+        delete(client);
+        return rc;
+    }
+    //printf("params = %s\n", params_.toString().c_str());
+    /* query capabilities */
+    caps_.pSizes = client->params.getSupportedPreviewSizes();
+    caps_.vSizes = client->params.getSupportedVideoSizes();
+    caps_.picSizes = client->params.getSupportedPictureSizes();
+    caps_.focusModes = client->params.getSupportedFocusModes();
+    caps_.wbModes = client->params.getSupportedWhiteBalance();
+    caps_.isoModes = client->params.getSupportedISO();
+    caps_.brightness = client->params.getSupportedBrightness();
+    caps_.sharpness = client->params.getSupportedSharpness();
+    caps_.contrast = client->params.getSupportedContrast();
+    caps_.previewFpsRanges = client->params.getSupportedPreviewFpsRanges();
+    caps_.videoFpsValues = client->params.getSupportedVideoFps();
+    caps_.previewFormats = client->params.getSupportedPreviewFormats();
+    caps_.rawSize = client->params.get("raw-size");
 
-    fprintf(stderr, "Default preview dimension %dx%d \n", preview_size.width, preview_size.height);
-    fprintf(stderr, "Default picture dimension %dx%d \n", picture_size.width, picture_size.height);
-    fprintf(stderr, "Default video dimension %dx%d \n", video_size.width, video_size.height);
+    pSize_ = client->params.getPreviewSize();
+    vSize_ = client->params.getVideoSize();
+    picSize_ = client->params.getPictureSize();
 
-    preview_size.width = 1920;
-    preview_size.height = 1080;
+    if (client->GetClientMode() == MASTER_CLIENT)
+        snprintf(mode, 7, MASTER_MODE);
+    else
+        snprintf(mode, 7, SLAVE_MODE);
+}
 
-    picture_size.width = 4208;
-    picture_size.height = 3120;
+CameraTest::~CameraTest()
+{
+}
 
-    video_size.width = 1280;
-    video_size.height = 720;
+static int dumpToFile(uint8_t* data, uint32_t size, char* name, uint64_t timestamp)
+{
+    FILE* fp;
+    fp = fopen(name, "wb");
+    if (!fp) {
+        printf("fopen failed for %s\n", name);
+        return -1;
+    }
+    fwrite(data, size, 1, fp);
+    printf("saved filename %s\n", name);
+    fclose(fp);
+}
 
-    client->params.setPreviewSize(preview_size);
-    client->params.setPictureSize(picture_size);
-    client->params.setVideoSize(video_size);
+static inline uint32_t align_size(uint32_t size, uint32_t align)
+{
+    return ((size + align - 1) & ~(align-1));
+}
 
+int CameraTest::takePicture()
+{
+    int rc;
+    struct timespec waitTime;
+    struct timeval now, now1;
+
+
+    pthread_mutex_lock(&mutexPicDone);
+    isPicDone = false;
+    printf("take picture\n");
+    rc = client->takePicture();
+    if (rc) {
+        printf("takePicture failed\n");
+        pthread_mutex_unlock(&mutexPicDone);
+        return rc;
+    }
+
+    //struct timespec waitTime;
+    //struct timeval now;
+
+    gettimeofday(&now, NULL);
+    waitTime.tv_sec = now.tv_sec + TAKEPICTURE_TIMEOUT_MS/MS_PER_SEC;
+    waitTime.tv_nsec = now.tv_usec * NS_PER_US + (TAKEPICTURE_TIMEOUT_MS % MS_PER_SEC) * NS_PER_MS;
+    /* wait for picture done */
+    while (isPicDone == false) {
+        rc = pthread_cond_timedwait(&cvPicDone, &mutexPicDone, &waitTime);
+        if (rc == ETIMEDOUT) {
+            printf("error: takePicture timed out\n");
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutexPicDone);
+
+    return 0;
+}
+
+int CameraTest::compressJpegAndSave(ICameraFrame *frame, char* name)
+{
+    uint32_t jpegSize = 0;
+    int jpegQuality = 90;
+    uint8_t *dest = NULL;
+    int rc = 0;
+
+    tjhandle jpegCompressor = tjInitCompress();
+    if (jpegCompressor == NULL) {
+        printf("Could not open TurboJpeg compressor\n");
+        return -1;
+    }
+
+    uint32_t w = picSize_.width;
+    uint32_t h = picSize_.height;
+    uint32_t stride = align_size(w, SNAPSHOT_WIDTH_ALIGN);
+    uint32_t scanlines = align_size(h, SNAPSHOT_HEIGHT_ALIGN);
+
+    uint32_t cbSize =  tjPlaneSizeYUV(1, w, 0, h, TJSAMP_420);
+    uint32_t crSize =  tjPlaneSizeYUV(2, w, 0, h, TJSAMP_420);
+    printf("st=%d, sc=%d\n", stride, scanlines);
+
+    uint8_t *yPlane, *cbPlane, *crPlane;
+    uint8_t* planes[3];
+    int strides[3];
+
+    yPlane = frame->data;
+    cbPlane = (uint8_t*) malloc(cbSize);
+    crPlane = (uint8_t*) malloc(crSize);
+
+    uint8_t *pCbcrSrc;
+    uint8_t *pCbDest = cbPlane;
+    uint8_t *pCrDest = crPlane;
+
+    uint32_t line=0;
+
+    /* copy interleaved CbCr data to separate Cb and Cr planes */
+    for (line=0; line < h/2; line++) {
+        pCbcrSrc = frame->data + (stride * scanlines) + line*stride;
+        uint32_t count = w/2;
+        while (count != 0) {
+            *pCrDest = *(pCbcrSrc++);
+            *pCbDest = *(pCbcrSrc++);
+            pCrDest++;
+            pCbDest++;
+            count--;
+        }
+    }
+    planes[0] = yPlane;
+    planes[1] = cbPlane;
+    planes[2] = crPlane;
+    strides[0] = stride;
+    strides[1] = 0;
+    strides[2] = 0;
+
+    tjCompressFromYUVPlanes(jpegCompressor, planes, w, strides, h, TJSAMP_420,
+                            &dest, (long unsigned int *)&jpegSize, jpegQuality,
+                            TJFLAG_FASTDCT);
+
+    /* save the file to disk */
+    printf("saving JPEG image: %s\n", name);
+    FILE *fp = fopen(name, "w");
+    if (fp == NULL) {
+        printf("fopen() failed\n");
+        rc = -1;
+        goto exit1;
+    }
+    fwrite(dest, jpegSize, 1, fp);
+    fclose(fp);
+
+exit1:
+    tjFree(dest);
+    tjDestroy(jpegCompressor);
+    free(cbPlane);
+    free(crPlane);
+    return 0;
+}
+
+void CameraTest::onError()
+{
+    printf("camera error!, aborting\n");
+    exit(EXIT_FAILURE);
+}
+
+void CameraTest::onControl(const ControlEvent& control)
+{
+    if (control.type == CAMERA_EVT_FOCUS) {
+        if (control.ext1 == true) {
+            printf("auto focus done\n");
+            pthread_mutex_lock(&mutexAutoFocusDone);
+            isAutoFocusDone = true;
+            pthread_cond_signal(&cvAutoFocusDone);
+            pthread_mutex_unlock(&mutexAutoFocusDone);
+        } else {
+            printf("auto focus failed\n");
+            isAutoFocusDone = false;
+        }
+    }
+}
+
+/**
+ *
+ * FUNCTION: onPreviewFrame
+ *
+ *  - This is called every frame I
+ *  - In the test app, we save files only after every 30 frames
+ *  - In parameter frame (ICameraFrame) also has the timestamps
+ *    field which is public
+ *
+ * @param frame
+ *
+ */
+void CameraTest::onPreviewFrame(ICameraFrame* frame)
+{
+    if (pFrameCount_ > 0 && pFrameCount_ % 30 == 0) {
+        char name[50];
+
+        if ( config_.outputFormat == RAW_FORMAT )
+        {
+            if(config_.storagePath ==1){
+                    snprintf(name, 50, QCAMERA_DUMP_LOCATION "%sP_%dx%d_%04d_%llu.raw",
+                 mode, pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
+            }else
+            snprintf(name, 50, "%sP_%dx%d_%04d_%llu.raw",
+                 mode, pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
+        }else{
+            if(config_.storagePath ==1){
+                    snprintf(name, 50, QCAMERA_DUMP_LOCATION "%sP_%dx%d_%04d_%llu.yuv",
+                 mode, pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
+            }else
+             snprintf(name, 50, "%sP_%dx%d_%04d_%llu.yuv",
+                 mode, pSize_.width, pSize_.height, pFrameCount_,frame->timeStamp);
+        }
+
+        if (config_.dumpFrames == true) {
+            dumpToFile(frame->data, frame->size, name, frame->timeStamp);
+        }
+        //printf("Preview FPS = %.2f\n", pFpsAvg_);
+    }
+
+    uint64_t diff = frame->timeStamp - pTimeStampPrev_;
+    if (pTimeStampPrev_ != 0)
+      pTimeTotal_ += diff;
+    pFpsAvg_ = ((pFpsAvg_ * pFrameCount_) + (1e9 / diff)) / (pFrameCount_ + 1);
+    pFrameCount_++;
+    pTimeStampPrev_  = frame->timeStamp;
+    frame->releaseRef();
+}
+
+void CameraTest::onPictureFrame(ICameraFrame* frame)
+{
+    char yuvName[128], jpgName[128];
+    char rawName[128];
+    if (config_.snapshotFormat == RAW_FORMAT) {
+        if(config_.storagePath ==1){
+                snprintf(rawName, 128, QCAMERA_DUMP_LOCATION "%ssnapshot_%s_mipi.raw",
+                         mode, caps_.rawSize.c_str());
+        }else
+                snprintf(rawName, 128, "%ssnapshot_%s_mipi.raw", mode, caps_.rawSize.c_str());
+        dumpToFile(frame->data, frame->size, rawName, frame->timeStamp);
+    } else {
+        if(config_.storagePath ==1){
+            if(!config_.hdrEnabled){
+                snprintf(jpgName, 128, QCAMERA_DUMP_LOCATION "%ssnapshot_%dx%d.jpg",
+                      mode, picSize_.width, picSize_.height);
+            }else{
+                snprintf(jpgName, 128, QCAMERA_DUMP_LOCATION "%ssnapshot_%dx%d_%d.jpg",
+                      mode, picSize_.width, picSize_.height, sFrameCount_);
+            }
+        }else{
+            if(!config_.hdrEnabled){
+                snprintf(jpgName, 128, "%ssnapshot_%dx%d.jpg", mode, picSize_.width, picSize_.height);
+            }else{
+                snprintf(jpgName, 128, "%ssnapshot_%dx%d_%d.jpg",
+                    mode, picSize_.width, picSize_.height, sFrameCount_);
+            }
+        }
+        dumpToFile(frame->data, frame->size, jpgName, frame->timeStamp);
+    }
+    /* notify the waiting thread about picture done */
+    pthread_mutex_lock(&mutexPicDone);
+    if(!config_.hdrEnabled ||
+        (config_.hdrEnabled && (sFrameCount_ == 1))){
+        isPicDone = true;
+        pthread_cond_signal(&cvPicDone);
+    }
+    pthread_mutex_unlock(&mutexPicDone);
+
+    sFrameCount_++;
+    frame->releaseRef();
+    printf("%s:%d\n", __func__, __LINE__);
+}
+
+FaceRoi appFaceData;
+void CameraTest::onMetadataFrame(ICameraFrame *frame)
+{
+    appFaceData = *frame->facedata;
+    printf("\nTotal Faces %d\n", appFaceData.number_of_faces);
+    for(int i = 0; i < appFaceData.number_of_faces; i++) {
+        printf("face %d\n    score %d, id %d, start %d,%d size %dx%d\n",i,
+            appFaceData.faces[i].score, appFaceData.faces[i].id,
+            appFaceData.faces[i].rect[0], appFaceData.faces[i].rect[1],
+            appFaceData.faces[i].rect[2], appFaceData.faces[i].rect[3]);
+        printf("    left eye %d,%d  right eye %d,%d mouth %d,%d\n",
+            appFaceData.faces[i].left_eye[0],
+            appFaceData.faces[i].left_eye[1],
+            appFaceData.faces[i].right_eye[0],
+            appFaceData.faces[i].right_eye[1],
+            appFaceData.faces[i].mouth[0],
+            appFaceData.faces[i].mouth[1]);
+        printf("    smile_degree %d, smile_score %d, blink_detected %d, face_recognised %d\n",
+            appFaceData.faces[i].smile_degree,
+            appFaceData.faces[i].smile_score,
+            appFaceData.faces[i].blink_detected,
+            appFaceData.faces[i].face_recognised);
+        printf("    gaze_angle %d, updown_dir %d, leftright_dir %d, roll_dir %d\n",
+            appFaceData.faces[i].gaze_angle,
+            appFaceData.faces[i].updown_dir,
+            appFaceData.faces[i].leftright_dir,
+            appFaceData.faces[i].roll_dir);
+        printf("    left_right_gaze %d, top_bottom_gaze %d, leye_blink %d, reye_blink %d\n",
+            appFaceData.faces[i].left_right_gaze,
+            appFaceData.faces[i].top_bottom_gaze,
+            appFaceData.faces[i].leye_blink,
+            appFaceData.faces[i].reye_blink);
+    }
+}
+
+/**
+ *
+ * FUNCTION: onVideoFrame
+ *
+ *  - This is called every frame I
+ *  - In the test app, we save files only after every 30 frames
+ *  - In parameter frame (ICameraFrame) also has the timestamps
+ *    field which is public
+ *
+ * @param frame
+ *
+ */
+void CameraTest::onVideoFrame(ICameraFrame* frame)
+{
+    if ((appFaceData.number_of_faces > 0) && (appFaceData.number_of_faces < 6))
+      for(int i = 0; i < appFaceData.number_of_faces; i++)
+        drawSquare(frame->data, vSize_.width, vSize_.height, appFaceData.faces[i].rect[0], appFaceData.faces[i].rect[1],
+            appFaceData.faces[i].rect[2], appFaceData.faces[i].rect[3]);
+
+    if (vFrameCount_ > 0 && vFrameCount_ % 30 == 0) {
+        char name[50];
+        if(config_.storagePath ==1){
+               snprintf(name, 50, QCAMERA_DUMP_LOCATION "%sV_%dx%d_%04d_%llu.yuv",
+                      mode, vSize_.width, vSize_.height, vFrameCount_,frame->timeStamp);
+        }else
+               snprintf(name, 50, "%sV_%dx%d_%04d_%llu.yuv",
+                      mode, vSize_.width, vSize_.height, vFrameCount_,frame->timeStamp);
+        if (config_.dumpFrames == true) {
+               dumpToFile(frame->data, frame->size, name, frame->timeStamp);
+        }
+        //printf("Video FPS = %.2f\n", vFpsAvg_);
+    }
+
+    uint64_t diff = frame->timeStamp - vTimeStampPrev_;
+    if (vTimeStampPrev_ != 0)
+      vTimeTotal_ += diff;
+    vFpsAvg_ = ((vFpsAvg_ * vFrameCount_) + (1e9 / diff)) / (vFrameCount_ + 1);
+    vFrameCount_++;
+    vTimeStampPrev_  = frame->timeStamp;
+    frame->releaseRef();
+}
+
+int CameraTest::printCapabilities()
+{
+    printf("Camera capabilities\n");
+
+    printf("available preview sizes:\n");
+    for (int i = 0; i < caps_.pSizes.size(); i++) {
+        printf("%d: %d x %d\n", i, caps_.pSizes[i].width, caps_.pSizes[i].height);
+    }
+    printf("available video sizes:\n");
+    for (int i = 0; i < caps_.vSizes.size(); i++) {
+        printf("%d: %d x %d\n", i, caps_.vSizes[i].width, caps_.vSizes[i].height);
+    }
+    printf("available picture sizes:\n");
+    for (int i = 0; i < caps_.picSizes.size(); i++) {
+        printf("%d: %d x %d\n", i, caps_.picSizes[i].width, caps_.picSizes[i].height);
+    }
+    printf("available preview formats:\n");
+    for (int i = 0; i < caps_.previewFormats.size(); i++) {
+        printf("%d: %s\n", i, caps_.previewFormats[i].c_str());
+    }
+    printf("available focus modes:\n");
+    for (int i = 0; i < caps_.focusModes.size(); i++) {
+        printf("%d: %s\n", i, caps_.focusModes[i].c_str());
+    }
+    printf("available whitebalance modes:\n");
+    for (int i = 0; i < caps_.wbModes.size(); i++) {
+        printf("%d: %s\n", i, caps_.wbModes[i].c_str());
+    }
+    printf("available ISO modes:\n");
+    for (int i = 0; i < caps_.isoModes.size(); i++) {
+        printf("%d: %s\n", i, caps_.isoModes[i].c_str());
+    }
+    printf("available brightness values:\n");
+    printf("min=%d, max=%d, step=%d\n", caps_.brightness.min,
+           caps_.brightness.max, caps_.brightness.step);
+    printf("available sharpness values:\n");
+    printf("min=%d, max=%d, step=%d\n", caps_.sharpness.min,
+           caps_.sharpness.max, caps_.sharpness.step);
+    printf("available contrast values:\n");
+    printf("min=%d, max=%d, step=%d\n", caps_.contrast.min,
+           caps_.contrast.max, caps_.contrast.step);
+
+    printf("available preview fps ranges:\n");
+    for (int i = 0; i < caps_.previewFpsRanges.size(); i++) {
+        printf("%d: [%d, %d]\n", i, caps_.previewFpsRanges[i].min,
+               caps_.previewFpsRanges[i].max);
+    }
+    printf("available video fps values:\n");
+    for (int i = 0; i < caps_.videoFpsValues.size(); i++) {
+        printf("%d: %d\n", i, caps_.videoFpsValues[i]);
+    }
+    return 0;
+}
+ImageSize UHDSize(3840,2160);
+ImageSize FHDSize(1920,1080);
+ImageSize HDSize(1280,720);
+ImageSize VGASize(640,480);
+ImageSize stereoVGASize(1280, 480);
+ImageSize QVGASize(320,240);
+ImageSize stereoQVGASize(640,240);
+
+const char usageStr[] =
+    "Camera API test application \n"
+    "\n"
+    "usage: camera-test [options]\n"
+    "\n"
+    "  -t <duration>   capture duration in seconds [10]\n"
+    "  -c <dis mode>   enable DIS\n"
+    "                    - eis_2_0\n"
+    "                    - disable\n"
+    "  -d              dump frames\n"
+    "  -i              info mode\n"
+    "                    - print camera capabilities\n"
+    "                    - streaming will not be started\n"
+    "  -f <type>       camera type\n"
+    "                    - hires\n"
+    "                    - optic\n"
+    "                    - right \n"
+    "                    - stereo \n"
+    "  -p <size>       Set resolution for preview frame\n"
+    "                    - 4k             ( imx sensor only ) \n"
+    "                    - 1080p          ( imx sensor only ) \n"
+    "                    - 720p           ( imx sensor only ) \n"
+    "                    - VGA            ( Max resolution of optic flow and right sensor )\n"
+    "                    - QVGA           ( 320x240 ) \n"
+    "                    - stereoVGA      ( 1280x480 : Stereo only - Max resolution )\n"
+    "                    - stereoQVGA     ( 640x240  : Stereo only )\n"
+    "  -v <size>       Set resolution for video frame\n"
+    "                    - 4k             ( imx sensor only ) \n"
+    "                    - 1080p          ( imx sensor only ) \n"
+    "                    - 720p           ( imx sensor only ) \n"
+    "                    - VGA            ( Max resolution of optic flow and right sensor )\n"
+    "                    - QVGA           ( 320x240 ) \n"
+    "                    - stereoVGA      ( 1280x480 : Stereo only - Max resolution )\n"
+    "                    - stereoQVGA     ( 640x240  : Stereo only )\n"
+    "                    - disable        ( do not start video stream )\n"
+    "  -n              take a picture with  max resolution of camera ( disabled by default)\n"
+    "                  $camera-test -f <type> -i to find max picture size\n"
+    "  -s <size>       take pickture at set resolution ( disabled by default) \n"
+    "                    - 4k             ( imx sensor only ) \n"
+    "                    - 1080p          ( imx sensor only ) \n"
+    "                    - 720p           ( imx sensor only ) \n"
+    "                    - VGA            ( Max resolution of optic flow and right sensor )\n"
+    "                    - QVGA           ( 320x240 ) \n"
+    "                    - stereoVGA      ( 1280x480 : Stereo only - Max resolution )\n"
+    "                    - stereoQVGA     ( 640x240  : Stereo only )\n"
+    "  -e <value>      set exposure control (only for ov7251)\n"
+    "                     min - 0\n"
+    "                     max - 65535\n"
+    "  -g <value>      set gain value (only for ov7251)\n"
+    "                     min - 0\n"
+    "                     max - 255\n"
+    "  -r < value>     set fps value      (Enter supported fps for requested resolution) \n"
+    "                    -  30 (default)\n"
+    "                    -  60 \n"
+    "                    -  90 \n"
+    "  -o <value>      Output format\n"
+    "                     0 :YUV format (default)\n"
+    "                     1 : RAW format [optic only] (default of optic)\n"
+    "  -j <value>      Snapshot Format\n"
+    "                     jpeg : JPEG format (default)\n"
+    "                     raw  : Full-size MIPI RAW format\n"
+    "  -V <level>      syslog level [0]\n"
+    "                    0: silent\n"
+    "                    1: error\n"
+    "                    2: info\n"
+    "                    3: debug\n"
+    " -S <MASK>         Enable stats log\n"
+    "                    0x00:  STATS_NO_LOG , ( Default )\n"
+    "                    0x01:  STATS_AEC_LOG_MASK  (1 << 0)\n"
+    "                    0x02:  STATS_AWB_LOG_MASK  (1 << 1)\n"
+    "                    0x04:  STATS_AF_LOG_MASK   (1 << 2)\n"
+    "                    0x08:  STATS_ASD_LOG_MASK  (1 << 3)\n"
+    "                    0x10:  STATS_AFD_LOG_MASK  (1 << 4)\n"
+    "                    0x1F:  STATS_ALL_LOG\n"
+    "  -u <value>       focus mode [3]\n"
+    "                    0: auto\n"
+    "                    1: infinity\n"
+    "                    2: macro\n"
+    "                    3: continuous-video\n"
+    "                    4: continuous-picture\n"
+    "                    5: manual\n"
+    "  -W              enable HDR\n"
+    "  -Z              enable ZSL\n"
+    "  -P              picture storage path\n"
+    "                    0: default path\n"
+    "                    1: Customization storage path\n"
+    "  -m              mobicat mode\n"
+    "                    0: disable mobicat(default)\n"
+    "                    1: enable mobicat\n"
+    "  -h              print this message\n"
+;
+
+static inline void printUsageExit(int code)
+{
+    printf("%s", usageStr);
+    exit(code);
+}
+/**
+ * FUNCTION: setFPSindex
+ *
+ * scans through the supported fps values and returns index of
+ * requested fps in the array of supported fps
+ *
+ * @param fps      : Required FPS  (Input)
+ * @param pFpsIdx  : preview fps index (output)
+ * @param vFpsIdx  : video fps index   (output)
+ *
+ *  */
+int CameraTest::setFPSindex(int fps, int &pFpsIdx, int &vFpsIdx)
+{
+    int defaultPrevFPSIndex = -1;
+    int defaultVideoFPSIndex = -1;
+    int i,rc = 0;
+    for (i = 0; i < caps_.previewFpsRanges.size(); i++) {
+        if (  (caps_.previewFpsRanges[i].max)/1000 == fps )
+        {
+            pFpsIdx = i;
+            break;
+        }
+        if ( (caps_.previewFpsRanges[i].max)/1000 == DEFAULT_CAMERA_FPS )
+        {
+            defaultPrevFPSIndex = i;
+        }
+    }
+    if ( i >= caps_.previewFpsRanges.size() )
+    {
+        if (defaultPrevFPSIndex != -1 )
+        {
+            pFpsIdx = defaultPrevFPSIndex;
+        } else
+        {
+            pFpsIdx = -1;
+            rc = -1;
+        }
+    }
+
+    for (i = 0; i < caps_.videoFpsValues.size(); i++) {
+        if ( fps == 30 * caps_.videoFpsValues[i])
+        {
+            vFpsIdx = i;
+            break;
+        }
+        if ( DEFAULT_CAMERA_FPS == 30 * caps_.videoFpsValues[i])
+        {
+            defaultVideoFPSIndex = i;
+        }
+    }
+    if ( i >= caps_.videoFpsValues.size())
+    {
+        if (defaultVideoFPSIndex != -1)
+        {
+            vFpsIdx = defaultVideoFPSIndex;
+        }else
+        {
+            vFpsIdx = -1;
+            rc = -1;
+        }
+    }
+    return rc;
+}
+
+/**
+ *  FUNCTION : setParameters
+ *
+ *  - When camera is opened, it is initialized with default set
+ *    of parameters.
+ *  - This function sets required parameters based on camera and
+ *    usecase
+ *  - params_setXXX and params_set  only updates parameter
+ *    values in a local object.
+ *  - params_.commit() function will update the hardware
+ *    settings with the current state of the parameter object
+ *  - Some functionality will not be application for all for
+ *    sensor modules. for eg. optic flow sensor does not support
+ *    autofocus/focus mode.
+ *  - Reference setting for different sensors and format are
+ *    provided in this function.
+ *
+ *  */
+int CameraTest::setParameters()
+{
+    int focusModeIdx = 3;
+    int wbModeIdx = 2;
+    int isoModeIdx = 0;
+    int pFpsIdx = 3;
+    int vFpsIdx = 3;
+    int prevFmtIdx = 0;
+    int rc = 0;
+
+
+    pSize_ = config_.pSize;
+    vSize_ = config_.vSize;
+    picSize_ = config_.picSize;
+    focusModeIdx = config_.focusModeIdx;
+	switch ( config_.func ){
+		case CAM_FUNC_OPTIC_FLOW:
+			if (config_.outputFormat == RAW_FORMAT) {
+				/* Do not turn on videostream for optic flow in RAW format */
+				config_.testVideo = false;
+				printf("Setting output = RAW_FORMAT for optic flow sensor \n");
+				client->params.set("preview-format", "bayer-rggb");
+				client->params.set("picture-format", "bayer-mipi-10gbrg");
+				client->params.set("raw-size", "640x480");
+			}
+			break;
+		case CAM_FUNC_RIGHT_SENSOR:
+			break;
+		case CAM_FUNC_STEREO:
+			break;
+		case CAM_FUNC_HIRES:
+		    if (config_.picSizeIdx != -1 ) {
+		        picSize_ = caps_.picSizes[config_.picSizeIdx];
+		        config_.picSize = picSize_;
+		    } else {
+		        picSize_ = config_.picSize;
+		    }
+                    if (config_.snapshotFormat == RAW_FORMAT) {
+                        printf("raw picture format: %s\n",
+                               "bayer-mipi-10bggr");
+                        client->params.set("picture-format",
+                                     "bayer-mipi-10bggr");
+                        printf("raw picture size: %s\n", caps_.rawSize.c_str());
+                    } else {
+                        printf("setting picture size: %dx%d\n",
+                                picSize_.width, picSize_.height);
+                        client->params.setPictureSize(picSize_);
+                    }
+
+            if (config_.disMode == "disable") {
+                printf("disable dis\n");
+                client->params.set("recording-hint", "false");
+                client->params.set("dis", config_.disMode.c_str());
+            } else {
+                printf("enable dis mode %s\n", config_.disMode.c_str());
+                client->params.set("recording-hint", "true");
+                client->params.set("dis", config_.disMode.c_str());
+            }
+
+			for (int i = 0; i < caps_.focusModes.size(); i++) {
+			       //printf("inside for loop:%d:%s \n",caps_.focusModes.size(),caps_.focusModes[i].c_str());
+			       if(!(strcmp(caps_.focusModes[i].c_str(),"fixed")))
+			       focusModeIdx=0;
+			}
+
+			printf("setting focus mode: %s\n",
+				 caps_.focusModes[focusModeIdx].c_str());
+			client->params.setFocusMode(caps_.focusModes[focusModeIdx]);
+
+			printf("setting WB mode: %s\n", caps_.wbModes[wbModeIdx].c_str());
+			client->params.setWhiteBalance(caps_.wbModes[wbModeIdx]);
+			printf("setting ISO mode: %s\n", caps_.isoModes[isoModeIdx].c_str());
+			client->params.setISO(caps_.isoModes[isoModeIdx]);
+
+            if (config_.hdrEnabled) {
+                client->params.set("scene-mode", "hdr");
+                client->params.set("hdr-need-1x", "true");
+                printf("enable hdr scene mode, need 1x\n");
+            }
+
+            if (config_.zslEnabled) {
+                client->params.set("zsl", "on");
+                printf("enable hdr scene mode\n");
+            }
+
+			printf("setting preview format: %s\n",
+				 caps_.previewFormats[prevFmtIdx].c_str());
+			client->params.setPreviewFormat(caps_.previewFormats[prevFmtIdx]);
+			break;
+		default:
+			printf("invalid sensor function \n");
+			break;
+	}
+    printf("setting preview size: %dx%d\n", pSize_.width, pSize_.height);
+    client->params.setPreviewSize(pSize_);
+    printf("setting video size: %dx%d\n", vSize_.width, vSize_.height);
+    client->params.setVideoSize(vSize_);
+
+    /* Find index and set FPS  */
+    rc = setFPSindex(config_.fps, pFpsIdx, vFpsIdx);
+    if ( rc == -1)
+    {
+        return rc;
+    }
+    printf("setting preview fps range: %d, %d ( idx = %d ) \n",
+    caps_.previewFpsRanges[pFpsIdx].min,
+    caps_.previewFpsRanges[pFpsIdx].max, pFpsIdx);
+    client->params.setPreviewFpsRange(caps_.previewFpsRanges[pFpsIdx]);
+    printf("setting video fps: %d ( idx = %d )\n", caps_.videoFpsValues[vFpsIdx], vFpsIdx );
+    client->params.setVideoFPS(caps_.videoFpsValues[vFpsIdx]);
+
+    client->params.setStatsLoggingMask(config_.statsLogMask);
+
+    if (config_.testVideo) {
+        client->params.set("recording-hint", "true");
+    }else{
+        client->params.set("recording-hint", "false");
+    }
+
+    if (config_.mobicat == 1) {
+       printf("enable mibicat\n");
+       client->params.set("mobicat", "enable");
+    } else {
+       printf("disable mobiact mode\n");
+       client->params.set("mobicat", "disable");
+    }
+
+    if (client->GetClientMode() != SLAVE_CLIENT) {
+        return client->params.commit();;
+    }
+    fprintf(stderr, "The application is slave don't set parameters\n");
+    return 0;
+}
+
+int CameraTest::run()
+{
+    int rc = EXIT_SUCCESS;
+
+    initialize();
+
+    if (config_.infoMode) {
+        printCapabilities();
+        return rc;
+    }
+
+    rc = setParameters();
+    if (rc) {
+        printf("setParameters failed\n");
+        printUsageExit(0);
+        goto del_camera;
+    }
+
+    /* initialize perf counters */
+    pTimeTotal_ = 0;
+    vTimeTotal_ = 0;
+    vFrameCount_ = 0;
+    pFrameCount_ = 0;
+    sFrameCount_ = 0;
+    vFpsAvg_ = 0.0f;
+    pFpsAvg_ = 0.0f;
+
+    /* starts the preview stream. At every preview frame onPreviewFrame( ) callback is invoked */
+    printf("start preview\n");
+    client->startPreview();
+
+    if (config_.faceDetect) {
+        printf("enable face detection\n");
+        client->sendFaceDetectCommand(true);
+    }
+
+    /* Set parameters which are required after starting preview */
+    switch(config_.func)
+    {
+        case CAM_FUNC_OPTIC_FLOW:
+            {
+                 client->params.setManualExposure(config_.exposureValue);
+                 client->params.setManualGain(config_.gainValue);
+                 printf("Setting exposure value =  %d , gain value = %d \n", config_.exposureValue, config_.gainValue );
+            }
+            break;
+        case CAM_FUNC_RIGHT_SENSOR:
+            {
+                 client->params.setManualExposure(config_.exposureValue);
+                 client->params.setManualGain(config_.gainValue);
+                 printf("Setting exposure value =  %d , gain value = %d \n", config_.exposureValue, config_.gainValue );
+            }
+            break;
+        case CAM_FUNC_STEREO:
+            {
+                client->params.setManualExposure(config_.exposureValue);
+                client->params.setManualGain(config_.gainValue);
+                printf("Setting exposure value =  %d , gain value = %d \n", config_.exposureValue, config_.gainValue );
+                client->params.setVerticalFlip(true);
+                client->params.setHorizontalMirror(true);
+                printf("Setting Vertical Flip and Horizontal Mirror bit in sensor \n");
+            }
+            break;
+
+    }
     rc = client->params.commit();
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "Settings committed\n");
-    preview_size = client->params.getPreviewSize();
-    picture_size = client->params.getPictureSize();
+    if (rc) {
+        printf("commit failed\n");
+       // exit(EXIT_FAILURE);
+    }
 
-    fprintf(stderr, "Set preview dimension %dx%d \n", preview_size.width, preview_size.height);
-    fprintf(stderr, "Set picture dimension %dx%d \n", picture_size.width, picture_size.height);
+    if (config_.testVideo  == true ) {
+        /* starts video stream. At every video frame onVideoFrame( )  callback is invoked */
+        printf("start recording\n");
+        client->startRecording();
+    }
 
-    client->sendFaceDetectCommand(true);
+    if (config_.testSnapshot == true) {
+        printf("waiting for 2 seconds for exposure to settle...\n");
+        /* sleep required to settle the exposure before taking snapshot.
+           This app does not provide interactive feedback to user
+           about the exposure */
+        sleep(2);
+        printf("taking picture\n");
+        rc = takePicture();
+        if (rc) {
+            printf("takePicture failed\n");
+            exit(EXIT_FAILURE);
+        }
+        if (config_.hdrEnabled && !config_.zslEnabled) {
+            /* In viewfinder-capture mode,
+               Android camera application will restart preview explicitly.
+               In normal mode, HAL will also restart preview after taking picture;
+               But hdr mode, if enable "hdr-need-1x", HAL will not do this.
+               Therefore, it's the limit of current HAL and here we follow the
+               application call rules. */
+            sleep(1);
+            printf("restart preview ...\n");
+            client->stopPreview();
+            client->startPreview();
+        }
+    }
 
-    rc = client->StartPreview();
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "Preview started\n");
+    /* Put the main/run thread to sleep and process the frames in the callbacks */
+    printf("waiting for %d seconds ...\n", config_.runTime);
+    sleep(config_.runTime);
 
-    sleep(5);
-    client->TakePicture();
-    sleep(5);
+    if (config_.faceDetect) {
+        printf("disable face detection\n");
+        client->sendFaceDetectCommand(false);
+    }
 
-    fprintf(stderr, "wait complete\n");
-    rc = client->StopPreview();
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "Preview stop\n");
+    /* After the sleep interval stop preview stream, stop video stream and end application */
+    if (config_.testVideo  == true) {
+        printf("stop recording\n");
+        client->stopRecording();
+    }
+    printf("stop preview\n");
+    client->stopPreview();
 
-    rc = client->StartRecording();
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "Start Recording\n");
+    printf("Average preview FPS = %.2f\n", (1e9 * 1.0 * (pFrameCount_-1))/pTimeTotal_);
+    if( config_.testVideo  == true )
+		printf("Average video FPS = %.2f\n", (1e9 * 1.0 * (vFrameCount_-1))/vTimeTotal_);
+    /* returns the number of camera-modules connected on the board */
+del_camera:
+    int n = client->getNumberOfCameras();
 
-    sleep(5);
-    rc = client->StopRecording();
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "Stop Recording\n");
+    if (n < 0) {
+        printf("getNumberOfCameras() failed, rc=%d\n", n);
+        return EXIT_FAILURE;
+    }
 
-    rc = client->CloseCamera(i);
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "Closed\n");
+    printf("num_cameras = %d\n", n);
+
+    if (n < 1) {
+        printf("No cameras found.\n");
+        return EXIT_FAILURE;
+    }
+
+    /* The camID for sensor is not fixed. It depends on which drivers comes up first.
+       Hence loop throuch all modules to find camID based on the functionality. */
+    int camId=-1;
+
+    /* find camera based on function */
+    for (int i=0; i<n; i++) {
+        struct CameraInfo info;
+        client->getCameraInfo(i, &info);
+        printf(" i = %d , info.func = %d \n",i, info.func);
+        if (info.func == config_.func) {
+            camId = i;
+        }
+    }
+
+    if (camId == -1 )
+    {
+        printf("Camera not found \n");
+        exit(1);
+    }
+    client->closeCamera(camId);
 
     rc = client->deInit();
-    if (rc < 0)
-        error = client->GetError();
-    fprintf(stderr, "deInited\n");
 
+    /* release camera device */
     delete(client);
+    return rc;
+}
 
-    fprintf(stderr, "Complete\n");
-    return 0;
+/**
+ *  FUNCTION: setDefaultConfig
+ *
+ *  set default config based on camera module
+ *
+ * */
+static int setDefaultConfig(TestConfig &cfg) {
+
+    cfg.outputFormat = YUV_FORMAT;
+    cfg.dumpFrames = false;
+    cfg.runTime = 10;
+    cfg.infoMode = false;
+    cfg.testVideo = true;
+    cfg.testSnapshot = false;
+    cfg.exposureValue = DEFAULT_EXPOSURE_VALUE;  /* Default exposure value */
+    cfg.gainValue = DEFAULT_GAIN_VALUE;  /* Default gain value */
+    cfg.fps = DEFAULT_CAMERA_FPS;
+    cfg.picSizeIdx = -1;
+    cfg.logLevel = CAM_LOG_SILENT;
+    cfg.snapshotFormat = JPEG_FORMAT;
+    cfg.statsLogMask = STATS_NO_LOG;
+    cfg.focusModeIdx = 3;
+    cfg.storagePath = 0;
+    cfg.faceDetect = 0;
+    cfg.disMode = "disable";
+    cfg.hdrEnabled = false;
+    cfg.zslEnabled = false;
+    cfg.mobicat= 0;
+
+    switch (cfg.func) {
+    case CAM_FUNC_OPTIC_FLOW:
+        cfg.pSize   = VGASize;
+        cfg.vSize   = VGASize;
+        cfg.picSize   = VGASize;
+        cfg.outputFormat = RAW_FORMAT;
+        break;
+    case CAM_FUNC_RIGHT_SENSOR:
+        cfg.pSize   = VGASize;
+        cfg.vSize   = VGASize;
+        cfg.picSize   = VGASize;
+        break;
+    case CAM_FUNC_STEREO:
+        cfg.pSize = stereoVGASize;
+        cfg.vSize  = stereoVGASize;
+        cfg.picSize  = stereoVGASize;
+        break;
+    case CAM_FUNC_HIRES:
+        cfg.pSize = FHDSize;
+        cfg.vSize = HDSize;
+        cfg.picSize = FHDSize;
+        break;
+    default:
+        printf("invalid sensor function \n");
+        break;
+    }
+
+}
+
+/**
+ *  FUNCTION: parseCommandline
+ *
+ *  parses commandline options and populates the config
+ *  data structure
+ *
+ *  */
+static TestConfig parseCommandline(int argc, char* argv[])
+{
+    TestConfig cfg;
+    cfg.func = CAM_FUNC_HIRES;
+
+    int c;
+    int outputFormat;
+    int exposureValueInt = 0;
+    int gainValueInt = 0;
+
+    while ((c = getopt(argc, argv, "hFWZdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
+        switch (c) {
+        case 'f':
+            {
+                string str(optarg);
+                if (str == "hires") {
+                    cfg.func = CAM_FUNC_HIRES;
+                } else if (str == "optic") {
+                    cfg.func = CAM_FUNC_OPTIC_FLOW;
+                } else if (str == "right") {
+                    cfg.func = CAM_FUNC_RIGHT_SENSOR;
+                } else if (str == "stereo") {
+                    cfg.func = CAM_FUNC_STEREO;
+                }
+                break;
+            }
+        case '?':
+            break;
+        default:
+            break;
+        }
+    }
+    setDefaultConfig(cfg);
+
+    optind = 1;
+    while ((c = getopt(argc, argv, "hFWZdt:io:e:g:p:v:ns:f:r:V:j:S:u:P:c:m:")) != -1) {
+        switch (c) {
+        case 'F':
+            cfg.faceDetect = 1;
+            break;
+        case 't':
+            cfg.runTime = atoi(optarg);
+            break;
+         case 'p':
+            {
+                string str(optarg);
+                if (str == "4k") {
+                    cfg.pSize = UHDSize;
+                } else if (str == "1080p") {
+                    cfg.pSize = FHDSize;
+                } else if (str == "720p") {
+                    cfg.pSize = HDSize;
+                } else if (str == "VGA") {
+                    cfg.pSize = VGASize;
+                } else if (str == "QVGA") {
+                    cfg.pSize = QVGASize;
+                } else if (str == "stereoVGA") {
+                    cfg.pSize = stereoVGASize;
+                } else if (str == "stereoQVGA") {
+                    cfg.pSize = stereoQVGASize;
+                }
+                break;
+            }
+        case 'v':
+            {
+                string str(optarg);
+                if (str == "4k") {
+                    cfg.vSize = UHDSize;
+                    cfg.testVideo = true;
+                } else if (str == "1080p") {
+                    cfg.vSize = FHDSize;
+                    cfg.testVideo = true;
+                } else if (str == "720p") {
+                    cfg.vSize = HDSize;
+                    cfg.testVideo = true;
+                } else if (str == "VGA") {
+                    cfg.vSize = VGASize;
+                    cfg.testVideo = true;
+                } else if (str == "QVGA") {
+                    cfg.vSize = QVGASize;
+                    cfg.testVideo = true;
+                } else if (str == "stereoVGA") {
+                    cfg.vSize = stereoVGASize;
+                    cfg.testVideo = true;
+                } else if (str == "stereoQVGA"){
+                    cfg.vSize = stereoQVGASize;
+                    cfg.testVideo = true;
+                } else if (str == "disable"){
+                    cfg.testVideo = false;
+                    cfg.focusModeIdx = 4;   /* continuous-picture */
+                }
+                break;
+            }
+        case 'n':
+            cfg.testSnapshot = true;
+            cfg.picSizeIdx = 0;
+            break;
+       case 's':
+            {
+                string str(optarg);
+                if (str == "4k") {
+                    cfg.picSize = UHDSize;
+                } else if (str == "1080p") {
+                    cfg.picSize = FHDSize;
+                } else if (str == "720p") {
+                    cfg.picSize = HDSize;
+                } else if (str == "VGA") {
+                    cfg.picSize = VGASize;
+                } else if (str == "QVGA") {
+                    cfg.picSize = QVGASize;
+                } else if (str == "stereoVGA") {
+                    cfg.picSize = stereoVGASize;
+                } else if (str == "stereoQVGA") {
+                    cfg.picSize = stereoQVGASize;
+                }
+                cfg.testSnapshot = true;
+                cfg.picSizeIdx = -1;
+                break;
+            }
+        case 'd':
+            cfg.dumpFrames = true;
+            break;
+        case 'i':
+            cfg.infoMode = true;
+            break;
+        case 'c': {
+                string str(optarg);
+                cfg.disMode = str;
+                break;
+            }
+        case  'e':
+            cfg.exposureValue =  atoi(optarg);
+            if (cfg.exposureValue < MIN_EXPOSURE_VALUE || cfg.exposureValue > MAX_EXPOSURE_VALUE) {
+                printf("Invalid exposure value. Using default\n");
+                cfg.exposureValue = DEFAULT_EXPOSURE_VALUE;
+            }
+            break;
+        case  'g':
+            cfg.gainValue =  atoi(optarg);
+            if (cfg.gainValue < MIN_GAIN_VALUE || cfg.gainValue > MAX_GAIN_VALUE) {
+                printf("Invalid exposure value. Using default\n");
+                cfg.gainValue = DEFAULT_GAIN_VALUE;
+            }
+            break;
+        case 'r':
+            cfg.fps = atoi(optarg);
+            if (!(cfg.fps == 30 || cfg.fps == 60 || cfg.fps == 90 || cfg.fps == 120)) {
+                cfg.fps = DEFAULT_CAMERA_FPS;
+                printf("Invalid fps values. Using default = %d ", cfg.fps);
+            }
+            break;
+        case 'o':
+            outputFormat = atoi(optarg);
+            switch (outputFormat) {
+            case 0: /* IMX135 , IMX214 */
+                cfg.outputFormat = YUV_FORMAT;
+                break;
+            case 1: /* optic only */
+                if (cfg.func == CAM_FUNC_OPTIC_FLOW) {
+                    cfg.outputFormat = RAW_FORMAT;
+                    cfg.testVideo = false;
+                } else {
+                    printf("Invalid format for sensor:  RAW mode is only supported for optic \n");
+                    printUsageExit(0);
+                }
+                break;
+            default:
+                printf("Invalid format. Setting to default YUV_FORMAT");
+                cfg.outputFormat = YUV_FORMAT;
+                break;
+            }
+            break;
+          case 'j': {
+              string str(optarg);
+              if (str == "jpeg") {
+                  cfg.snapshotFormat = JPEG_FORMAT;
+              } else if (str == "raw") {
+                  cfg.snapshotFormat = RAW_FORMAT;
+              } else {
+                  printf("invalid snapshot format \"%s\", using default\n",
+                         optarg);
+              }
+              break;
+          }
+        case 'V':
+            cfg.logLevel = (AppLoglevel)atoi(optarg);
+            break;
+        case 'S':
+            cfg.statsLogMask = (int)strtol(optarg, NULL, 0);
+            break;
+        case 'f':
+            break;
+        case 'u':
+            cfg.focusModeIdx = atoi(optarg); // 2: MACRO 1: INFINITY ;//3: CONTINOUS VIDEO; 5: manual
+            break;
+        case 'P':
+            cfg.storagePath = (int)atoi(optarg);
+            switch (cfg.storagePath) {
+                 case 0: /* Default Path */
+                     printf("Default Path\n");
+                     break;
+                 case 1:
+                     if(access(QCAMERA_DUMP_LOCATION, 0)==0)
+                         printf("%s already created!\n",QCAMERA_DUMP_LOCATION);
+                     else{
+                         int status = mkdir(QCAMERA_DUMP_LOCATION, 0666);
+                         if(status==0)
+                             printf("create %s!\n",QCAMERA_DUMP_LOCATION);
+                         else{
+                             printf("create storage path failed, Setting to default path\n");
+                             cfg.storagePath = 0;
+                         }
+                     }
+                     break;
+                 default:
+                     printf("Invalid storage path. Setting to default path\n");
+                     cfg.storagePath = 0;
+                     break;
+            }
+            break;
+        case 'W':
+            cfg.hdrEnabled = true;
+            break;
+        case 'Z':
+            cfg.zslEnabled = true;
+            break;
+        case 'm':
+            cfg.mobicat= (int)atoi(optarg);
+            break;
+        case 'h':
+        case '?':
+            printUsageExit(0);
+        default:
+            abort();
+        }
+    }
+
+    if (cfg.testVideo) {
+        if (cfg.hdrEnabled) {
+            cfg.hdrEnabled = false;
+            printf("Not support multi-frame HDR during recording\n");
+        }
+
+        if (cfg.zslEnabled) {
+            cfg.zslEnabled = false;
+            printf("Not support ZSL during recording\n");
+        }
+    }
+
+    if (cfg.snapshotFormat == RAW_FORMAT) {
+        cfg.testVideo = false;
+        cfg.hdrEnabled = false;
+    }
+
+    if (cfg.zslEnabled) {
+        cfg.focusModeIdx = 4;    /* continuous-picture */
+    }
+
+    return cfg;
+}
+
+int main(int argc, char* argv[])
+{
+
+    TestConfig config = parseCommandline(argc, argv);
+
+    /* setup syslog level */
+    if (config.logLevel == CAM_LOG_SILENT) {
+        setlogmask(LOG_UPTO(LOG_EMERG));
+    } else if (config.logLevel == CAM_LOG_DEBUG) {
+        setlogmask(LOG_UPTO(LOG_DEBUG));
+    } else if (config.logLevel == CAM_LOG_INFO) {
+        setlogmask(LOG_UPTO(LOG_INFO));
+    } else if (config.logLevel == CAM_LOG_ERROR) {
+        setlogmask(LOG_UPTO(LOG_ERR));
+    }
+    openlog(NULL, LOG_NDELAY, LOG_DAEMON);
+
+    CameraTest test(config);
+    test.run();
+
+    return EXIT_SUCCESS;
 }

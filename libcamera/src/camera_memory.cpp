@@ -37,7 +37,9 @@ namespace camera
 /* create a new memory object and map/allocate the buffer */
 CameraMemory::CameraMemory(int fd, uint32_t size)
 {
+    int rc;
     valid_ = false;
+
     mem_ = (camera_memory_t*)malloc(sizeof(camera_memory_t));
     if (mem_ == NULL) {
         CAM_ERR("malloc() failed");
@@ -45,19 +47,56 @@ CameraMemory::CameraMemory(int fd, uint32_t size)
     }
     if (fd < 0) {
         /* allocate new memory */
-        mem_->data = malloc(size);
-        if (mem_->data == NULL) {
-            CAM_ERR("malloc() failed");
+        struct ion_allocation_data alloc;
+        struct ion_fd_data ion_info_fd;
+
+        main_ion_fd_ = open("/dev/ion", O_RDONLY);
+        if (main_ion_fd_ < 0) {
+            CAM_ERR("Ion dev open failed: %s\n", strerror(errno));
+            return;
         }
+
+        memset(&alloc, 0, sizeof(alloc));
+        memset(&handle_data_, 0, sizeof(struct ion_handle_data));
+        alloc.len = size;
+        /* to make it page size aligned */
+        alloc.len = (alloc.len + 4095) & (~4095);
+        alloc.align = 4096;
+
+        alloc.heap_mask = 0x1 << ION_IOMMU_HEAP_ID;;
+        rc = ioctl(main_ion_fd_, ION_IOC_ALLOC, &alloc);
+        if (rc < 0) {
+            CAM_ERR("ION allocation failed: %s\n", strerror(errno));
+            return;
+        }
+
+        memset(&ion_info_fd, 0, sizeof(ion_info_fd));
+        ion_info_fd.handle = alloc.handle;
+        rc = ioctl(main_ion_fd_, ION_IOC_SHARE, &ion_info_fd);
+        if (rc < 0) {
+            CAM_ERR("ION map failed %s\n", strerror(errno));
+            return;
+        }
+        mem_->data = mmap(NULL, alloc.len, PROT_READ | PROT_WRITE, MAP_SHARED,
+                          ion_info_fd.fd, 0);
+
+        if (mem_->data == NULL) {
+               CAM_ERR("malloc() failed");
+        }
+        mem_->size = alloc.len;
+        frame.fd = ion_info_fd.fd;
+        handle_data_.handle = ion_info_fd.handle;
         type_ = MEM_ALLOCATED;
     } else {
         /* map the memory specified by fd using mmap */
+        main_ion_fd_ = 0;
         mem_->data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED,
                           fd, 0);
         if (mem_->data == MAP_FAILED) {
             CAM_ERR("mmap() failed\n");
         }
         type_ = MEM_MAPPED;
+        mem_->size = size;
 
         /* populate buffer metadata */
         metadata_.buffer_type = android::kMetadataBufferTypeCameraSource;
@@ -69,16 +108,15 @@ CameraMemory::CameraMemory(int fd, uint32_t size)
         nh->data[2] = size;
         metadata_.meta_handle = nh;
         frame.metadata = &metadata_;
+        frame.fd = fd;
     }
     valid_ = true;
     mem_->handle = this;
-    mem_->size = size;
     mem_->release = releaseMemory;
 
     /* initialize frame */
     frame.data = (uint8_t *)mem_->data;
-    frame.fd = fd;
-    frame.size = size;
+    frame.size = mem_->size;
 }
 
 /* unmap/free the buffer and destroy the memory object */
@@ -86,7 +124,10 @@ CameraMemory::~CameraMemory()
 {
     switch (type_) {
       case MEM_ALLOCATED:
-          free(mem_->data);
+          if (main_ion_fd_) {
+            ioctl(main_ion_fd_, ION_IOC_FREE, &handle_data_);
+            close(main_ion_fd_);
+          }
           break;
       case MEM_MAPPED:
           if (munmap(mem_->data, mem_->size) < 0) {

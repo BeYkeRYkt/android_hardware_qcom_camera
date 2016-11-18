@@ -46,8 +46,10 @@ server_test_CXXFLAGS += -I ../libcamera/inc
 server_test_CXXFLAGS += -I ../libcamera/src
 server_test_CXXFLAGS += -I ../QCamera2/HAL
 server_test_CXXFLAGS += -I ../libcamera/inc
+server_test_CXXFLAGS += -I ../mm-image-codec/qomx_core
+server_test_CXXFLAGS += -I ../mm-image-codec/qexif
 
 server_test_SOURCES = src/server_test.cpp
 
-server_test_LDADD = -lpthread libcamcli.la ../libcamera/libcamera.la
+server_test_LDADD = -lpthread -lturbojpeg libcamcli.la ../libcamera/libcamera.la
 

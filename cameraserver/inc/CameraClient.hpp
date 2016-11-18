@@ -33,7 +33,7 @@
 #include "camera_parameters.h"
 #include "camera_memory.h"
 
-#define SEVER_SOCKET_PATH  "/root/cam_srv_sock"
+#define SEVER_SOCKET_PATH  "/tmp/camera/cam_srv_sock"
 
 using namespace camera;
 
@@ -47,28 +47,28 @@ enum CamFunction {
 };
 
 typedef enum _ClientModeType {
-    MASTER_CLIENT,
     SLAVE_CLIENT,
+    MASTER_CLIENT,
 } ClientModeType;
 
 typedef enum _ErrorType {
-    NO_ERROR,
-    ERROR_SERVER_DIED,
-    ERROR_SEND_COMMAND,
-    ERROR_NOT_SUPPORTED_CAMERA,
-    ERROR_OPEN_CAMERA,
-    ERROR_CLOSE_CAMERA,
-    ERROR_START_PREVIEW,
-    ERROR_STOP_PREVIEW,
-    ERROR_START_RECORDING,
-    ERROR_STOP_RECORDING,
-    ERROR_TAKE_PICTURE,
-    ERROR_CANCEL_PICTURE,
-    ERROR_START_AUTOFOCUS,
-    ERROR_STOP_AUTOFOCUS,
-    ERROR_FACE_DETECT,
-    ERROR_COMMIT_PARAMS,
-    ERROR_GET_PARAMS,
+    NO_ERROR,                      // 0
+    ERROR_SERVER_DIED,             // 1
+    ERROR_SEND_COMMAND,            // 2
+    ERROR_NOT_SUPPORTED_CAMERA,    // 3
+    ERROR_OPEN_CAMERA,             // 4
+    ERROR_CLOSE_CAMERA,            // 5
+    ERROR_START_PREVIEW,           // 6
+    ERROR_STOP_PREVIEW,            // 7
+    ERROR_START_RECORDING,         // 8
+    ERROR_STOP_RECORDING,          // 9
+    ERROR_TAKE_PICTURE,            // 10
+    ERROR_CANCEL_PICTURE,          // 11
+    ERROR_START_AUTOFOCUS,         // 12
+    ERROR_STOP_AUTOFOCUS,          // 13
+    ERROR_FACE_DETECT,             // 14
+    ERROR_COMMIT_PARAMS,           // 15
+    ERROR_GET_PARAMS,              // 16
 } ErrorType;
 
 typedef struct _CameraFuncType {
@@ -139,20 +139,20 @@ public:
     /* Deinitialize API. It should be called before client object is deleted */
     int deInit();
 
-    int OpenCamera(int camID);
-    int CloseCamera(int camID);
+    int openCamera(int camID);
+    int closeCamera(int camID);
 
-    int StartPreview();
-    int StopPreview();
+    int startPreview();
+    int stopPreview();
 
-    int StartRecording();
-    int StopRecording();
+    int startRecording();
+    int stopRecording();
 
-    int TakePicture();
-    int CancelPicture();
+    int takePicture();
+    int cancelPicture();
 
-    void AddListener(ICameraListener* listener);
-    void RemoveListener(ICameraListener* listener);
+    void addListener(ICameraListener* listener);
+    void removeListener(ICameraListener* listener);
 
     int startAutoFocus() {};
     int stopAutoFocus()  {};
@@ -160,10 +160,10 @@ public:
     int sendFaceDetectCommand(bool turn_on);
 
     void SetNumCameras(int NumCameras);
-    int  GetNumCameras();
+    int  getNumberOfCameras();
 
     void SetCameraInfo(CameraFuncType *CameraFunc);
-    void GetCameraInfo( int idx, struct CameraInfo  *info);
+    void getCameraInfo( int idx, struct CameraInfo  *info);
 
     int GetIsActive() { return mIsActive;}
     void SetIsActive(int isActive) { mIsActive = isActive;}

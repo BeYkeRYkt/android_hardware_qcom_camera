@@ -52,7 +52,14 @@ static void *MainThreadLoop(void *arg)
       while (pCameraClient->GetIsActive())
       {
 
-        readBytes = socket_recvmsg(pCameraClient->mSocketFD, &CameraCommand, sizeof(ICameraCommandType), &recvFD, &err_no);
+        readBytes = socket_recvmsg(pCameraClient->mSocketFD,
+                  &CameraCommand, sizeof(ICameraCommandType),
+                  &recvFD, &err_no);
+        if(err_no != 0) {
+             CameraCommand.type = STOP_SESSION_DONE;
+             pthread_cond_signal(&pCameraClient->mAPIcond);
+             break;
+        }
         if ((CameraCommand.payload_size != 0)/* && (readBytes == sizeof(ICameraCommandType))*/)
         {
 
@@ -65,7 +72,15 @@ static void *MainThreadLoop(void *arg)
             }
             int totalBytes = 0;
             do {
-                readBytes = socket_recvmsg(pCameraClient->mSocketFD, (char*)commandPayload + totalBytes, CameraCommand.payload_size - totalBytes, &recvFD, &err_no);
+                readBytes = socket_recvmsg(pCameraClient->mSocketFD,
+                    (char*)commandPayload + totalBytes,
+                    CameraCommand.payload_size - totalBytes,
+                    &recvFD, &err_no);
+                if(err_no != 0) {
+                    CameraCommand.type = STOP_SESSION_DONE;
+                    pthread_cond_signal(&pCameraClient->mAPIcond);
+                    break;
+                }
                 totalBytes += readBytes;
             } while (readBytes > 0 && totalBytes < CameraCommand.payload_size);
 
@@ -83,6 +98,7 @@ static void *MainThreadLoop(void *arg)
                         pCameraClient->params.readObject(paramsBuf);
                     } else {
                         fprintf(stderr,"Error receiving camera parameters\n");
+                         pCameraClient->SetError(ERROR_GET_PARAMS);
                     }
                     pCameraClient->SetError(NO_ERROR);
                     pthread_cond_signal(&pCameraClient->params.mAPIcond);
@@ -105,7 +121,7 @@ static void *MainThreadLoop(void *arg)
                     pthread_cond_signal(&pCameraClient->params.mAPIcond);
                     break;
                 case OPEN_CAMERA_DONE:
-                    pCameraClient->SetNumCameras(*(ClientModeType *)commandPayload);
+                    pCameraClient->SetClientMode(*(ClientModeType *)commandPayload);
                     pCameraClient->SetError(NO_ERROR);
                     pthread_cond_signal(&pCameraClient->mAPIcond);
                     break;
@@ -133,7 +149,7 @@ static void *MainThreadLoop(void *arg)
                         pnewMemEntry = new CameraMemory(recvFD, pnewFrame->bufSize);
                         pCameraClient->pMem.push_back(pnewMemEntry);
                     }
-                    pPreviewFrame = new ICameraClientFrame(0,
+                    pPreviewFrame = new ICameraClientFrame(pnewFrame->timestamp,
                             &pCameraClient->pMem[pnewFrame->index]->frame,
                             pnewFrame->index,
                             pCameraClient->mSocketFD,
@@ -148,11 +164,15 @@ static void *MainThreadLoop(void *arg)
                 {
                     CameraMemory *pnewMemEntry;
                     ICameraClientFrame *pSnapshotFrame;
-                    void *pSnapData = (void *)commandPayload;
-                    pSnapshotFrame = new ICameraClientFrame(0, -1,
-                            CameraCommand.payload_size, pSnapData, NULL,
-                            -1, pCameraClient->mSocketFD,
+                    ICameraCommandFrameType *pnewFrame =
+                        (ICameraCommandFrameType *)commandPayload;
+                    pnewMemEntry = new CameraMemory(recvFD, pnewFrame->bufSize);
+                    pSnapshotFrame = new ICameraClientFrame(0,
+                            &pnewMemEntry->frame,
+                            pnewFrame->index,
+                            pCameraClient->mSocketFD,
                             pCameraClient->GetLock());
+
                     pSnapshotFrame->facedata = NULL;
                     pSnapshotFrame->acquireRef();
                     pCameraClient->mCamListner->onPictureFrame(pSnapshotFrame);
@@ -540,7 +560,7 @@ void ICameraClient::SetNumCameras(int NumCameras)
     mNumCameras = NumCameras;
 }
 
-int  ICameraClient::GetNumCameras()
+int  ICameraClient::getNumberOfCameras()
 {
     return mNumCameras;
 }
@@ -550,7 +570,7 @@ void ICameraClient::SetCameraInfo(CameraFuncType *CameraFunc)
     memcpy(&mCameraFunc, CameraFunc, sizeof(CameraFuncType));
 }
 
-void  ICameraClient::GetCameraInfo( int idx, struct CameraInfo  *info)
+void  ICameraClient::getCameraInfo( int idx, struct CameraInfo  *info)
 {
    info->func = mCameraFunc.camera_func[idx];
 }
@@ -560,9 +580,10 @@ void ICameraClient::SetClientMode(ClientModeType ClientMode)
      mClientMode = ClientMode;
      if (mClientMode == SLAVE_CLIENT)
         params.SetSlaveMode(true);
+     fprintf(stderr, "Master mode %d\n", mClientMode);
 }
 
-int ICameraClient::OpenCamera(int camId)
+int ICameraClient::openCamera(int camId)
 {
     ICameraCommandType command;
     int sentBytes;
@@ -602,7 +623,7 @@ int ICameraClient::OpenCamera(int camId)
 }
 
 
-int ICameraClient::CloseCamera(int camId)
+int ICameraClient::closeCamera(int camId)
 {
     ICameraCommandType command;
     int sentBytes;
@@ -641,7 +662,7 @@ int ICameraClient::CloseCamera(int camId)
 
 }
 
-int ICameraClient::StartPreview()
+int ICameraClient::startPreview()
 {
     ICameraCommandType command;
     int sentBytes;
@@ -670,7 +691,7 @@ int ICameraClient::StartPreview()
     return 0;
 }
 
-int ICameraClient::StopPreview()
+int ICameraClient::stopPreview()
 {
     ICameraCommandType command;
     int sentBytes;
@@ -700,7 +721,7 @@ int ICameraClient::StopPreview()
 }
 
 
-int ICameraClient::StartRecording()
+int ICameraClient::startRecording()
 {
     ICameraCommandType command;
     int sentBytes;
@@ -729,7 +750,7 @@ int ICameraClient::StartRecording()
     return 0;
 }
 
-int ICameraClient::StopRecording()
+int ICameraClient::stopRecording()
 {
     ICameraCommandType command;
     int sentBytes;
@@ -759,7 +780,7 @@ int ICameraClient::StopRecording()
 }
 
 
-int ICameraClient::TakePicture()
+int ICameraClient::takePicture()
 {
     ICameraCommandType command;
     int sentBytes;
@@ -788,7 +809,7 @@ int ICameraClient::TakePicture()
     return 0;
 }
 
-int ICameraClient::CancelPicture()
+int ICameraClient::cancelPicture()
 {
     ICameraCommandType command;
     int sentBytes;
@@ -857,7 +878,7 @@ int ICameraClient::sendFaceDetectCommand(bool turn_on)
 
 }
 
-void ICameraClient::AddListener(ICameraListener* listener)
+void ICameraClient::addListener(ICameraListener* listener)
 {
 
     if (mCamListner == listener) {
@@ -870,7 +891,7 @@ void ICameraClient::AddListener(ICameraListener* listener)
 }
 
 
-void ICameraClient::RemoveListener(ICameraListener* listener)
+void ICameraClient::removeListener(ICameraListener* listener)
 {
 
 

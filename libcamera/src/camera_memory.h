@@ -32,6 +32,9 @@
 #include <hardware/camera.h>
 #include "qcamera2.h"
 #include <QComOMXMetadata.h>
+#include <sys/ioctl.h>
+#include <linux/msm_ion.h>
+#include <fcntl.h>
 
 namespace camera
 {
@@ -71,6 +74,8 @@ class CameraMemory
     uint8_t nh_mem_[sizeof(native_handle_t) +
         (NH_NUM_FDS + NH_NUM_INTS) * sizeof(int)];
     camera_memory_t* mem_;
+    int main_ion_fd_;
+    struct ion_handle_data handle_data_;
     MemType type_;
 };
 

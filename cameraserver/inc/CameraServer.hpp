@@ -43,6 +43,7 @@ enum ClientState {
   CLIENT_INACTIVE,
   CLIENT_OPEN,
   CLIENT_PREVIEW,
+  CLIENT_RECORDING,
 };
 
 enum ClientThreadState {
@@ -69,7 +70,20 @@ public:
     int mNumFrameFd;
     ClientState mState;
     bool mExpPicture;
+    bool mExpFaces;
 };
+
+class ServerAutoLock
+{
+public:
+  ServerAutoLock(pthread_mutex_t *aMutex) {
+    mMutex = aMutex;pthread_mutex_lock(mMutex);};
+  ~ServerAutoLock() {pthread_mutex_unlock(mMutex);};
+
+private:
+  pthread_mutex_t *mMutex;
+};
+
 
 class CameraObject : public ICameraListener {
 public:
@@ -78,15 +92,18 @@ public:
 
     /* listener methods */
     virtual void onError();
+    virtual void onControl();
     virtual void onPreviewFrame(ICameraFrame* frame);
     virtual void onVideoFrame(ICameraFrame* frame);
     virtual void onPictureFrame(ICameraFrame* frame);
     virtual void onMetadataFrame(ICameraFrame *frame);
+    bool         isCameraOpen();
     pthread_mutex_t mCameraObjLock;
     ICameraDevice* mCamera;                                 // ICameraDevice instance
     CameraParams mParams;                                   // ICameraParameters instance used to hold camera parameters received from Camera
     int mOpenInstances;
     int mStartedPreviews;
+    int mStartedVideos;
 };
 
 
@@ -121,6 +138,7 @@ private:
     std::vector<struct CameraInfo> mCameraInfo;    // Vector of camera info for every camera
     std::vector<CameraObject *> pCamObjects;       // Vector of camera objects allocated according number of cameras
     std::list<ClientDescriptor *> pClDescriptors;  // Vector to keep data specific for every Client.
+    pthread_mutex_t mLock;
 };
 
 class SrvCameraObject: public CameraObject {
@@ -128,6 +146,7 @@ public:
     SrvCameraObject(CameraServer *srv, int camId);       // Constructor of Camera Object
     virtual ~SrvCameraObject();                          // Destructor of Camera Object
     virtual void onError();
+    virtual void onControl();
     virtual void onPreviewFrame(ICameraFrame* frame);
     virtual void onVideoFrame(ICameraFrame* frame);
     virtual void onPictureFrame(ICameraFrame* frame);
