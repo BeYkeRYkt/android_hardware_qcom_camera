@@ -1733,6 +1733,7 @@ typedef struct {
     cam_sub_format_type_t sub_format_type[MAX_NUM_STREAMS];
     cam_frame_margins_t margins[MAX_NUM_STREAMS];
     cam_dimension_t stream_sz_plus_margin[MAX_NUM_STREAMS]; /*stream sizes + margin*/
+    int32_t sensor_vendor_mode;
 } cam_stream_size_info_t;
 
 typedef enum {
@@ -2332,6 +2333,7 @@ typedef enum {
     CAM_INTF_META_DC_SAC_OUTPUT_INFO,
     /* Dual camera - enable low power mode for the slave camera */
     CAM_INTF_META_DC_LOW_POWER_ENABLE,
+    CAM_INTF_META_VENDOR_SENSOR_MODE,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2925,5 +2927,10 @@ typedef enum {
     CAM_STREAM_CACHE_OPS_HONOUR_FLAGS,
     CAM_STREAM_CACHE_OPS_DISABLED
 } cam_stream_cache_ops_t;
+
+typedef struct {
+    int32_t max;
+    int32_t id;
+} cam_sensor_mode_t;
 
 #endif /* __QCAMERA_TYPES_H__ */

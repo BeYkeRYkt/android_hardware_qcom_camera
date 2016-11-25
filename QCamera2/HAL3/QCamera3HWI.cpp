@@ -4027,6 +4027,20 @@ int QCamera3HardwareInterface::processCaptureRequest(
             clear_metadata_buffer(mParameters);
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_PARM_HAL_VERSION, hal_version);
+            if (meta.exists(QCAMERA3_VENDOR_SENSOR_MODE)) {
+                int32_t mode =  meta.find(QCAMERA3_VENDOR_SENSOR_MODE).data.i32[0];
+                LOGE("%s: %d EVG mode: %d", __func__, __LINE__, mode);
+                ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                        CAM_INTF_META_VENDOR_SENSOR_MODE, mode);
+                rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                        mParameters);
+                if (rc < 0) {
+                    LOGE("set_parms for unconfigure failed");
+                    pthread_mutex_unlock(&mMutex);
+                    return rc;
+                }
+                stream_config_info.sensor_vendor_mode = mode;
+            }
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_META_STREAM_INFO, stream_config_info);
             rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
@@ -4109,6 +4123,20 @@ int QCamera3HardwareInterface::processCaptureRequest(
             } else {
                  mStreamConfigInfo.is_type[i] = IS_TYPE_NONE;
             }
+        }
+
+        if (meta.exists(QCAMERA3_VENDOR_SENSOR_MODE)) {
+            int32_t mode =  meta.find(QCAMERA3_VENDOR_SENSOR_MODE).data.i32[0];
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_META_VENDOR_SENSOR_MODE, mode)) {
+                LOGE("Set Sensor Mode is failed");
+            }
+          mStreamConfigInfo.sensor_vendor_mode = mode;
+        }
+        rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                mParameters);
+        if (rc < 0) {
+            LOGE("set_parms for unconfigure failed");
         }
 
         ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
@@ -5670,6 +5698,11 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         }
     }
 
+    IF_META_AVAILABLE(int32_t, vendorSensorMode, CAM_INTF_META_VENDOR_SENSOR_MODE, metadata) {
+        int32_t fwk_vendorSensorMode = *vendorSensorMode;
+        camMetadata.update(QCAMERA3_VENDOR_SENSOR_MODE, &fwk_vendorSensorMode, 1);
+    }
+
     IF_META_AVAILABLE(uint32_t, hotPixelMode, CAM_INTF_META_HOTPIXEL_MODE, metadata) {
         uint8_t fwk_hotPixelMode = (uint8_t) *hotPixelMode;
         camMetadata.update(ANDROID_HOT_PIXEL_MODE, &fwk_hotPixelMode, 1);
@@ -6318,6 +6351,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
             fwk_hdr = QCAMERA3_VIDEO_HDR_MODE_ON;
         }
         camMetadata.update(QCAMERA3_VIDEO_HDR_MODE, &fwk_hdr, 1);
+    }
+
+    IF_META_AVAILABLE(int32_t, sm, CAM_INTF_META_VENDOR_SENSOR_MODE, metadata) {
+        camMetadata.update(QCAMERA3_VENDOR_SENSOR_MODE, sm, 1);
     }
 
     IF_META_AVAILABLE(cam_ir_mode_type_t, ir, CAM_INTF_META_IR_MODE, metadata) {
@@ -8647,6 +8684,11 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
             (const uint8_t*)&gCamCapability[cameraId]->related_cam_calibration,
             sizeof(gCamCapability[cameraId]->related_cam_calibration));
 
+    staticInfo.update(QCAMERA3_VENDOR_SENSOR_MAX_MODE,
+            (const int32_t*)&gCamCapability[cameraId]->sensor_mode.max, 1);
+    staticInfo.update(QCAMERA3_VENDOR_SENSOR_MODE,
+            (const int32_t*)&gCamCapability[cameraId]->sensor_mode.id, 1);
+
     uint8_t isMonoOnly =
             (gCamCapability[cameraId]->color_arrangement == CAM_FILTER_ARRANGEMENT_Y);
     staticInfo.update(QCAMERA3_SENSOR_IS_MONO_ONLY,
@@ -9442,6 +9484,12 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
     /* IR Mode Default Off */
     int32_t ir_mode = (int32_t)QCAMERA3_IR_MODE_OFF;
     settings.update(QCAMERA3_IR_MODE, &ir_mode, 1);
+
+    int32_t smode = 0;
+    settings.update(QCAMERA3_VENDOR_SENSOR_MODE, &smode, 1);
+
+    int32_t smode_max = 0;
+    settings.update(QCAMERA3_VENDOR_SENSOR_MODE, &smode_max, 1);
 
     /* Manual Convergence AEC Speed is disabled by default*/
     float default_aec_speed = 0;
@@ -10259,6 +10307,14 @@ int QCamera3HardwareInterface::translateToHalMetadata
         float focalLength = frame_settings.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_LENS_FOCAL_LENGTH,
                 focalLength)) {
+            rc = BAD_VALUE;
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_VENDOR_SENSOR_MODE)) {
+        int32_t fwk_vendorSensorMode = frame_settings.find(QCAMERA3_VENDOR_SENSOR_MODE).data.i32[0];
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_VENDOR_SENSOR_MODE,
+                fwk_vendorSensorMode)) {
             rc = BAD_VALUE;
         }
     }
