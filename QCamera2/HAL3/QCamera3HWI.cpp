@@ -82,7 +82,7 @@ namespace qcamera {
 
 #define MAX_RAW_STREAMS        1
 #define MAX_STALLING_STREAMS   1
-#define MAX_PROCESSED_STREAMS  3
+#define MAX_PROCESSED_STREAMS  6
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #define PREVIEW_FPS_FOR_HFR    (30)
