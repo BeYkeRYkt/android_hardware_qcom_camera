@@ -4362,6 +4362,18 @@ int QCamera3HardwareInterface::processCaptureRequest(
             clear_metadata_buffer(mParameters);
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_PARM_HAL_VERSION, hal_version);
+            if (meta.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+                float mode =  meta.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+                ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                        CAM_INTF_META_LENS_FOCAL_LENGTH, mode);
+                rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                        mParameters);
+                if (rc < 0) {
+                    LOGE("set_parms for unconfigure failed");
+                    pthread_mutex_unlock(&mMutex);
+                    return rc;
+                }
+            }
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_META_STREAM_INFO, stream_config_info);
             rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
@@ -4482,6 +4494,19 @@ int QCamera3HardwareInterface::processCaptureRequest(
                      mStreamConfigInfo.dewarp_type[i] = DEWARP_NONE;
                  }
             }
+        }
+
+        if (meta.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+            float mode =  meta.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_META_LENS_FOCAL_LENGTH, mode)) {
+                LOGE("Set Sensor Mode is failed");
+            }
+        }
+        rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                mParameters);
+        if (rc < 0) {
+            LOGE("set_parms for unconfigure failed");
         }
 
         ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
@@ -8323,8 +8348,8 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
 
     /*should be using focal lengths but sensor doesn't provide that info now*/
     staticInfo.update(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS,
-                      &gCamCapability[cameraId]->focal_length,
-                      1);
+                      gCamCapability[cameraId]->focal_lengths,
+                      gCamCapability[cameraId]->focal_lengths_count);
 
     staticInfo.update(ANDROID_LENS_INFO_AVAILABLE_APERTURES,
             gCamCapability[cameraId]->apertures,

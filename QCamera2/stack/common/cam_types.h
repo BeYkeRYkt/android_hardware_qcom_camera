@@ -2594,7 +2594,7 @@ typedef struct {
     cam_rational_type_t transform_matrix[CC_MATRIX_ROWS][CC_MATRIX_COLS];
 } cam_color_correct_matrix_t;
 
-#define CAM_FOCAL_LENGTHS_MAX     1
+#define CAM_FOCAL_LENGTHS_MAX     18
 #define CAM_APERTURES_MAX         1
 #define CAM_FILTER_DENSITIES_MAX  1
 #define CAM_MAX_MAP_HEIGHT        6
