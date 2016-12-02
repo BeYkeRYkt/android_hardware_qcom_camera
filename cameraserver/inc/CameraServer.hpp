@@ -46,6 +46,11 @@ enum ClientState {
   CLIENT_RECORDING,
 };
 
+enum InputFrameType {
+    PREVIEW_FRAME,
+    VIDEO_FRAME,
+};
+
 enum ClientThreadState {
     WAIT_RECV_COMMAND,
     WAIT_RECV_PAYLOAD,
@@ -55,6 +60,7 @@ enum ClientThreadState {
 struct ClientFrame {
     ICameraFrame* mFrame;
     int mFrameFd;
+    InputFrameType mFrameType;
 };
 class ClientDescriptor {
 public:
@@ -92,7 +98,7 @@ public:
 
     /* listener methods */
     virtual void onError();
-    virtual void onControl();
+    virtual void onControl(const ControlEvent& control);
     virtual void onPreviewFrame(ICameraFrame* frame);
     virtual void onVideoFrame(ICameraFrame* frame);
     virtual void onPictureFrame(ICameraFrame* frame);
@@ -146,7 +152,7 @@ public:
     SrvCameraObject(CameraServer *srv, int camId);       // Constructor of Camera Object
     virtual ~SrvCameraObject();                          // Destructor of Camera Object
     virtual void onError();
-    virtual void onControl();
+    virtual void onControl(const ControlEvent& control);
     virtual void onPreviewFrame(ICameraFrame* frame);
     virtual void onVideoFrame(ICameraFrame* frame);
     virtual void onPictureFrame(ICameraFrame* frame);

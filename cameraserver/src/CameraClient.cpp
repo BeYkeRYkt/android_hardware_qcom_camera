@@ -243,6 +243,19 @@ static void *MainThreadLoop(void *arg)
     }
 }
 
+int wait_for_ack(pthread_cond_t *mAPIcond, pthread_mutex_t *mAPIlock)
+{
+    struct timespec time;
+    int rc = 0;
+
+    clock_gettime(CLOCK_REALTIME, &time);
+    time.tv_sec += 1;
+
+    rc = pthread_cond_timedwait(mAPIcond, mAPIlock, &time);
+
+    return rc;
+}
+
 ICameraClientFrame::ICameraClientFrame( int64_t timestamp,
             QCamera2Frame *frame, int index, int SocketFD,
             pthread_mutex_t *pAPIlock) :
@@ -348,7 +361,7 @@ int ICameraClientParams::init(ICameraDevice* device)
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(mAPIlock);
 
@@ -366,12 +379,19 @@ int ICameraClientParams::init(ICameraDevice* device)
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, mAPIlock);
+    rc = wait_for_ack(&mAPIcond, mAPIlock);
 
     pthread_mutex_unlock(mAPIlock);
 
-    if (dev->GetError() != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr,"Parameters Init Ack was not received\n");
         return -1;
+    }
+
+    if (dev->GetError() != NO_ERROR) {
+        fprintf(stderr,"Error during parameters init \n");
+        return -1;
+    }
     return 0;
 
 }
@@ -381,7 +401,7 @@ int ICameraClientParams::commit()
     ICameraCommandType command;
     int sentBytes;
     char *paramStr = NULL;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     if (mSlaveMode)
     {
@@ -415,12 +435,18 @@ int ICameraClientParams::commit()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, mAPIlock);
+    rc = wait_for_ack(&mAPIcond, mAPIlock);
 
     pthread_mutex_unlock(mAPIlock);
 
-    if (dev->GetError() != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr, "Commit Ack was not received \n");
         return -1;
+    }
+    if (dev->GetError() != NO_ERROR) {
+        fprintf(stderr, "Error during commit\n");
+        return -1;
+    }
     return 0;
 
 }
@@ -476,7 +502,7 @@ int ICameraClient::Init()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_create(&mThread_id, NULL, MainThreadLoop, this);
 
@@ -496,8 +522,14 @@ int ICameraClient::Init()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr,"Client Init Ack was not received\n");
+        pthread_mutex_unlock(&mAPIlock);
+        return -1;
+    }
     if (mError != NO_ERROR) {
+        fprintf(stderr,"Error during client init\n");
         pthread_mutex_unlock(&mAPIlock);
         return -1;
     }
@@ -515,9 +547,14 @@ int ICameraClient::Init()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
+
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr,"Client Init Ack was not received\n");
+        return -1;
+    }
     if (mError != NO_ERROR)
         return -1;
 
@@ -528,7 +565,7 @@ int ICameraClient::deInit()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -544,12 +581,17 @@ int ICameraClient::deInit()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
 
-    if (mError != NO_ERROR)
+    if (rc ==  ETIMEDOUT) {
+        fprintf(stderr, " Client Deinit Ack was not received\n");
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr," Error during client deinit\n");
         return -1;
+    }
 
     pthread_join(mThread_id, NULL);
     return 0;
@@ -587,7 +629,7 @@ int ICameraClient::openCamera(int camId)
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -612,12 +654,17 @@ int ICameraClient::openCamera(int camId)
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr, " Client OpenCamera Ack was not received\n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr, "Error during Client OpenCamera\n");
+        return -1;
+    }
     return 0;
 
 }
@@ -627,7 +674,7 @@ int ICameraClient::closeCamera(int camId)
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -652,12 +699,17 @@ int ICameraClient::closeCamera(int camId)
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc ==  ETIMEDOUT) {
+        fprintf(stderr," Client CloseCamer Ack was not received\n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr," Error during client closecamera\n");
+        return -1;
+    }
     return 0;
 
 }
@@ -666,7 +718,7 @@ int ICameraClient::startPreview()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -682,12 +734,17 @@ int ICameraClient::startPreview()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr,"Client StartPreview Ack was not received\n");
         return -1;
+    }
+    if (mError != NO_ERROR){
+        fprintf(stderr,"Error during Client StartPreview \n");
+        return -1;
+    }
     return 0;
 }
 
@@ -695,7 +752,7 @@ int ICameraClient::stopPreview()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -711,12 +768,17 @@ int ICameraClient::stopPreview()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc ==  ETIMEDOUT) {
+        fprintf(stderr,"Client StopPreview was not received \n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr,"Error during client stop preview \n");
+        return -1;
+    }
     return 0;
 }
 
@@ -725,7 +787,7 @@ int ICameraClient::startRecording()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -741,12 +803,17 @@ int ICameraClient::startRecording()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc ==  ETIMEDOUT) {
+        fprintf(stderr,"Client StartRecording Ack was not recieved\n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr," Error duirng client Start Recording \n");
+        return -1;
+    }
     return 0;
 }
 
@@ -754,7 +821,7 @@ int ICameraClient::stopRecording()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -770,12 +837,16 @@ int ICameraClient::stopRecording()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr, "Client StopRecording Ack was not received\n");
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr,"Error during client stop recording\n");
         return -1;
+    }
     return 0;
 }
 
@@ -784,7 +855,7 @@ int ICameraClient::takePicture()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -800,12 +871,17 @@ int ICameraClient::takePicture()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr,"Client TakePicture Ack was not received\n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr,"Error during client take picture\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -813,7 +889,7 @@ int ICameraClient::cancelPicture()
 {
     ICameraCommandType command;
     int sentBytes;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -829,12 +905,17 @@ int ICameraClient::cancelPicture()
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr," Client CancelPicture Ack was not received\n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr,"Error during client cancel picture\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -843,7 +924,7 @@ int ICameraClient::sendFaceDetectCommand(bool turn_on)
     ICameraCommandType command;
     int sentBytes;
     int payload = turn_on;
-    int err_no = 0;
+    int err_no = 0, rc = 0;
 
     pthread_mutex_lock(&mAPIlock);
     memset(&command, 0, sizeof(ICameraCommandType));
@@ -868,12 +949,17 @@ int ICameraClient::sendFaceDetectCommand(bool turn_on)
         return -1;
     }
 
-    pthread_cond_wait(&mAPIcond, &mAPIlock);
+    rc = wait_for_ack(&mAPIcond, &mAPIlock);
 
     pthread_mutex_unlock(&mAPIlock);
-
-    if (mError != NO_ERROR)
+    if (rc == ETIMEDOUT) {
+        fprintf(stderr," Client sendFaceDetect Ack was not received\n");
         return -1;
+    }
+    if (mError != NO_ERROR) {
+        fprintf(stderr,"Error during client sendFaceDetect\n");
+        return -1;
+    }
     return 0;
 
 }

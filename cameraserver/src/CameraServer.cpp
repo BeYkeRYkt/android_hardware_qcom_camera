@@ -84,7 +84,7 @@ CameraObject::~CameraObject()
     return;
 }
 
-void CameraObject::onControl()
+void CameraObject::onControl(const ControlEvent& control)
 {
     return;
 }
@@ -130,7 +130,7 @@ SrvCameraObject::~SrvCameraObject()
 {
 }
 
-void SrvCameraObject::onControl()
+void SrvCameraObject::onControl(const ControlEvent& control)
 {
 }
 
@@ -730,7 +730,7 @@ ErrorType CameraServer::processCommand(ClientDescriptor &client,
             }
             if (!error) {
                 ack.type = STOP_RECORDING_DONE;
-                client.mState == CLIENT_PREVIEW;
+                client.mState = CLIENT_PREVIEW;
             } else {
                 res = ERROR_STOP_RECORDING;
             }
@@ -767,10 +767,13 @@ ErrorType CameraServer::processCommand(ClientDescriptor &client,
         case RELEASE_FRAME: {
             int index = *(int*)payload;
             if ((index < MAX_FDS_FOR_CLIENT) &&
-                (client.mState == CLIENT_PREVIEW ||
+                ((client.mState == CLIENT_PREVIEW &&
+                client.mClFrames[index].mFrameType == PREVIEW_FRAME) ||
                  client.mState == CLIENT_RECORDING)) {
-
-                client.mClFrames[index].mFrame->releaseRef();
+                if ((client.mExpPicture == false) ||
+                    (client.mState != CLIENT_PREVIEW)) {
+                    client.mClFrames[index].mFrame->releaseRef();
+                }
                 ack.type = RELEASE_FRAME_DONE;
             } else {
                 res = ERROR_SEND_COMMAND;
@@ -853,6 +856,10 @@ int  CameraServer::dispatchFrame(int camId, ICameraCommand cmd,
                     currentFd = 0;
                 }
                 (*it)->mClFrames[i].mFrame = frame;
+                if (cmd == NEW_VIDEO_FRAME)
+                    (*it)->mClFrames[i].mFrameType = VIDEO_FRAME;
+                else if (cmd == NEW_PREVIEW_FRAME)
+                    (*it)->mClFrames[i].mFrameType = PREVIEW_FRAME;
                 (*it)->mClFrames[i].mFrame->acquireRef();
             }
             pthread_mutex_lock(&(*it)->mClientLock);

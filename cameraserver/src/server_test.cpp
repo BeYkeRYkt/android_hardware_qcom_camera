@@ -443,15 +443,15 @@ int CameraTest::takePicture()
     struct timeval now, now1;
 
 
-    pthread_mutex_lock(&mutexPicDone);
-    isPicDone = false;
+
     printf("take picture\n");
     rc = client->takePicture();
     if (rc) {
         printf("takePicture failed\n");
-        pthread_mutex_unlock(&mutexPicDone);
         return rc;
     }
+    pthread_mutex_lock(&mutexPicDone);
+    isPicDone = false;
 
     //struct timespec waitTime;
     //struct timeval now;
@@ -661,7 +661,6 @@ void CameraTest::onPictureFrame(ICameraFrame* frame)
     pthread_mutex_unlock(&mutexPicDone);
 
     sFrameCount_++;
-    frame->releaseRef();
     printf("%s:%d\n", __func__, __LINE__);
 }
 
