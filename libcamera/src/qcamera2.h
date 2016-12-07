@@ -49,8 +49,8 @@ class QCamera2Frame : public ICameraFrame
 {
 private:
     struct camera_device* dev_;
-    
     FrameType type;
+
 public:
     QCamera2Frame() : dev_(NULL) {}
 
@@ -76,8 +76,10 @@ class QCamera2 : public ICameraDevice
     std::vector<ICameraListener *> listeners_;
 
     bool isPreviewRequested_;
-    bool isPreviewRunning_;
-    bool isVideoRunning_;
+    static bool isPreviewRunning_;
+    static bool isVideoRunning_;
+
+    static int msg_to_stream(int32_t msg_type);
 
     static void notify_callback(int32_t msg_type, int32_t ext1, int32_t ext2,
                                 void* user);

@@ -54,6 +54,14 @@ const int ID_STR_LEN = 16;
 
 static camera_module_t* g_halModule = NULL;
 static pthread_mutex_t halMutex = PTHREAD_MUTEX_INITIALIZER;
+enum stream_type{
+    STREAM_PREVIEW,
+    STREAM_VIDEO,
+    STREAM_NUM
+};
+static pthread_mutex_t streamMutex[STREAM_NUM];
+bool QCamera2::isVideoRunning_ = false;
+bool QCamera2::isPreviewRunning_ = false;
 
 static vector<int> g_openCameras;
 
@@ -276,10 +284,11 @@ void QCamera2Frame::dispatchFrame(ICameraListener* listener,
 QCamera2::QCamera2() :
     dev_(NULL),
     id_(-1),
-    isPreviewRequested_(false),
-    isPreviewRunning_(false),
-    isVideoRunning_(false)
+    isPreviewRequested_(false)
 {
+    int i;
+    for (i = 0; i < STREAM_NUM; i++)
+        pthread_mutex_init(&streamMutex[i], NULL);
 }
 
 int QCamera2::init(int idx)
@@ -351,6 +360,18 @@ void QCamera2::notify_callback(int32_t msg_type, int32_t ext1, int32_t ext2,
     }
 }
 
+int32_t QCamera2::msg_to_stream(int32_t msg_type)
+{
+    switch(msg_type) {
+        case CAMERA_MSG_PREVIEW_FRAME:
+            return STREAM_PREVIEW;
+        case CAMERA_MSG_VIDEO_FRAME:
+            return STREAM_VIDEO;
+        default:
+            return STREAM_PREVIEW;
+    }
+}
+
 void QCamera2::data_callback(int32_t msg_type,
                              const camera_memory_t* data,
                              unsigned int index,
@@ -358,16 +379,23 @@ void QCamera2::data_callback(int32_t msg_type,
                              void* user)
 {
     QCamera2* me = (QCamera2*)user;
-
+    pthread_mutex_lock(&streamMutex[msg_to_stream(msg_type)]);
     if (NULL == me) {
         CAM_ERR("failed");
         return;
     }
+    if (((CAMERA_MSG_PREVIEW_FRAME == msg_type) ||
+        (CAMERA_MSG_PREVIEW_METADATA == msg_type)) && (!isPreviewRunning_))
+        goto exit;
+    if ((CAMERA_MSG_VIDEO_FRAME == msg_type) && (!isVideoRunning_))
+        goto exit;
     /* notify each listener */
     for (int i=0; i < me->listeners_.size(); i++) {
         QCamera2Frame::dispatchFrame(me->listeners_[i], me->dev_, 0,
                                      msg_type, data);
     }
+exit:
+    pthread_mutex_unlock(&streamMutex[msg_to_stream(msg_type)]);
 }
 
 void QCamera2::data_timestamp_callback(int64_t timestamp, int32_t msg_type,
@@ -375,17 +403,24 @@ void QCamera2::data_timestamp_callback(int64_t timestamp, int32_t msg_type,
                                        unsigned int index, void* user)
 {
     QCamera2* me = (QCamera2*)user;
-
+    pthread_mutex_lock(&streamMutex[msg_to_stream(msg_type)]);
     if (NULL == me) {
         CAM_ERR("failed");
         return;
     }
 
+    if (((CAMERA_MSG_PREVIEW_FRAME == msg_type) ||
+        (CAMERA_MSG_PREVIEW_METADATA == msg_type)) && (!isPreviewRunning_))
+        goto exit;
+    if ((CAMERA_MSG_VIDEO_FRAME == msg_type) && (!isVideoRunning_))
+        goto exit;
     /* notify each listener */
     for (int i=0; i < me->listeners_.size(); i++) {
         QCamera2Frame::dispatchFrame(me->listeners_[i], me->dev_, timestamp,
                                      msg_type, data);
     }
+exit:
+    pthread_mutex_unlock(&streamMutex[msg_to_stream(msg_type)]);
 }
 
 int QCamera2::setParameters(const ICameraParameters& params)
@@ -459,6 +494,7 @@ int QCamera2::takePicture()
 int QCamera2::startPreview()
 {
     int rc = 0;
+    pthread_mutex_lock(&streamMutex[msg_to_stream(CAMERA_MSG_PREVIEW_FRAME)]);
     if (isPreviewRequested_ && isPreviewRunning_) {
         CAM_ERR("preview is already started.");
         return -1;
@@ -472,6 +508,7 @@ int QCamera2::startPreview()
             isPreviewRunning_ = true;
         }
     }
+    pthread_mutex_unlock(&streamMutex[msg_to_stream(CAMERA_MSG_PREVIEW_FRAME)]);
     return 0;
 }
 
@@ -488,20 +525,23 @@ void QCamera2::sendFaceDetectCommand(bool turn_on)
 
 void QCamera2::stopPreview()
 {
+    pthread_mutex_lock(&streamMutex[msg_to_stream(CAMERA_MSG_PREVIEW_FRAME)]);
     isPreviewRequested_ = false;
-    dev_->ops->enable_msg_type(dev_, CAMERA_MSG_PREVIEW_METADATA);
+    dev_->ops->disable_msg_type(dev_, CAMERA_MSG_PREVIEW_METADATA);
     dev_->ops->disable_msg_type(dev_, CAMERA_MSG_PREVIEW_FRAME);
     /* stop preview only if video is not running */
     if (isPreviewRunning_ == true && isVideoRunning_ == false) {
         dev_->ops->stop_preview(dev_);
         isPreviewRunning_ = false;
     }
+    pthread_mutex_unlock(&streamMutex[msg_to_stream(CAMERA_MSG_PREVIEW_FRAME)]);
 }
 
 int QCamera2::startRecording()
 {
     int rc=0;
     /* start preview internally */
+    pthread_mutex_lock(&streamMutex[msg_to_stream(CAMERA_MSG_VIDEO_FRAME)]);
     if (isPreviewRunning_ == false) {
         rc = dev_->ops->start_preview(dev_);
         if (rc != 0) {
@@ -514,12 +554,14 @@ int QCamera2::startRecording()
     if (rc == 0) {
         isVideoRunning_ = true;
     }
+    pthread_mutex_unlock(&streamMutex[msg_to_stream(CAMERA_MSG_VIDEO_FRAME)]);
 bail:
     return rc;
 }
 
 void QCamera2::stopRecording()
 {
+    pthread_mutex_lock(&streamMutex[msg_to_stream(CAMERA_MSG_VIDEO_FRAME)]);
     dev_->ops->disable_msg_type(dev_, CAMERA_MSG_VIDEO_FRAME);
     dev_->ops->stop_recording(dev_);
     isVideoRunning_ = false;
@@ -527,6 +569,7 @@ void QCamera2::stopRecording()
     if (isPreviewRequested_ == false && isPreviewRunning_ == true) {
         dev_->ops->stop_preview(dev_);
     }
+    pthread_mutex_unlock(&streamMutex[msg_to_stream(CAMERA_MSG_VIDEO_FRAME)]);
 }
 
 int QCamera2::startAutoFocus()
