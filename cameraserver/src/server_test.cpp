@@ -114,6 +114,7 @@
 #include "turbojpeg.h"
 
 #include "stdio.h"
+#include "camera_memory.h"
 #include "CameraClient.hpp"
 #include "camera_log.h"
 
@@ -552,8 +553,12 @@ exit1:
 
 void CameraTest::onError()
 {
-    printf("camera error!, aborting\n");
-    exit(EXIT_FAILURE);
+    if (client->GetError() == ERROR_SERVER_DIED) {
+        printf("camera server died!, aborting\n");
+        exit(EXIT_FAILURE);
+    } else {
+        printf("WARNING: Handle camera server error %d\n", client->GetError());
+    }
 }
 
 void CameraTest::onControl(const ControlEvent& control)

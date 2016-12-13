@@ -1134,6 +1134,7 @@ int QCamera2HardwareInterface::openCamera()
     char value[PROPERTY_VALUE_MAX];
     int enable_4k2k;
     int i;
+    int32_t rc;
 
     if (mCameraHandle) {
         ALOGE("Failure: Camera already opened");
@@ -1219,13 +1220,18 @@ int QCamera2HardwareInterface::openCamera()
           gCamCapability[mCameraId]->video_sizes_tbl_cnt--;
        }
     }
-
-    int32_t rc = m_postprocessor.init(jpegEvtHandle, this);
-    if (rc != 0) {
-        ALOGE("Init Postprocessor failed");
-        mCameraHandle->ops->close_camera(mCameraHandle->camera_handle);
-        mCameraHandle = NULL;
-        return UNKNOWN_ERROR;
+    struct  camera_info *p_info;
+    pthread_mutex_lock(&g_camlock);
+    p_info = get_cam_info(mCameraId);
+    pthread_mutex_unlock(&g_camlock);
+    if (p_info->facing == 0) {
+        rc = m_postprocessor.init(jpegEvtHandle, this);
+        if (rc != 0) {
+            ALOGE("Init Postprocessor failed");
+            mCameraHandle->ops->close_camera(mCameraHandle->camera_handle);
+            mCameraHandle = NULL;
+            return UNKNOWN_ERROR;
+        }
     }
 
     // update padding info from jpeg

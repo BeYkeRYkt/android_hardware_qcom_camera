@@ -776,7 +776,7 @@ ErrorType CameraServer::processCommand(ClientDescriptor &client,
                 }
                 ack.type = RELEASE_FRAME_DONE;
             } else {
-                res = ERROR_SEND_COMMAND;
+                res = ERROR_RELEASE_BUF;
             }
         }
             break;

@@ -31,7 +31,6 @@
 #include "camera.h"
 #include "pthread.h"
 #include "camera_parameters.h"
-#include "camera_memory.h"
 
 #define SEVER_SOCKET_PATH  "/tmp/camera/cam_srv_sock"
 
@@ -69,37 +68,12 @@ typedef enum _ErrorType {
     ERROR_FACE_DETECT,             // 14
     ERROR_COMMIT_PARAMS,           // 15
     ERROR_GET_PARAMS,              // 16
+    ERROR_RELEASE_BUF,             // 17
 } ErrorType;
 
 typedef struct _CameraFuncType {
     int camera_func[4];
 } CameraFuncType;
-
-class ICameraClientFrame : public ICameraFrame
-{
-private:
-
-public:
-    ICameraClientFrame( int64_t timestamp,
-            QCamera2Frame *frame, int index, int SocketFD,
-            pthread_mutex_t *pAPIlock);
-    ICameraClientFrame( int64_t timestamp,
-            int fd, int bufsize, void *data, void *metadata,
-            int index, int SocketFD,
-            pthread_mutex_t *pAPIlock);
-    virtual ~ICameraClientFrame();
-
-    virtual uint32_t acquireRef();
-
-    virtual uint32_t releaseRef();
-
-    void setSocketFD(int mSocketFD);
-private:
-    uint32_t refs_;
-    int32_t index_;
-    int mSocketFD;
-    pthread_mutex_t *mAPIlock;
-};
 
 class ICameraClientParams : public CameraParams
 {
@@ -122,7 +96,6 @@ public:
     pthread_cond_t mAPIcond;
 
 };
-
 
 class ICameraClient
 {
@@ -190,7 +163,6 @@ private:
     ErrorType  mError;
 
 public:
-    std::vector <CameraMemory *> pMem;
     int mSocketFD;
     ICameraClientParams params;
     pthread_cond_t mAPIcond;
