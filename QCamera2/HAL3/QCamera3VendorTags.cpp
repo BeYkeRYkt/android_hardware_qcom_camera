@@ -168,10 +168,12 @@ vendor_tag_info_t qcamera3_bg_stats[QCAMERA3_BG_STATS_END -
 
 vendor_tag_info_t qcamera3_tnr_tuning[QCAMERA3_TNR_TUNING_END -
         QCAMERA3_TNR_TUNING_START] = {
-    { "tnr_intensity", TYPE_FLOAT },
-    { "motion_detection_sensitivity", TYPE_FLOAT },
+    { "available_custom_tnr", TYPE_BYTE },
+    { "tnr_tuning_custom", TYPE_INT32 },
     { "tnr_tuning_range_min", TYPE_FLOAT },
     { "tnr_tuning_range_max", TYPE_FLOAT },
+    { "tnr_intensity", TYPE_FLOAT },
+    { "motion_detection_sensitivity", TYPE_FLOAT },
 };
 
 vendor_tag_info_t qcamera3_custom_ae[QCAMERA3_CUSTOM_AE_END -
@@ -267,10 +269,12 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_BG_STATS_GB_NUM,
 
     // QCAMERA3_TNR_TUNING_START
+    (uint32_t)QCAMERA3_TNR_TUNING_CUSTOM_AVAILABLE,
+    (uint32_t)QCAMERA3_TNR_TUNING_CUSTOM,
     (uint32_t)QCAMERA3_TNR_INTENSITY,
-    (uint32_t)QCAMERA3_MOTION_DETECTION_SENSITIVITY,
     (uint32_t)QCAMERA3_TNR_TUNING_RANGE_MIN,
     (uint32_t)QCAMERA3_TNR_TUNING_RANGE_MAX,
+    (uint32_t)QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
 
     //QCAMERA3_CUSTOM_AE_START
     (uint32_t)QCAMERA3_CUSTOM_AE_INPUT,

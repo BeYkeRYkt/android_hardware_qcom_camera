@@ -1863,6 +1863,8 @@ typedef enum {
     CAM_INTF_PARM_IR_CAMERA_MODE, /* cam_ir_camera_modes_t */
     /* IR mode camera parameter */
     CAM_INTF_PARM_BG_STATS, /* cam_bg_stats_data_t */
+    /* Custom tuning */
+    CAM_INTF_PARM_TNR_CUSTOM_TUNING,
     /* TNR intensity */
     CAM_INTF_PARM_TNR_INTENSITY,
     /* Motion detection sensitivity */
@@ -2147,9 +2149,16 @@ typedef struct {
     uint8_t metadata_index;
 } cam_chroma_flash_t;
 
+typedef enum {
+    CAM_TNR_CUSTOM_TUNING_DISABLE,
+    CAM_TNR_CUSTOM_TUNING_ENABLE,
+    CAM_TNR_CUSTOM_TUNING_MAX
+} cam_tnr_custom_tuning_enb_t;
+
 typedef struct {
   float max;
   float min;
+  cam_tnr_custom_tuning_enb_t custom;
   float def_tnr_intensity;
   float def_md_sensitivity;
 } cam_tnr_tuning_t;

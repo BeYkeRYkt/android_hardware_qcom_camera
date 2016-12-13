@@ -915,6 +915,7 @@ typedef struct {
     INCLUDE(CAM_INTF_PARM_IR_CAMERA_MODE,               cam_ir_camera_modes_t,       1);
     INCLUDE(CAM_INTF_PARM_CUSTOM_TUNING,                int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_BG_STATS,                     cam_bg_stats_data_t,         1);
+    INCLUDE(CAM_INTF_PARM_TNR_CUSTOM_TUNING,            int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_TNR_INTENSITY,                float,                       1);
     INCLUDE(CAM_INTF_PARM_MOTION_DETECTION_SENSITIVITY, float,                       1);
     INCLUDE(CAM_INTF_PARM_CUSTOM_AE_INPUT,              cam_custom_ae_input_t,       1);

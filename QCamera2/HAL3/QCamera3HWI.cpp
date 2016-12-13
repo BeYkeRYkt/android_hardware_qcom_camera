@@ -267,6 +267,13 @@ const QCamera3HardwareInterface::QCameraMap<
     { ANDROID_BG_STATS_ON,   CAM_BG_STATS_ON }
 };
 
+const QCamera3HardwareInterface::QCameraMap<
+        camera_metadata_enum_android_tnr_tuning_custom_t,
+        cam_tnr_custom_tuning_enb_t> QCamera3HardwareInterface::TNR_CUSTOM_TUNING_MAP[] = {
+    { ANDROID_TNR_TUNING_CUSTOM_DISABLE,  CAM_TNR_CUSTOM_TUNING_DISABLE },
+    { ANDROID_TNR_TUNING_CUSTOM_ENABLE,   CAM_TNR_CUSTOM_TUNING_ENABLE }
+};
+
 /* Since there is no mapping for all the options some Android enum are not listed.
  * Also, the order in this list is important because while mapping from HAL to Android it will
  * traverse from lower to higher index which means that for HAL values that are map to different
@@ -4322,6 +4329,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
             (int32_t *)&(bg_stats->bg_gb_num), STATS_MAX_BG_STATS_NUM);
     }
 
+    IF_META_AVAILABLE(int32_t, tnr_tuning_custom, CAM_INTF_PARM_TNR_CUSTOM_TUNING, metadata) {
+        camMetadata.update(QCAMERA3_TNR_TUNING_CUSTOM, tnr_tuning_custom, 1);
+    }
+
     IF_META_AVAILABLE(float, tnr_intensity, CAM_INTF_PARM_TNR_INTENSITY, metadata) {
         camMetadata.update(QCAMERA3_TNR_INTENSITY, tnr_intensity, 1);
     }
@@ -6275,10 +6286,20 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(QCAMERA3_TNR_TUNING_RANGE_MAX,
             &gCamCapability[cameraId]->tnr_tuning_ctrl.max, 1);
 
+    uint8_t tnr_custom_tuning[CAM_TNR_CUSTOM_TUNING_MAX];
+    uint8_t tnr_custom_tuning_num = 1;
+    tnr_custom_tuning[0] = CAM_TNR_CUSTOM_TUNING_DISABLE;
+    if (gCamCapability[cameraId]->tnr_tuning_ctrl.custom) {
+        tnr_custom_tuning[tnr_custom_tuning_num] = CAM_TNR_CUSTOM_TUNING_ENABLE;
+        tnr_custom_tuning_num++;
+    }
+    staticInfo.update(QCAMERA3_TNR_TUNING_CUSTOM_AVAILABLE,
+            tnr_custom_tuning, tnr_custom_tuning_num);
+
     staticInfo.update(QCAMERA3_TNR_INTENSITY,
             &gCamCapability[cameraId]->tnr_tuning_ctrl.def_tnr_intensity, 1);
 
-    staticInfo.update(QCAMERA3_MOTION_DETECTION_SENSITIVITY,
+    staticInfo.update(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
             &gCamCapability[cameraId]->tnr_tuning_ctrl.def_md_sensitivity, 1);
 
     int32_t available_sizes_tbl[MAX_SIZES_CNT * 2];
@@ -7927,6 +7948,18 @@ int QCamera3HardwareInterface::translateToHalMetadata
         }
     }
 
+    if (frame_settings.exists(QCAMERA3_TNR_TUNING_CUSTOM)) {
+        cam_tnr_custom_tuning_enb_t value = (cam_tnr_custom_tuning_enb_t)
+                lookupHalName(TNR_CUSTOM_TUNING_MAP,
+                METADATA_MAP_SIZE(TNR_CUSTOM_TUNING_MAP),
+                frame_settings.find(QCAMERA3_TNR_TUNING_CUSTOM).data.i32[0]);
+
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                CAM_INTF_PARM_TNR_CUSTOM_TUNING, value)) {
+            rc = BAD_VALUE;
+        }
+    }
+
     if (frame_settings.exists(QCAMERA3_TNR_INTENSITY)) {
         float value = frame_settings.find(QCAMERA3_TNR_INTENSITY).data.f[0];
         if ((gCamCapability[mCameraId]->tnr_tuning_ctrl.max < value) ||
@@ -7940,9 +7973,9 @@ int QCamera3HardwareInterface::translateToHalMetadata
         }
     }
 
-    if (frame_settings.exists(QCAMERA3_MOTION_DETECTION_SENSITIVITY)) {
+    if (frame_settings.exists(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY)) {
         float value = frame_settings.find(
-                QCAMERA3_MOTION_DETECTION_SENSITIVITY).data.f[0];
+                QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY).data.f[0];
         if ((gCamCapability[mCameraId]->tnr_tuning_ctrl.max < value) ||
                 (gCamCapability[mCameraId]->tnr_tuning_ctrl.min > value)) {
             ALOGE("%s: Invalid motion detection sensitivity value %f!",
