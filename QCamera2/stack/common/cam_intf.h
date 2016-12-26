@@ -98,6 +98,14 @@ typedef enum {
     CAM_PERF_STATS_FPS_CONTROL
 } cam_dual_camera_perf_mode_t;
 
+/*Enum to inform about camera type in dual camera use-cases*/
+typedef enum {
+    CAM_DEFER_DEFAULT,
+    CAM_DEFER_START,
+    CAM_DEFER_PROCESS,
+    CAM_DEFER_FLUSH
+} cam_dual_camera_defer_cmd_t;
+
 /* Payload for sending bundling info to backend */
 typedef struct {
     cam_sync_related_sensors_control_t sync_control;
@@ -136,6 +144,7 @@ typedef struct {
         cam_dual_camera_bundle_info_t  bundle_info;
         cam_dual_camera_master_info_t  mode;
         cam_dual_camera_perf_control_t value;
+        cam_dual_camera_defer_cmd_t defer_cmd;
     };
 } cam_dual_camera_cmd_info_t;
 
@@ -196,20 +205,22 @@ typedef struct {
     /* AEC sync OTP data */
     /* AEC sync brightness ration. Fixed Point Q10*/
     int16_t    brightness_ratio;
-    /* Reference mono gain value obtained from setup stage and used during calibration stage */
+    /* Reference aux gain value obtained from setup stage and used during calibration stage */
     /* Fixed Point Q10 */
-    int16_t    ref_mono_gain;
-    /* Reference mono line count obtained from setup stage and used during calibration stage */
-    uint16_t   ref_mono_linecount;
-    /* Reference bayer gain value obtained from setup stage and used during calibration stage */
+    int16_t    ref_aux_gain;
+    /* Reference aux line count obtained from setup stage and used during calibration stage */
+    uint16_t   ref_aux_linecount;
+    /* Reference master gain value obtained from setup stage and used during calibration stage */
     /* Fixed Point Q10 */
-    int16_t    ref_bayer_gain;
-    /* Reference bayer line count obtained from setup stage and used during calibration stage */
-    uint16_t   ref_bayer_linecount;
-    /* Reference bayer color temperature */
-    uint16_t   ref_bayer_color_temperature;
+    int16_t    ref_master_gain;
+    /* Reference master line count obtained from setup stage and used during calibration stage */
+    uint16_t   ref_master_linecount;
+    /* Reference master color temperature */
+    uint16_t   ref_master_color_temperature;
     /* Reserved for future use */
     float      reserved[RELCAM_CALIB_RESERVED_MAX];
+    void       *dc_otp_params;
+    int        dc_otp_size; /* in bytes */
 } cam_related_system_calibration_data_t;
 #pragma pack()
 
@@ -988,6 +999,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_SNAP_CROP_INFO_ISP,           cam_stream_crop_info_t,   1);
     INCLUDE(CAM_INTF_META_SNAP_CROP_INFO_CPP,           cam_stream_crop_info_t,   1);
     INCLUDE(CAM_INTF_META_DCRF,                         cam_dcrf_result_t,        1);
+    INCLUDE(CAM_INTF_PARM_SYNC_DC_PARAMETERS,           uint32_t,                  1);
 
     /* HAL1 specific */
     /* read only */
@@ -1106,6 +1118,11 @@ typedef struct {
     INCLUDE(CAM_INTF_PARM_HAL_BRACKETING_HDR,           cam_hdr_param_t,             1);
     INCLUDE(CAM_INTF_META_DC_LOW_POWER_ENABLE,          uint8_t,                     1);
     INCLUDE(CAM_INTF_META_DC_SAC_OUTPUT_INFO,           cam_sac_output_info_t,       1);
+    INCLUDE(CAM_INTF_META_DC_IN_SNAPSHOT_PP_ZOOM_RANGE, uint8_t,                     1);
+    INCLUDE(CAM_INTF_META_DC_BOKEH_MODE,                uint8_t,                     1);
+    INCLUDE(CAM_INTF_PARM_FOV_COMP_ENABLE,              int32_t,                     1);
+    INCLUDE(CAM_INTF_META_LED_CALIB_RESULT,             int32_t,                     1);
+    INCLUDE(CAM_INTF_PARM_DC_ZOOM,                      int32_t,                     1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to
@@ -1175,6 +1192,13 @@ static inline void clear_metadata_buffer(metadata_buffer_t *meta)
       meta->is_statsdebug_bestats_params_valid = 0;
       meta->is_statsdebug_bhist_params_valid = 0;
       meta->is_statsdebug_3a_tuning_params_valid = 0;
+      /* tuning parameter sizes are never gets zero.
+       * It gets overwritten when it populated
+       * But we can't reply and make decision based on that
+       */
+      meta->tuning_params.tuning_sensor_data_size = 0;
+      meta->tuning_params.tuning_vfe_data_size = 0;
+      meta->tuning_params.tuning_mod1_stats_data_size = 0;
     }
 }
 

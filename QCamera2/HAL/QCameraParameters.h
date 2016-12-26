@@ -606,6 +606,16 @@ private:
 #endif
     //param key for HFR batch size
     static const char KEY_QC_VIDEO_BATCH_SIZE[];
+
+    static const char KEY_QC_SUPPORTED_METADATA_TYPES[];
+    static const char QC_METADATA_ASD[];
+    static const char QC_METADATA_FD[];
+    static const char QC_METADATA_HDR[];
+    static const char QC_METADATA_LED_CALIB[];
+
+    //Key to enable dual LED calibration
+    static const char KEY_QC_LED_CALIBRATION[];
+
     enum {
         CAMERA_ORIENTATION_UNKNOWN = 0,
         CAMERA_ORIENTATION_PORTRAIT = 1,
@@ -662,6 +672,7 @@ public:
     bool isZSLMode() {return m_bZslMode;};
     bool isRdiMode() {return m_bRdiMode;};
     bool isSecureMode() {return m_bSecureMode;};
+    cam_stream_type_t getSecureStreamType() {return mSecureStraemType;};
     bool isNoDisplayMode() {return m_bNoDisplayMode;};
     bool isWNREnabled() {return m_bWNROn;};
     bool isTNRSnapshotEnabled() {return m_bTNRSnapshotOn;};
@@ -702,6 +713,7 @@ public:
     bool isFpsDebugEnabled() {return m_bDebugFps;};
     bool isHistogramEnabled() {return m_bHistogramEnabled;};
     bool isSceneSelectionEnabled() {return m_bSceneSelection;};
+    bool isSmallJpegSizeEnabled() {return m_bSmallJpegSize;};
     int32_t setSelectedScene(cam_scene_mode_type scene);
     cam_scene_mode_type getSelectedScene();
     bool isFaceDetectionEnabled() {return ((m_nFaceProcMask &
@@ -720,6 +732,9 @@ public:
     bool isAVTimerEnabled();
     bool isDISEnabled();
     int32_t setISType();
+    void setSmallJpegSize(cam_dimension_t sensor_dim, cam_dimension_t snap_dim);
+    int32_t updateSnapshotPpMask(cam_stream_size_info_t &stream_config_info);
+    int32_t getSensorOutputSize(cam_dimension_t max_dim, cam_dimension_t &sensor_dim);
     cam_is_type_t getVideoISType();
     cam_is_type_t getPreviewISType();
     uint8_t getMobicatMask();
@@ -745,6 +760,7 @@ public:
     bool isPreviewFlipChanged() { return m_bPreviewFlipChanged; };
     bool isVideoFlipChanged() { return m_bVideoFlipChanged; };
     bool isSnapshotFlipChanged() { return m_bSnapshotFlipChanged; };
+    bool isZoomChanged() { return m_bZoomChanged; };
     void setHDRSceneEnable(bool bflag);
     int32_t updateAWBParams(cam_awb_params_t &awb_params);
 
@@ -865,6 +881,7 @@ public:
     int32_t bundleRelatedCameras(bool sync);
     uint8_t fdModeInVideo();
     bool isOEMFeatEnabled() { return m_bOEMFeatEnabled; }
+    uint8_t isOEMFeatFrameSkipEnabled();
 
     int32_t setZslMode(bool value);
     int32_t updateZSLModeValue(bool value);
@@ -878,7 +895,6 @@ public:
 
     int32_t getAnalysisInfo(
         bool fdVideoEnabled,
-        bool hal3,
         cam_feature_mask_t featureMask,
         cam_analysis_info_t *pAnalysisInfo);
 
@@ -890,6 +906,8 @@ public:
     bool isDualCamera() {return m_bDualCamera;};
     int32_t setCameraControls(int32_t controls);
     int32_t setSwitchCamera();
+    int32_t setDeferCamera(cam_dual_camera_defer_cmd_t type);
+    int32_t getDualLedCalibration() {return m_dualLedCalibration;};
 private:
     int32_t setPreviewSize(const QCameraParameters& );
     int32_t setVideoSize(const QCameraParameters& );
@@ -1079,6 +1097,7 @@ private:
     String8 createFpsString(cam_fps_range_t &fps);
     String8 createZoomRatioValuesString(uint32_t *zoomRatios, size_t length);
     int32_t setDualLedCalibration(const QCameraParameters& params);
+    int32_t setDualLedCalibration(const char *str);
     int32_t setAdvancedCaptureMode();
 
     // ops for batch set/get params with server
@@ -1099,6 +1118,11 @@ private:
     int32_t updateParamEntry(const char *key, const char *value);
     int32_t commitParamChanges();
     void updateViewAngles();
+
+    //Update Frame Number for super parameter
+    int32_t updateFrameNumber();
+    int32_t SyncDCParams();
+    void setSyncDCParams();
 
     // Map from strings to values
     static const cam_dimension_t THUMBNAIL_SIZES_MAP[];
@@ -1134,6 +1158,7 @@ private:
     static const QCameraMap<int> SEE_MORE_MODES_MAP[];
     static const QCameraMap<int> STILL_MORE_MODES_MAP[];
     static const QCameraMap<int> NOISE_REDUCTION_MODES_MAP[];
+    static const QCameraMap<int> METADATA_TYPES_MAP[];
 
     /*Common for all objects*/
     static uint32_t sessionId[MM_CAMERA_MAX_NUM_SENSORS];
@@ -1184,6 +1209,7 @@ private:
     bool m_bPreviewFlipChanged;        // if flip setting for preview changed
     bool m_bVideoFlipChanged;          // if flip setting for video changed
     bool m_bSnapshotFlipChanged;       // if flip setting for snapshot changed
+    bool m_bZoomChanged;               // if zoom value changed
     bool m_bFixedFrameRateSet;      // Indicates that a fixed frame rate is set
     qcamera_thermal_mode m_ThermalMode; // adjust fps vs adjust frameskip
     cam_dimension_t m_LiveSnapshotSize; // live snapshot size
@@ -1266,6 +1292,11 @@ private:
     bool m_bDualCamera;
     uint32_t mActiveState;
     uint32_t mActiveCamera;
+    bool m_bSmallJpegSize;
+    cam_stream_type_t mSecureStraemType;
+    //Frame number for super parameter
+    uint32_t mFrameNumber;
+    uint32_t mSyncDCParam;
 };
 
 }; // namespace qcamera

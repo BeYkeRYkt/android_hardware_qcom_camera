@@ -27,38 +27,23 @@
  *
  */
 
-#ifndef __QCAMERA_COMMON_H__
-#define __QCAMERA_COMMON_H__
+#ifndef __QCAMERAFOVCONTROLSETTINGS_H__
+#define __QCAMERAFOVCONTROLSETTINGS_H__
 
-// Camera dependencies
-#include "cam_types.h"
-#include "cam_intf.h"
+// Main camera fallback mechanism for low light and macro scene
+#define FOVC_MAIN_CAM_FALLBACK_MECHANISM        (1)
 
-namespace qcamera {
+// camera mode settings
+#define FOVC_CAM_SNAPSHOT_PP_ENABLE             (1)
+#define FOVC_CAM_SNAPSHOT_PP_ZOOM_MIN           (1.5)
+#define FOVC_CAM_SNAPSHOT_PP_ZOOM_MAX           (2.75)
+#define FOVC_CAM_SNAPSHOT_PP_LUX_MIN            (100)
 
-#define ALIGN(a, b) (((a) + (b)) & ~(b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+// camcorder mode settings
+#define FOVC_CAMCORDER_SNAPSHOT_PP_ENABLE       (0)
 
-class QCameraCommon {
-public:
-    QCameraCommon();
-    ~QCameraCommon();
+// Main and Aux camera switch settings
+#define FOVC_AUXCAM_SWITCH_LUX_MIN              (100)
+#define FOVC_AUXCAM_SWITCH_FOCUS_DIST_CM_MIN    (15)
 
-    int32_t init(cam_capability_t *cap);
-
-    int32_t getAnalysisInfo(
-        bool fdVideoEnabled, cam_feature_mask_t featureMask,
-        cam_analysis_info_t *pAnalysisInfo);
-    static uint32_t calculateLCM(int32_t num1, int32_t num2);
-    cam_dimension_t getMatchingDimension(
-            cam_dimension_t exp_dim,
-            cam_dimension_t cur_dim);
-
-private:
-    cam_capability_t *m_pCapability;
-
-};
-
-}; // namespace qcamera
-#endif /* __QCAMERA_COMMON_H__ */
-
+#endif /* __QCAMERAFOVCONTROL_H__ */

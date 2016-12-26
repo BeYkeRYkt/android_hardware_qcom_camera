@@ -35,7 +35,7 @@
 #include <media/msmb_camera.h>
 
 #define CAM_MAX_NUM_BUFS_PER_STREAM 64
-#define MAX_METADATA_PRIVATE_PAYLOAD_SIZE_IN_BYTES 8096
+#define MAX_METADATA_PRIVATE_PAYLOAD_SIZE_IN_BYTES 12256
 #define AWB_DEBUG_DATA_SIZE               (45000)
 #define AEC_DEBUG_DATA_SIZE               (5000)
 #define AF_DEBUG_DATA_SIZE                (60000)
@@ -89,15 +89,45 @@
 #define TUNING_VFE_DATA_MAX        0x10000 /*(need value from vfe team)*/
 #define TUNING_CPP_DATA_MAX        0x10000 /*(need value from pproc team)*/
 #define TUNING_CAC_DATA_MAX        0x10000 /*(need value from imglib team)*/
+#define TUNING_MOD1_AEC_DATA_MAX   ((16*(sizeof(int))) + (16*(sizeof(float))))
+#define TUNING_MOD1_AWB_DATA_MAX   ((16*(sizeof(int))) + (16*(sizeof(float))))
+#define TUNING_MOD1_AF_DATA_MAX    ((16*(sizeof(int))) + (16*(sizeof(float))))
+#define TUNING_MOD1_STATS_DATA_MAX (TUNING_MOD1_AEC_DATA_MAX + \
+                                   TUNING_MOD1_AEC_DATA_MAX + \
+                                   TUNING_MOD1_AEC_DATA_MAX)
+
 #define TUNING_DATA_MAX            (TUNING_SENSOR_DATA_MAX + \
-                                   TUNING_VFE_DATA_MAX + TUNING_CPP_DATA_MAX + \
+                                   TUNING_VFE_DATA_MAX + \
+                                   TUNING_MOD1_STATS_DATA_MAX + \
+                                   TUNING_CPP_DATA_MAX + \
                                    TUNING_CAC_DATA_MAX)
 
 #define TUNING_SENSOR_DATA_OFFSET  0
 #define TUNING_VFE_DATA_OFFSET     TUNING_SENSOR_DATA_MAX
-#define TUNING_CPP_DATA_OFFSET     (TUNING_SENSOR_DATA_MAX + TUNING_VFE_DATA_MAX)
+#define TUNING_MOD1_AEC_DATA_OFFSET  (TUNING_SENSOR_DATA_MAX + \
+                                     TUNING_VFE_DATA_MAX)
+
+#define TUNING_MOD1_AWB_DATA_OFFSET  (TUNING_SENSOR_DATA_MAX + \
+                                      TUNING_VFE_DATA_MAX + \
+                                      TUNING_MOD1_AEC_DATA_MAX)
+
+#define TUNING_MOD1_AF_DATA_OFFSET  (TUNING_SENSOR_DATA_MAX + \
+                                     TUNING_VFE_DATA_MAX + \
+                                     TUNING_MOD1_AEC_DATA_MAX + \
+                                     TUNING_MOD1_AWB_DATA_MAX)
+
+#define TUNING_CPP_DATA_OFFSET     (TUNING_SENSOR_DATA_MAX + \
+                                    TUNING_VFE_DATA_MAX + \
+                                    TUNING_MOD1_AEC_DATA_MAX + \
+                                    TUNING_MOD1_AWB_DATA_MAX + \
+                                    TUNING_MOD1_AF_DATA_MAX)
 #define TUNING_CAC_DATA_OFFSET     (TUNING_SENSOR_DATA_MAX + \
-                                   TUNING_VFE_DATA_MAX + TUNING_CPP_DATA_MAX)
+                                    TUNING_VFE_DATA_MAX + \
+                                    TUNING_MOD1_AEC_DATA_MAX + \
+                                    TUNING_MOD1_AWB_DATA_MAX + \
+                                    TUNING_MOD1_AF_DATA_MAX + \
+                                    TUNING_CPP_DATA_OFFSET)
+
 #define MAX_STATS_DATA_SIZE 4000
 
 #define MAX_AF_BRACKETING_VALUES 5
@@ -1015,6 +1045,7 @@ typedef enum {
     CAM_CAPTURE_LOW_LIGHT,
     CAM_CAPTURE_RESET,
     CAM_CAPTURE_MANUAL_3A,
+    CAM_CAPTURE_LED_CAL,
     CAM_CAPTURE_MAX
 } cam_capture_type;
 
@@ -1633,6 +1664,7 @@ typedef struct {
     uint32_t tuning_data_version;
     size_t tuning_sensor_data_size;
     size_t tuning_vfe_data_size;
+    size_t tuning_mod1_stats_data_size; //Stats data
     size_t tuning_cpp_data_size;
     size_t tuning_cac_data_size;
     size_t tuning_cac_data_size2;
@@ -1684,7 +1716,9 @@ typedef enum {
     /*cmd to suspend or resume cameras*/
     CAM_DUAL_CAMERA_LOW_POWER_MODE,
     /*cmd to send information about role switch*/
-    CAM_DUAL_CAMERA_MASTER_INFO
+    CAM_DUAL_CAMERA_MASTER_INFO,
+    /*Command to Defer dual camera session*/
+    CAM_DUAL_CAMERA_DEFER_INFO,
 } cam_dual_camera_cmd_type;
 
 typedef enum {
@@ -1733,6 +1767,7 @@ typedef struct {
     cam_sub_format_type_t sub_format_type[MAX_NUM_STREAMS];
     cam_frame_margins_t margins[MAX_NUM_STREAMS];
     cam_dimension_t stream_sz_plus_margin[MAX_NUM_STREAMS]; /*stream sizes + margin*/
+    uint8_t is_secure;
 } cam_stream_size_info_t;
 
 typedef enum {
@@ -1798,7 +1833,7 @@ typedef struct {
 } cam_buf_divert_info_t;
 
 typedef enum {
-    CAM_SPATIAL_ALIGN_QCOM = 1 << 0,
+    CAM_SPATIAL_ALIGN_QTI  = 1 << 0,
     CAM_SPATIAL_ALIGN_OEM  = 1 << 1
 } cam_spatial_align_type_t;
 
@@ -1808,6 +1843,8 @@ typedef struct {
 } cam_sac_output_shift_t;
 
 typedef struct {
+    uint8_t                is_master_hint_valid;
+    uint8_t                master_hint;
     uint8_t                is_master_preview_valid;
     uint8_t                master_preview;
     uint8_t                is_master_3A_valid;
@@ -1816,10 +1853,7 @@ typedef struct {
     uint8_t                ready_status;
     uint8_t                is_output_shift_valid;
     cam_sac_output_shift_t output_shift;
-    uint8_t                is_wide_focus_roi_shift_valid;
-    cam_sac_output_shift_t wide_focus_roi_shift;
-    uint8_t                is_tele_focus_roi_shift_valid;
-    cam_sac_output_shift_t tele_focus_roi_shift;
+    cam_dimension_t        reference_res_for_output_shift;
 } cam_sac_output_info_t;
 
 
@@ -2332,6 +2366,17 @@ typedef enum {
     CAM_INTF_META_DC_SAC_OUTPUT_INFO,
     /* Dual camera - enable low power mode for the slave camera */
     CAM_INTF_META_DC_LOW_POWER_ENABLE,
+    /* Dual camera - indicate if in the snapshot postprocess zoom range */
+    CAM_INTF_META_DC_IN_SNAPSHOT_PP_ZOOM_RANGE,
+    /* Dual camera - indicate if snapshot bokeh mode is selected */
+    CAM_INTF_META_DC_BOKEH_MODE,
+    CAM_INTF_PARM_FOV_COMP_ENABLE,
+    /*Meta to update dual LED calibration results to app*/
+    CAM_INTF_META_LED_CALIB_RESULT,
+    /* Dual camera - zoom value for the other camera */
+    CAM_INTF_PARM_DC_ZOOM,
+    /* Dual camera sync parameter */
+    CAM_INTF_PARM_SYNC_DC_PARAMETERS,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2559,6 +2604,8 @@ typedef struct {
 #define CAM_QCOM_FEATURE_STAGGERED_VIDEO_HDR (((cam_feature_mask_t)1UL)<<36)
 #define CAM_QCOM_FEATURE_METADATA_BYPASS (((cam_feature_mask_t)1UL)<<37)
 #define CAM_QTI_FEATURE_SAT             (((cam_feature_mask_t)1UL)<<38)
+#define CAM_QTI_FEATURE_CPP_DOWNSCALE   (((cam_feature_mask_t)1UL)<<39)
+#define CAM_QTI_FEATURE_FIXED_FOVC      (((cam_feature_mask_t)1UL) << 40)
 #define CAM_QCOM_FEATURE_PP_SUPERSET    (CAM_QCOM_FEATURE_DENOISE2D|CAM_QCOM_FEATURE_CROP|\
                                          CAM_QCOM_FEATURE_ROTATION|CAM_QCOM_FEATURE_SHARPNESS|\
                                          CAM_QCOM_FEATURE_SCALE|CAM_QCOM_FEATURE_CAC|\
@@ -2925,5 +2972,20 @@ typedef enum {
     CAM_STREAM_CACHE_OPS_HONOUR_FLAGS,
     CAM_STREAM_CACHE_OPS_DISABLED
 } cam_stream_cache_ops_t;
+
+typedef struct {
+  int reserved_i[16];
+  float reserved_f[16];
+}tuning_mod1_data_AWB;
+
+typedef struct {
+  int reserved_i[16];
+  float reserved_f[16];
+}tuning_mod1_data_AEC;
+
+typedef struct {
+  int reserved_i[16];
+  float reserved_f[16];
+}tuning_mod1_data_AF;
 
 #endif /* __QCAMERA_TYPES_H__ */
