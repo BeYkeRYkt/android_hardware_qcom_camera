@@ -505,7 +505,7 @@ int32_t QCameraStateMachine::procEvtPreviewStoppedState(qcamera_sm_evt_enum_t ev
         break;
     case QCAMERA_SM_EVT_RELEASE_RECORIDNG_FRAME:
         {
-            ALOGW("Free video handle %d %d", evt, m_state);
+            CDBG("Free video handle %d %d", evt, m_state);
             QCameraVideoMemory::closeNativeHandle((const void *)payload);
         }
     case QCAMERA_SM_EVT_START_RECORDING:
@@ -842,7 +842,7 @@ int32_t QCameraStateMachine::procEvtPreviewReadyState(qcamera_sm_evt_enum_t evt,
         break;
     case QCAMERA_SM_EVT_RELEASE_RECORIDNG_FRAME:
         {
-            CDBG_HIGH("Free video handle %d %d", evt, m_state);
+            CDBG("Free video handle %d %d", evt, m_state);
             QCameraVideoMemory::closeNativeHandle((const void *)payload);
         }
     case QCAMERA_SM_EVT_START_NODISPLAY_PREVIEW:
@@ -1231,7 +1231,7 @@ int32_t QCameraStateMachine::procEvtPreviewingState(qcamera_sm_evt_enum_t evt,
         break;
     case QCAMERA_SM_EVT_RELEASE_RECORIDNG_FRAME:
         {
-            ALOGW("Free video handle %d %d", evt, m_state);
+            CDBG("Free video handle %d %d", evt, m_state);
             QCameraVideoMemory::closeNativeHandle((const void *)payload);
         }
     case QCAMERA_SM_EVT_CANCEL_PICTURE:

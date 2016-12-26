@@ -261,11 +261,6 @@ typedef enum {
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_14BPP_RGGB,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_14BPP_BGGR,
 
-    /* UBWC format */
-    CAM_FORMAT_YUV_420_NV12_UBWC,
-
-    CAM_FORMAT_YUV_420_NV21_VENUS,
-
     CAM_FORMAT_MAX
 } cam_format_t;
 
@@ -629,7 +624,6 @@ typedef struct  {
 typedef enum {
     CAM_STREAMING_MODE_CONTINUOUS, /* continous streaming */
     CAM_STREAMING_MODE_BURST,      /* burst streaming */
-    CAM_STREAMING_MODE_BATCH,      /* stream frames in batches */
     CAM_STREAMING_MODE_MAX
 } cam_streaming_mode_t;
 
