@@ -124,9 +124,13 @@ CameraMemory::~CameraMemory()
 {
     switch (type_) {
       case MEM_ALLOCATED:
-          if (main_ion_fd_) {
+          if (main_ion_fd_ && mem_->data != NULL) {
+            munmap(mem_->data, mem_->size);
+            close(frame.fd);
             ioctl(main_ion_fd_, ION_IOC_FREE, &handle_data_);
             close(main_ion_fd_);
+            mem_->data = NULL;
+            frame.fd = -1;
           }
           break;
       case MEM_MAPPED:
