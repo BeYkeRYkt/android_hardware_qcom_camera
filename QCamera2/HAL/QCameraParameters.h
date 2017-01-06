@@ -907,6 +907,7 @@ public:
     int32_t setCameraControls(int32_t controls);
     int32_t setSwitchCamera();
     int32_t setDeferCamera(cam_dual_camera_defer_cmd_t type);
+    void setBundledSnapshot(bool value) { mbundledSnapshot = value; }
     int32_t getDualLedCalibration() {return m_dualLedCalibration;};
 private:
     int32_t setPreviewSize(const QCameraParameters& );
@@ -1108,12 +1109,6 @@ private:
     int32_t commitGetBatchAux();
     void    setAuxParameters();
 
-    void * getPointerofParam(cam_intf_parm_type_t meta_id,
-            metadata_buffer_t* metadata);
-    uint32_t getSizeofParam(cam_intf_parm_type_t param_id);
-    int32_t setAUXParameter(cam_intf_parm_type_t paramType,
-            void *paramValue, uint32_t paramLength);
-
     // ops to tempororily update parameter entries and commit
     int32_t updateParamEntry(const char *key, const char *value);
     int32_t commitParamChanges();
@@ -1297,6 +1292,7 @@ private:
     //Frame number for super parameter
     uint32_t mFrameNumber;
     uint32_t mSyncDCParam;
+    bool mbundledSnapshot;
 };
 
 }; // namespace qcamera
