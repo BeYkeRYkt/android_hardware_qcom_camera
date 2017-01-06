@@ -7316,7 +7316,7 @@ int32_t QCameraParameters::getStreamDimension(cam_stream_type_t streamType,
                     && cur_pic_height >= m_pCapability->preview_sizes_tbl[k].height) {
                     dim.width = m_pCapability->preview_sizes_tbl[k].width;
                     dim.height = m_pCapability->preview_sizes_tbl[k].height;
-                    ALOGV("%s:re-set size, pic_width=%d, pic_height=%d, pre_width=%d,pre_height=%d",
+                    ALOGV("%s: re-set size, pic_width=%d, pic_height=%d, pre_width=%d,pre_height=%d",
                             __func__,cur_pic_width,cur_pic_height, dim.width, dim.height);
                     break;
                  }
@@ -7329,6 +7329,32 @@ int32_t QCameraParameters::getStreamDimension(cam_stream_type_t streamType,
                         __func__,cur_pic_width, cur_pic_height, dim.width, dim.height);
            }
 
+        }
+
+        if (dim.width >= 3840 && dim.height >= 2160) {
+            ALOGV("%s: get postview dimension, is 4k preview", __func__);
+            if (dim.width <= cur_pic_width && dim.height <= cur_pic_height) {
+                ALOGV("%s: reduce the post-preview size when taking >4k picture", __func__);
+                size_t k;
+                size_t k1 = m_pCapability->preview_sizes_tbl_cnt;
+                size_t size = 0;
+                for (k = 0; k < m_pCapability->preview_sizes_tbl_cnt; ++k) {
+                    int width = m_pCapability->preview_sizes_tbl[k].width;
+                    int height = m_pCapability->preview_sizes_tbl[k].height;
+                    if (width > 1920 || height > 1080)
+                        continue;
+                    if (width * height > size)
+                        k1 = k;
+                }
+                if (k1 == m_pCapability->preview_sizes_tbl_cnt) {
+                    ALOGE("%s: can not found a proper postview size for this picture size", __func__);
+                } else {
+                    dim.width = m_pCapability->preview_sizes_tbl[k1].width;
+                    dim.height = m_pCapability->preview_sizes_tbl[k1].height;
+                    ALOGV("%s: re-set size, pic_width=%d, pic_height=%d, pre_width=%d, pre_height=%d.",
+                            __func__,cur_pic_width, cur_pic_height, dim.width, dim.height);
+                }
+            }
         }
         break;
     case CAM_STREAM_TYPE_SNAPSHOT:
