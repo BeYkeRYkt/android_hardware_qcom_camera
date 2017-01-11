@@ -410,6 +410,7 @@ int32_t QCamera3Stream::init(cam_stream_type_t streamType,
     mStreamInfo->num_bufs = minNumBuffers;
     mStreamInfo->pp_config.feature_mask = postprocess_mask;
     mStreamInfo->is_type = is_type;
+    mStreamInfo->dewarp_type = mChannel->getDewarpType();
     mStreamInfo->pp_config.rotation = streamRotation;
 
     memset(value, 0, sizeof(value));

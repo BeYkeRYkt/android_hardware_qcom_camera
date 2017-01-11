@@ -615,6 +615,8 @@ private:
             cam_auto_exposure_mode_type> AEC_MODES_MAP[];
     static const QCameraMap<qcamera3_ext_iso_mode_t,
             cam_iso_mode_type> ISO_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_ext_dewarp_type_t,
+            cam_dewarp_type_t> DEWARP_TYPE_MAP[];
     static const QCameraPropMap CDS_MAP[];
 
     pendingRequestIterator erasePendingRequest(pendingRequestIterator i);
