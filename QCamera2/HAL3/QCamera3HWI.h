@@ -337,7 +337,8 @@ private:
     int64_t getMinFrameDuration(const camera3_capture_request_t *request);
     void handleMetadataWithLock(mm_camera_super_buf_t *metadata_buf,
             bool free_and_bufdone_meta_buf,
-            bool firstMetadataInBatch);
+            bool firstMetadataInBatch,
+            bool *p_is_metabuf_queued);
     void handleBatchMetadata(mm_camera_super_buf_t *metadata_buf,
             bool free_and_bufdone_meta_buf);
     void handleBufferWithLock(camera3_stream_buffer_t *buffer,
@@ -396,6 +397,8 @@ private:
     static void setPAAFSupport(cam_feature_mask_t& feature_mask,
             cam_stream_type_t stream_type,
             cam_color_filter_arrangement_t filter_arrangement);
+    int32_t setSensorHDR(metadata_buffer_t *hal_metadata, bool enable,
+            bool isVideoHdrEnable = false);
 
     camera3_device_t   mCameraDevice;
     uint32_t           mCameraId;
@@ -448,6 +451,7 @@ private:
     uint8_t m_bSwTnrPreview;
     uint8_t m_bTnrVideo;
     uint8_t m_debug_avtimer;
+    uint8_t m_cacModeDisabled;
 
     /* Data structure to store pending request */
     typedef struct {
@@ -536,6 +540,7 @@ private:
     float mHFRVideoFps;
 public:
     uint8_t mOpMode;
+    bool mStreamConfig;
 private:
     uint32_t mFirstFrameNumberInBatch;
     camera3_stream_t mDummyBatchStream;
@@ -556,6 +561,7 @@ private:
     /* sensor output size with current stream configuration */
     QCamera3CropRegionMapper mCropRegionMapper;
 
+    cam_feature_mask_t mCurrFeatureState;
     /* Ldaf calibration data */
     bool mLdafCalibExist;
     uint32_t mLdafCalib[2];
@@ -596,6 +602,8 @@ private:
             cam_ir_mode_type_t> IR_MODES_MAP[];
     static const QCameraMap<qcamera3_ext_instant_aec_mode_t,
             cam_aec_convergence_type> INSTANT_AEC_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_android_binning_correction_mode_t,
+            cam_binning_correction_mode_t> BINNING_CORRECTION_MODES_MAP[];
     static const QCameraPropMap CDS_MAP[];
 
     pendingRequestIterator erasePendingRequest(pendingRequestIterator i);
@@ -613,6 +621,7 @@ private:
     cam_dual_camera_cmd_info_t *m_pDualCamCmdPtr;
     cam_sync_related_sensors_event_info_t m_relCamSyncInfo;
     Mutex mFlushLock;
+    bool m_bSensorHDREnabled;
 };
 
 }; // namespace qcamera
