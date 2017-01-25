@@ -96,7 +96,7 @@ typedef struct {
     uint8_t               camMasterHint;
     uint8_t               camMasterPreview;
     uint8_t               camMaster3A;
-    uint32_t              activeCamState;
+    uint32_t              activeCameras;
     spatial_align_shift_t shiftWide;
     spatial_align_shift_t shiftTele;
 } spatial_align_result_t;
@@ -148,6 +148,8 @@ typedef struct {
     uint32_t                     focusDistStableCount;
     uint32_t                     focusDistStableCountThreshold;
     dual_cam_transition_params_t transitionParams;
+    uint32_t                     afStatusMain;
+    uint32_t                     afStatusAux;
 } fov_control_data_t;
 
 typedef struct {
@@ -190,7 +192,7 @@ typedef struct {
     bool            isValid;
     cam_sync_type_t camMasterPreview;
     cam_sync_type_t camMaster3A;
-    uint32_t        activeCamState;
+    uint32_t        activeCameras;
     bool            snapshotPostProcess;
     bool            snapshotPostProcessZoomRange;
 } fov_control_result_t;
@@ -207,6 +209,7 @@ public:
     metadata_buffer_t* processResultMetadata(metadata_buffer_t* metaMainCam,
             metadata_buffer_t* metaAuxCam);
     fov_control_result_t getFovControlResult();
+    cam_frame_margins_t getFrameMargins(int8_t masterCamera);
 
 private:
     QCameraFOVControl();
@@ -227,6 +230,7 @@ private:
     void generateFovControlResult();
     bool isMainCamFovWider();
     bool isSpatialAlignmentReady();
+    void resetVars();
 
     Mutex                           mMutex;
     fov_control_config_t            mFovControlConfig;
