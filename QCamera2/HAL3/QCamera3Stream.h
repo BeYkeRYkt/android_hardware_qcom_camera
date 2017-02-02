@@ -63,6 +63,7 @@ public:
                          cam_stream_reproc_config_t* reprocess_config,
                          uint8_t minStreamBufNum,
                          uint32_t postprocess_mask,
+                         cam_rotation_t rotation,
                          cam_is_type_t is_type,
                          hal3_stream_cb_routine stream_cb,
                          void *userdata);

@@ -1364,11 +1364,20 @@ typedef struct {
    uint32_t max_buffers;
 } cam_buffer_info_t;
 
+// Counter clock wise
+typedef enum {
+    ROTATE_0 = 1<<0,
+    ROTATE_90 = 1<<1,
+    ROTATE_180 = 1<<2,
+    ROTATE_270 = 1<<3,
+} cam_rotation_t;
+
 typedef struct {
     cam_dimension_t stream_sizes[MAX_NUM_STREAMS];
     uint32_t num_streams;
     cam_stream_type_t type[MAX_NUM_STREAMS];
     uint32_t postprocess_mask[MAX_NUM_STREAMS];
+    cam_rotation_t rotation[MAX_NUM_STREAMS];
     cam_buffer_info_t buffer_info;
     cam_is_type_t is_type;
     cam_hfr_mode_t hfr_mode;
@@ -2103,14 +2112,6 @@ typedef struct {
 
 #define CAM_QCOM_FEATURE_PP_PASS_1      CAM_QCOM_FEATURE_PP_SUPERSET
 #define CAM_QCOM_FEATURE_PP_PASS_2      CAM_QCOM_FEATURE_SCALE | CAM_QCOM_FEATURE_CROP;
-
-// Counter clock wise
-typedef enum {
-    ROTATE_0 = 1<<0,
-    ROTATE_90 = 1<<1,
-    ROTATE_180 = 1<<2,
-    ROTATE_270 = 1<<3,
-} cam_rotation_t;
 
 typedef struct {
    cam_rotation_t rotation;         /* jpeg rotation */

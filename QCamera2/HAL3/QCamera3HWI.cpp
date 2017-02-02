@@ -1377,6 +1377,17 @@ int QCamera3HardwareInterface::configureStreams(
         uint32_t stream_usage = newStream->usage;
         mStreamConfigInfo.stream_sizes[i].width = (int32_t)newStream->width;
         mStreamConfigInfo.stream_sizes[i].height = (int32_t)newStream->height;
+
+        if (newStream->rotation == CAMERA3_STREAM_ROTATION_0) {
+            mStreamConfigInfo.rotation[i] = ROTATE_0;
+        } else if (newStream->rotation == CAMERA3_STREAM_ROTATION_90) {
+            mStreamConfigInfo.rotation[i] = ROTATE_90;
+        } else if (newStream->rotation == CAMERA3_STREAM_ROTATION_180) {
+            mStreamConfigInfo.rotation[i] = ROTATE_180;
+        } else if (newStream->rotation == CAMERA3_STREAM_ROTATION_270) {
+            mStreamConfigInfo.rotation[i] = ROTATE_270;
+        }
+
         if (newStream->stream_type == CAMERA3_STREAM_BIDIRECTIONAL &&
             newStream->format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED && jpegStream){
             //for zsl stream the size is jpeg stream size
@@ -1497,6 +1508,7 @@ int QCamera3HardwareInterface::configureStreams(
                         newStream,
                         (cam_stream_type_t) mStreamConfigInfo.type[i],
                         mStreamConfigInfo.postprocess_mask[i],
+                        mStreamConfigInfo.rotation[i],
                         jpegStream->width, jpegStream->height);
                 if (channel == NULL) {
                     ALOGE("%s: allocation of channel failed", __func__);
@@ -1516,7 +1528,8 @@ int QCamera3HardwareInterface::configureStreams(
                             this,
                             newStream,
                             (cam_stream_type_t) mStreamConfigInfo.type[i],
-                            mStreamConfigInfo.postprocess_mask[i]);
+                            mStreamConfigInfo.postprocess_mask[i],
+                            mStreamConfigInfo.rotation[i]);
                     if (channel == NULL) {
                         ALOGE("%s: allocation of channel failed", __func__);
                         pthread_mutex_unlock(&mMutex);
@@ -1551,6 +1564,7 @@ int QCamera3HardwareInterface::configureStreams(
                             mCameraHandle->ops, captureResultCb,
                             &padding_info, this, newStream,
                             mStreamConfigInfo.postprocess_mask[i],
+                            mStreamConfigInfo.rotation[i],
                             m_bIs4KVideo, mMetadataChannel,
                             (m_bIsVideo ? 1 : MAX_INFLIGHT_REQUESTS));
                     if (mPictureChannel == NULL) {

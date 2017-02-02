@@ -69,6 +69,7 @@ QCamera3Channel::QCamera3Channel(uint32_t cam_handle,
                                channel_cb_routine cb_routine,
                                cam_padding_info_t *paddingInfo,
                                uint32_t postprocess_mask,
+                               cam_rotation_t rotation,
                                void *userData, uint32_t numBuffers)
 {
     m_camHandle = cam_handle;
@@ -85,6 +86,7 @@ QCamera3Channel::QCamera3Channel(uint32_t cam_handle,
     mPaddingInfo = *paddingInfo;
 
     mPostProcMask = postprocess_mask;
+    mRotation = rotation;
 
     mIsType = IS_TYPE_NONE;
     mNumBuffers = numBuffers;
@@ -196,6 +198,7 @@ int32_t QCamera3Channel::addStream(cam_stream_type_t streamType,
                                   cam_dimension_t streamDim,
                                   uint8_t minStreamBufNum,
                                   uint32_t postprocessMask,
+                                  cam_rotation_t rotation,
                                   cam_is_type_t isType)
 {
     int32_t rc = NO_ERROR;
@@ -221,7 +224,7 @@ int32_t QCamera3Channel::addStream(cam_stream_type_t streamType,
     }
 
     rc = pStream->init(streamType, streamFormat, streamDim, NULL, minStreamBufNum,
-                       postprocessMask, isType, streamCbRoutine, this);
+                       postprocessMask, rotation, isType, streamCbRoutine, this);
     if (rc == 0) {
         mStreams[m_numStreams] = pStream;
         m_numStreams++;
@@ -652,10 +655,11 @@ QCamera3RegularChannel::QCamera3RegularChannel(uint32_t cam_handle,
                     camera3_stream_t *stream,
                     cam_stream_type_t stream_type,
                     uint32_t postprocess_mask,
+                    cam_rotation_t rotation,
                     uint32_t numBuffers) :
                         QCamera3Channel(cam_handle, cam_ops, cb_routine,
-                                paddingInfo, postprocess_mask, userData,
-                                numBuffers),
+                                paddingInfo, postprocess_mask, rotation,
+                                userData, numBuffers),
                         mFrameCount(0),
                         mLastFrameCount(0),
                         mLastFpsTime(0),
@@ -698,11 +702,12 @@ QCamera3RegularChannel::QCamera3RegularChannel(uint32_t cam_handle,
                     camera3_stream_t *stream,
                     cam_stream_type_t stream_type,
                     uint32_t postprocess_mask,
+                    cam_rotation_t rotation,
                     uint32_t width, uint32_t height,
                     uint32_t numBuffers) :
                         QCamera3Channel(cam_handle, cam_ops, cb_routine,
-                                paddingInfo, postprocess_mask, userData,
-                                numBuffers),
+                                paddingInfo, postprocess_mask, rotation,
+                                userData, numBuffers),
                         mFrameCount(0),
                         mLastFrameCount(0),
                         mLastFpsTime(0),
@@ -798,6 +803,7 @@ int32_t QCamera3RegularChannel::initialize(cam_is_type_t isType)
             streamDim,
             mNumBufs,
             mPostProcMask,
+            mRotation,
             mIsType);
 
     return rc;
@@ -1088,7 +1094,7 @@ QCamera3MetadataChannel::QCamera3MetadataChannel(uint32_t cam_handle,
                     void *userData, uint32_t numBuffers) :
                         QCamera3Channel(cam_handle, cam_ops,
                                 cb_routine, paddingInfo, postprocess_mask,
-                                userData, numBuffers),
+                                ROTATE_0, userData, numBuffers),
                         mMemory(NULL)
 {
 }
@@ -1127,7 +1133,7 @@ int32_t QCamera3MetadataChannel::initialize(cam_is_type_t isType)
 
     mIsType = isType;
     rc = QCamera3Channel::addStream(CAM_STREAM_TYPE_METADATA, CAM_FORMAT_MAX,
-            streamDim, (uint8_t)mNumBuffers, mPostProcMask, mIsType);
+            streamDim, (uint8_t)mNumBuffers, mPostProcMask, ROTATE_0, mIsType);
     if (rc < 0) {
         ALOGE("%s: addStream failed", __func__);
     }
@@ -1201,7 +1207,8 @@ QCamera3RawChannel::QCamera3RawChannel(uint32_t cam_handle,
                     bool raw_16, uint32_t numBuffers) :
                         QCamera3RegularChannel(cam_handle, cam_ops,
                                 cb_routine, paddingInfo, userData, stream,
-                                CAM_STREAM_TYPE_RAW, postprocess_mask, numBuffers),
+                                CAM_STREAM_TYPE_RAW, postprocess_mask,
+                                ROTATE_0, numBuffers),
                         mIsRaw16(raw_16)
 {
     char prop[PROPERTY_VALUE_MAX];
@@ -1385,7 +1392,7 @@ QCamera3RawDumpChannel::QCamera3RawDumpChannel(uint32_t cam_handle,
                     void *userData,
                     uint32_t postprocess_mask, uint32_t numBuffers) :
                         QCamera3Channel(cam_handle, cam_ops, NULL,
-                                paddingInfo, postprocess_mask,
+                                paddingInfo, postprocess_mask, ROTATE_0,
                                 userData, numBuffers),
                         mDim(rawDumpSize),
                         mMemory(NULL)
@@ -1591,7 +1598,7 @@ int32_t QCamera3RawDumpChannel::initialize(cam_is_type_t isType)
     mIsType = isType;
     rc = QCamera3Channel::addStream(CAM_STREAM_TYPE_RAW,
         CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG, mDim, (uint8_t)mNumBuffers,
-        mPostProcMask, mIsType);
+        mPostProcMask, ROTATE_0, mIsType);
     if (rc < 0) {
         ALOGE("%s: addStream failed", __func__);
     }
@@ -1754,11 +1761,13 @@ QCamera3PicChannel::QCamera3PicChannel(uint32_t cam_handle,
                     void *userData,
                     camera3_stream_t *stream,
                     uint32_t postprocess_mask,
+                    cam_rotation_t rotation,
                     bool is4KVideo,
                     QCamera3Channel *metadataChannel,
                     uint32_t numBuffers) :
                         QCamera3Channel(cam_handle, cam_ops, cb_routine,
-                        paddingInfo, postprocess_mask, userData, numBuffers),
+                            paddingInfo, postprocess_mask, rotation, userData,
+                            numBuffers),
                         m_postprocessor(this),
                         mCamera3Stream(stream),
                         mNumBufsRegistered(CAM_MAX_NUM_BUFS_PER_STREAM),
@@ -1867,7 +1876,7 @@ int32_t QCamera3PicChannel::initialize(cam_is_type_t isType)
 
     mNumSnapshotBufs = mCamera3Stream->max_buffers;
     rc = QCamera3Channel::addStream(streamType, streamFormat, streamDim,
-            (uint8_t)mCamera3Stream->max_buffers, mPostProcMask, mIsType);
+            (uint8_t)mCamera3Stream->max_buffers, mPostProcMask, ROTATE_0, mIsType);
 
     Mutex::Autolock lock(mFreeBuffersLock);
     mFreeBufferList.clear();
@@ -2876,7 +2885,7 @@ QCamera3ReprocessChannel::QCamera3ReprocessChannel(uint32_t cam_handle,
                                                  uint32_t postprocess_mask,
                                                  void *userData, void *ch_hdl) :
     QCamera3Channel(cam_handle, cam_ops, cb_routine, paddingInfo, postprocess_mask,
-                    userData, ((QCamera3PicChannel *)ch_hdl)->getNumBuffers()),
+        ROTATE_0, userData, ((QCamera3PicChannel *)ch_hdl)->getNumBuffers()),
     picChHandle(ch_hdl),
     mOfflineBuffersIndex(-1),
     m_pSrcChannel(NULL),
@@ -3569,6 +3578,7 @@ int32_t QCamera3ReprocessChannel::addReprocStreamsFromSource(cam_pp_feature_conf
             streamDim, &reprocess_config,
             (uint8_t)mNumBuffers,
             reprocess_config.pp_feature_config.feature_mask,
+            reprocess_config.pp_feature_config.rotation,
             is_type,
             QCamera3Channel::streamCbRoutine, this);
 
@@ -3605,7 +3615,7 @@ QCamera3SupportChannel::QCamera3SupportChannel(uint32_t cam_handle,
                     cam_format_t streamFormat,
                     void *userData, uint32_t numBuffers) :
                         QCamera3Channel(cam_handle, cam_ops,
-                                NULL, paddingInfo, postprocess_mask,
+                                NULL, paddingInfo, postprocess_mask, ROTATE_0,
                                 userData, numBuffers),
                         mMemory(NULL)
 {
@@ -3643,7 +3653,7 @@ int32_t QCamera3SupportChannel::initialize(cam_is_type_t isType)
     mIsType = isType;
     rc = QCamera3Channel::addStream(mStreamType,
         mStreamFormat, mDim, MIN_STREAMING_BUFFER_NUM,
-        mPostProcMask, mIsType);
+        mPostProcMask, ROTATE_0, mIsType);
     if (rc < 0) {
         ALOGE("%s: addStream failed", __func__);
     }

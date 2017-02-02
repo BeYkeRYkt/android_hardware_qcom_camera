@@ -66,6 +66,7 @@ public:
                    channel_cb_routine cb_routine,
                    cam_padding_info_t *paddingInfo,
                    uint32_t postprocess_mask,
+                   cam_rotation_t rotation,
                    void *userData, uint32_t numBuffers);
     QCamera3Channel();
     virtual ~QCamera3Channel();
@@ -75,6 +76,7 @@ public:
                       cam_dimension_t streamDim,
                       uint8_t minStreamBufnum,
                       uint32_t postprocessMask,
+                      cam_rotation_t rotation,
                       cam_is_type_t isType);
     virtual int32_t start();
     virtual int32_t stop();
@@ -133,6 +135,7 @@ protected:
     channel_cb_routine mChannelCB;
     //cam_padding_info_t *mPaddingInfo;
     uint32_t mPostProcMask;
+    cam_rotation_t mRotation;
     uint32_t mYUVDump;
     cam_is_type_t mIsType;
     uint32_t mNumBuffers;
@@ -156,6 +159,7 @@ public:
                     camera3_stream_t *stream,
                     cam_stream_type_t stream_type,
                     uint32_t postprocess_mask,
+                    cam_rotation_t rotation,
                     uint32_t numBuffers = MAX_INFLIGHT_REQUESTS);
 
     QCamera3RegularChannel(uint32_t cam_handle,
@@ -166,6 +170,7 @@ public:
                     camera3_stream_t *stream,
                     cam_stream_type_t stream_type,
                     uint32_t postprocess_mask,
+                    cam_rotation_t rotation,
                     uint32_t width, uint32_t height,
                     uint32_t numBuffers = MAX_INFLIGHT_REQUESTS);
 
@@ -299,6 +304,7 @@ public:
             void *userData,
             camera3_stream_t *stream,
             uint32_t postprocess_mask,
+            cam_rotation_t rotation,
             bool is4KVideo,
             QCamera3Channel *metadataChannel,
             uint32_t numBuffers = MAX_INFLIGHT_REQUESTS);
