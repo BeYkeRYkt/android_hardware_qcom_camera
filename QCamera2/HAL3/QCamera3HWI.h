@@ -598,6 +598,8 @@ private:
             cam_test_pattern_mode_t> TEST_PATTERN_MAP[];
     static const QCameraMap<camera_metadata_enum_android_video_hdr_mode_t,
             cam_video_hdr_mode_t> VIDEO_HDR_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_android_exposure_t,
+            cam_exposure_data_enb_t> EXPOSURE_MAP[];
     static const QCameraMap<camera_metadata_enum_android_sensor_reference_illuminant1_t,
             cam_illuminat_t> REFERENCE_ILLUMINANT_MAP[];
     static const QCameraMap<int32_t,

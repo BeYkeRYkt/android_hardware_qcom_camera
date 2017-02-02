@@ -35,6 +35,12 @@
 
 namespace qcamera {
 
+// QCAMERA3_EXPOSURE_DATA_ENABLE
+typedef enum camera_metadata_enum_android_exposure {
+    QCAMERA3_EXPOSURE_DATA_OFF,
+    QCAMERA3_EXPOSURE_DATA_ON,
+} camera_metadata_enum_android_exposure_t;
+
 enum qcamera3_ext_section {
     QCAMERA3_PRIVATEDATA = VENDOR_SECTION,
     QCAMERA3_CDS,
@@ -61,6 +67,7 @@ enum qcamera3_ext_section {
     QCAMERA3_BINNING_CORRECTION,
     QCAMERA3_STATS,
     QCAMERA3_WNR,
+    QCAMERA3_EXPOSURE_DATA,
     QCAMERA3_SECTIONS_END
 };
 
@@ -89,7 +96,8 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_HISTOGRAM_START = QCAMERA3_HISTOGRAM << 16,
     QCAMERA3_BINNING_CORRECTION_START = QCAMERA3_BINNING_CORRECTION << 16,
     QCAMERA3_STATS_START = QCAMERA3_STATS << 16,
-    QCAMERA3_WNR_START = QCAMERA3_WNR << 16
+    QCAMERA3_WNR_START = QCAMERA3_WNR << 16,
+    QCAMERA3_EXPOSURE_DATA_START = QCAMERA3_EXPOSURE_DATA << 16
 };
 
 enum qcamera3_ext_tags {
@@ -346,7 +354,79 @@ enum qcamera3_ext_tags {
        range[1] = maximum value
     */
     QCAMERA3_WNR_RANGE = QCAMERA3_WNR_START,
-    QCAMERA3_WNR_END
+    QCAMERA3_WNR_END,
+
+    /* Property Name:  org.codeaurora.qcamera3.exposure.enable
+       Type: int
+       Enable/Disbale BG stat
+    */
+    QCAMERA3_EXPOSURE_DATA_ENABLE  = QCAMERA3_EXPOSURE_DATA_START,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.region_h_num
+       Type: int
+       Number of region in each ROW of ROI area
+    */
+    QCAMERA3_EXPOSURE_DATA_REGION_H_NUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.region_v_num
+       Type: int
+       Number of region in each Column of ROI area
+    */
+    QCAMERA3_EXPOSURE_DATA_REGION_V_NUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.region_pixel_cnt
+       Type: int
+       Pixel Count in a region
+    */
+    QCAMERA3_EXPOSURE_DATA_REGION_PIXEL_CNT,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.region_height
+       Type: int
+       Height of a region
+    */
+    QCAMERA3_EXPOSURE_DATA_REGION_HEIGHT,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.region_width
+       Type: int
+       Width of a region
+    */
+    QCAMERA3_EXPOSURE_DATA_REGION_WIDTH,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.r_sum
+       Type: int[]
+       total sum of r color value of all the pixel within that region
+    */
+    QCAMERA3_EXPOSURE_DATA_R_SUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.b_sum
+       Type: int[]
+       total sum of B color value of all the pixel within that region
+    */
+    QCAMERA3_EXPOSURE_DATA_B_SUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.gr_sum
+       Type: int[]
+       total sum of GR color value of all the pixel within that region
+    */
+    QCAMERA3_EXPOSURE_DATA_GR_SUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.gb_sum
+       Type: int[]
+       total sum of GB color value of all the pixel within that region
+    */
+    QCAMERA3_EXPOSURE_DATA_GB_SUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.r_num
+       Type: int[]
+       number of pixel whose color value are included in r_sum.
+    */
+    QCAMERA3_EXPOSURE_DATA_R_NUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.b_num
+       Type: int[]
+       number of pixel whose color value are included in b_sum
+    */
+    QCAMERA3_EXPOSURE_DATA_B_NUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.gr_num
+       Type: int[]
+       number of pixel whose color value are included in gr_sum
+    */
+    QCAMERA3_EXPOSURE_DATA_GR_NUM,
+    /* Property Name:  org.codeaurora.qcamera3.exposure.gb_num
+       Type: int[]
+       number of pixel whose color value are included in gb_sum
+    */
+    QCAMERA3_EXPOSURE_DATA_GB_NUM,
+    QCAMERA3_EXPOSURE_DATA_END
 };
 
 // QCAMERA3_OPAQUE_RAW_FORMAT
