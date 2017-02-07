@@ -827,12 +827,18 @@ int QCamera3HardwareInterface::validateStreamDimensions(
         case HAL_PIXEL_FORMAT_YCbCr_420_888:
         case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
         default:
+            int32_t w = (int32_t)newStream->width;
+            int32_t h = (int32_t)newStream->height;
+            if (newStream->rotation == CAMERA3_STREAM_ROTATION_90 ||
+                    newStream->rotation == CAMERA3_STREAM_ROTATION_270) {
+                w = (int32_t)newStream->height;
+                h = (int32_t)newStream->width;
+            }
+
             /* ZSL stream will be full active array size validate that*/
             if (newStream->stream_type == CAMERA3_STREAM_BIDIRECTIONAL) {
-                if (((int32_t)newStream->width ==
-                            gCamCapability[mCameraId]->active_array_size.width) &&
-                        ((int32_t)newStream->height ==
-                                gCamCapability[mCameraId]->active_array_size.height)) {
+                if ((w == gCamCapability[mCameraId]->active_array_size.width) &&
+                    (h == gCamCapability[mCameraId]->active_array_size.height)) {
                     sizeFound = true;
                 }
                 /* We could potentially break here to enforce ZSL stream
@@ -847,12 +853,10 @@ int QCamera3HardwareInterface::validateStreamDimensions(
             count = MIN(gCamCapability[mCameraId]->picture_sizes_tbl_cnt,
                     MAX_SIZES_CNT);
             for (size_t i = 0; i < count; i++) {
-                if (((int32_t)newStream->width ==
-                            gCamCapability[mCameraId]->picture_sizes_tbl[i].width) &&
-                        ((int32_t)newStream->height ==
-                                gCamCapability[mCameraId]->picture_sizes_tbl[i].height)) {
+                if ((w == gCamCapability[mCameraId]->picture_sizes_tbl[i].width) &&
+                    (h == gCamCapability[mCameraId]->picture_sizes_tbl[i].height)) {
                     sizeFound = true;
-                break;
+                    break;
                 }
             }
             break;
