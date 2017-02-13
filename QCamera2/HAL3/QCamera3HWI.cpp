@@ -84,7 +84,11 @@ namespace qcamera {
 #define MAX_STALLING_STREAMS   1
 #define MAX_PROCESSED_STREAMS  3
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
+#ifdef _DRONE_
+#define MIN_FPS_FOR_BATCH_MODE (90)
+#else
 #define MIN_FPS_FOR_BATCH_MODE (120)
+#endif
 #define PREVIEW_FPS_FOR_HFR    (30)
 #define DEFAULT_VIDEO_FPS      (30.0)
 #define TEMPLATE_MAX_PREVIEW_FPS (30.0)
