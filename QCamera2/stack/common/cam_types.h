@@ -955,6 +955,12 @@ typedef enum {
 } cam_binning_correction_mode_t;
 
 typedef struct {
+    int32_t min;
+    int32_t max;
+    int32_t default_val;
+} cam_wnr_intensity_range_t;
+
+typedef struct {
     uint32_t size;
     uint8_t data[OIS_DATA_MAX_SIZE];
 } cam_ois_data_t;
@@ -1141,6 +1147,7 @@ typedef enum {
 typedef struct {
     uint8_t denoise_enable;
     cam_denoise_process_type_t process_plates;
+    uint8_t strength;
 } cam_denoise_param_t;
 
 #define CAM_FACE_PROCESS_MASK_DETECTION     (1U<<0)

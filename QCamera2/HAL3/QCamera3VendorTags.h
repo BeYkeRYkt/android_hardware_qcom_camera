@@ -60,6 +60,7 @@ enum qcamera3_ext_section {
     QCAMERA3_HISTOGRAM,
     QCAMERA3_BINNING_CORRECTION,
     QCAMERA3_STATS,
+    QCAMERA3_WNR,
     QCAMERA3_SECTIONS_END
 };
 
@@ -87,7 +88,8 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_SHARPNESS_START = QCAMERA3_SHARPNESS_DATA << 16,
     QCAMERA3_HISTOGRAM_START = QCAMERA3_HISTOGRAM << 16,
     QCAMERA3_BINNING_CORRECTION_START = QCAMERA3_BINNING_CORRECTION << 16,
-    QCAMERA3_STATS_START = QCAMERA3_STATS << 16
+    QCAMERA3_STATS_START = QCAMERA3_STATS << 16,
+    QCAMERA3_WNR_START = QCAMERA3_WNR << 16
 };
 
 enum qcamera3_ext_tags {
@@ -335,7 +337,16 @@ enum qcamera3_ext_tags {
        gaze_degree[1] = top-bottom
     */
     QCAMERA3_STATS_GAZE_DEGREE,
-    QCAMERA3_STATS_END
+    QCAMERA3_STATS_END,
+
+    /* Property Name:  org.codeaurora.qcamera3.wnr.range
+       Type: int8[2]
+       Description: WNR range value
+       range[0] = minimum value
+       range[1] = maximum value
+    */
+    QCAMERA3_WNR_RANGE = QCAMERA3_WNR_START,
+    QCAMERA3_WNR_END
 };
 
 // QCAMERA3_OPAQUE_RAW_FORMAT

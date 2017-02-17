@@ -647,6 +647,8 @@ typedef struct cam_capability{
     size_t supported_binning_correction_mode_cnt;
     cam_binning_correction_mode_t supported_binning_modes[CAM_BINNING_CORRECTION_MODE_MAX];
 
+    cam_wnr_intensity_range_t wnr_range;
+
     /*camera index*/
     uint32_t camera_index;
 
@@ -964,7 +966,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_LENS_OPT_STAB_MODE,           cam_ois_mode_t,              1);
     INCLUDE(CAM_INTF_META_VIDEO_STAB_MODE,              uint32_t,                    1);
     INCLUDE(CAM_INTF_META_LENS_FOCUS_STATE,             uint32_t,                    1);
-    INCLUDE(CAM_INTF_META_NOISE_REDUCTION_MODE,         uint32_t,                    1);
+    INCLUDE(CAM_INTF_META_NOISE_REDUCTION_MODE,         cam_denoise_param_t,         1);
     INCLUDE(CAM_INTF_META_NOISE_REDUCTION_STRENGTH,     uint32_t,                    1);
     INCLUDE(CAM_INTF_META_SCALER_CROP_REGION,           cam_crop_region_t,           1);
     INCLUDE(CAM_INTF_META_SCENE_FLICKER,                uint32_t,                    1);
