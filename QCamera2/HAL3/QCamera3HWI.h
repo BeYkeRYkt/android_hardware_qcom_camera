@@ -436,6 +436,7 @@ private:
     bool m_bIs4KVideo;
     bool m_bEisSupportedSize;
     bool m_bEisEnable;
+    bool m_bEis3PropertyEnabled;
     bool m_bEisSupported;
     typedef struct {
         cam_dimension_t dim;
@@ -539,7 +540,7 @@ private:
     // Fixed video fps
     float mHFRVideoFps;
 public:
-    uint8_t mOpMode;
+    uint32_t mOpMode;
     bool mStreamConfig;
     QCameraCommon   mCommon;
 private:

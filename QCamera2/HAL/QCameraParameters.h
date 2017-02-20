@@ -734,7 +734,8 @@ public:
     int32_t setISType();
     void setSmallJpegSize(cam_dimension_t sensor_dim, cam_dimension_t snap_dim);
     int32_t updateSnapshotPpMask(cam_stream_size_info_t &stream_config_info);
-    int32_t getSensorOutputSize(cam_dimension_t max_dim, cam_dimension_t &sensor_dim);
+    int32_t getSensorOutputSize(cam_dimension_t max_dim, cam_dimension_t &sensor_dim,
+            uint32_t cam_type = MM_CAMERA_TYPE_MAIN);
     cam_is_type_t getVideoISType();
     cam_is_type_t getPreviewISType();
     uint8_t getMobicatMask();
@@ -812,7 +813,7 @@ public:
     bool isUBWCEnabled();
 
     int getBrightness();
-    int32_t updateOisValue(bool oisValue);
+    int32_t updateOisMode(cam_ois_mode_t oisMode);
     int32_t setIntEvent(cam_int_evt_params_t params);
     bool getofflineRAW() {return mOfflineRAW;}
     bool getQuadraCfa();
@@ -902,7 +903,7 @@ public:
     bool sendStreamConfigForPickRes(cam_stream_size_info_t &stream_config_info);
     int32_t updateDtVc(int32_t *dt, int32_t *vc);
     bool isLinkPreviewForLiveShot();
-
+    bool needSnapshotPP();
     int32_t SetDualCamera(bool value);
     bool isDualCamera() {return m_bDualCamera;};
     int32_t setCameraControls(int32_t controls);
@@ -1218,7 +1219,7 @@ private:
     bool m_bLocalHDREnabled;   // This flag tells whether HDR enabled or not regarless of APP mode
     bool m_bAVTimerEnabled;    //if AVTimer is enabled
     bool m_bDISEnabled;
-    bool m_bOISEnabled;
+    cam_ois_mode_t m_bOISMode;
     cam_still_more_t m_stillmore_config;
     bool m_bMetaRawEnabled;
 
@@ -1291,6 +1292,7 @@ private:
     bool m_bDualCamera;
     uint32_t mActiveCameras;
     uint32_t mMasterCamera;
+    bool m_bRedEyeReduction;
     bool m_bSmallJpegSize;
     cam_stream_type_t mSecureStraemType;
     //Frame number for super parameter

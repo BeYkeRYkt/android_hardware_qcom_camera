@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -931,6 +931,7 @@ void QCamera2HardwareInterface::preview_stream_cb_routine(mm_camera_super_buf_t 
             err = stream->bufDone((uint32_t)dequeuedIdx);
             if ( err < 0) {
                 LOGW("stream bufDone failed %d", err);
+                err = NO_ERROR;
             }
         }
     }
@@ -2074,7 +2075,7 @@ int32_t QCamera2HardwareInterface::updateMetadata(metadata_buffer_t *pMetaData)
 
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, pMetaData) {
         if (isDualCamera()) {
-            if ((mActiveCameras == MM_CAMERA_DUAL_CAM) && mBundledSnapshot) {
+            if ((mActiveCameras == MM_CAMERA_DUAL_CAM) && m_bNeedHalPP) {
                 crop_data->ignore_crop = 1; // CPP ignores the crop in this special zone
                 // Set the margins to 0.
                 crop_data->margins.widthMargins  = 0.0f;
