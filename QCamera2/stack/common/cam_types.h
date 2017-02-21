@@ -145,6 +145,8 @@
 #define MAX_INFLIGHT_HFR_REQUESTS (48)
 #define MIN_INFLIGHT_HFR_REQUESTS (40)
 
+#define MAX_VIDEO_BUFFERS 30
+
 #define QCAMERA_DUMP_FRM_LOCATION "/data/misc/camera/"
 #define QCAMERA_MAX_FILEPATH_LENGTH 64
 
@@ -1767,6 +1769,12 @@ typedef enum {
     CAM_3A_SYNC_ALGO_CTRL,/* Algorithm updated cameras directly */
 } cam_3a_sync_mode_t;
 
+typedef enum {
+    OIS_MODE_INACTIVE,
+    OIS_MODE_ACTIVE,
+    OIS_MODE_HOLD,
+} cam_ois_mode_t;
+
 typedef struct {
     cam_dimension_t stream_sizes[MAX_NUM_STREAMS];
     uint32_t num_streams;
@@ -1874,6 +1882,9 @@ typedef struct {
     uint8_t                is_output_shift_valid;
     cam_sac_output_shift_t output_shift;
     cam_dimension_t        reference_res_for_output_shift;
+    uint8_t                is_focus_roi_shift_valid;
+    cam_sac_output_shift_t focus_roi_shift;
+    cam_dimension_t        reference_res_for_focus_roi_shift;
 } cam_sac_output_info_t;
 
 
@@ -2004,7 +2015,7 @@ typedef enum {
     CAM_INTF_PARM_FPS_RANGE, /* 10 */
     CAM_INTF_PARM_AWB_LOCK,
     CAM_INTF_PARM_EFFECT,
-    CAM_INTF_PARM_BESTSHOT_MODE,
+    CAM_INTF_PARM_RAW_DIMENSION,
     CAM_INTF_PARM_DIS_ENABLE,
     CAM_INTF_PARM_LED_MODE,
     CAM_INTF_META_HISTOGRAM,
@@ -2039,7 +2050,7 @@ typedef enum {
     CAM_INTF_PARM_RECORDING_HINT,
     CAM_INTF_PARM_HDR,
     CAM_INTF_PARM_MAX_DIMENSION,
-    CAM_INTF_PARM_RAW_DIMENSION,
+    CAM_INTF_PARM_BESTSHOT_MODE,
     CAM_INTF_PARM_FRAMESKIP,
     CAM_INTF_PARM_ZSL_MODE,  /* indicating if it's running in ZSL mode */
     CAM_INTF_PARM_BURST_NUM,
@@ -2401,10 +2412,16 @@ typedef enum {
     CAM_INTF_PARM_SYNC_DC_PARAMETERS,
     /* AF focus position info */
     CAM_INTF_META_AF_FOCUS_POS,
+    /* AEC LUX index */
+    CAM_INTF_META_AEC_LUX_INDEX,
+    /* Object's focus distance in cm*/
+    CAM_INTF_META_AF_OBJ_DIST_CM,
     /* Binning Correction Algorithm */
     CAM_INTF_META_BINNING_CORRECTION_MODE,
     /* Read Sensor OIS data */
     CAM_INTF_META_OIS_READ_DATA,
+    /*event to flush stream buffers*/
+    CAM_INTF_PARM_FLUSH_FRAMES,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2638,6 +2655,8 @@ typedef struct {
 #define CAM_QTI_FEATURE_SAC             (((cam_feature_mask_t)1UL)<<42)
 #define CAM_QTI_FEATURE_RTBDM           (((cam_feature_mask_t)1UL)<<43)
 #define CAM_QTI_FEATURE_BINNING_CORRECTION (((cam_feature_mask_t)1UL)<<44)
+#define CAM_QTI_FEATURE_RTB             (((cam_feature_mask_t)1UL)<<45)
+#define CAM_QCOM_FEATURE_LCAC           ((cam_feature_mask_t)1UL<<46)
 #define CAM_QCOM_FEATURE_PP_SUPERSET    (CAM_QCOM_FEATURE_DENOISE2D|CAM_QCOM_FEATURE_CROP|\
                                          CAM_QCOM_FEATURE_ROTATION|CAM_QCOM_FEATURE_SHARPNESS|\
                                          CAM_QCOM_FEATURE_SCALE|CAM_QCOM_FEATURE_CAC|\

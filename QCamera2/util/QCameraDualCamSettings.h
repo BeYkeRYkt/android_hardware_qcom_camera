@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,26 +30,47 @@
 #ifndef __QCAMERADUALCAMSETTINGS_H__
 #define __QCAMERADUALCAMSETTINGS_H__
 
-typedef enum {
-    NONE,
-    SENSOR_SLEEP,
-    ISPIF_FRAME_DROP
-} dual_cam_lpm_mode;
+#include <cam_intf.h>
 
+typedef enum {
+    OIS_HOLD,
+    OIS_ACTIVE_IN_LPM
+} dual_cam_ois_setting;
+// OIS_HOLD: This is partially active OIS with servo control enabled and gyro control disabled.
+// In this mode, the lens moves back to its hold position indicated in the OTP calibration data.
+// OIS_ACTIVE_IN_LPM: This setting dynamically chooses between ACTIVE and HOLD modes based on
+// active camera state. It activates OIS when one of the cameras goes into LPM. When both
+// the cameras stream, HOLD mode gets selected.
 
 // Dual camera settings
-
-// This setting should be 1 if hw sync is in place, 0 otherwise.
-#define DUALCAM_HW_SYNC_ENABLED                 (1)
 
 // This setting enables/disables LPM. When disabled(0), none of the cameras will go
 // into low power mode.
 #define DUALCAM_LPM_ENABLE                      (1)
 
-// This setting indicates LPM modes for two cameras. Possible LPM modes are listed
-// under dual_cam_lpm_mode.
-#define DUALCAM_LPM_MODE_MAIN                   (NONE)
-#define DUALCAM_LPM_MODE_AUX                    (SENSOR_SLEEP)
+// This setting indicates low power modes for two cameras
+// Available low power modes:
+// CAM_PERF_NONE : No/Invalid mode
+// CAM_PERF_SENSOR_SUSPEND : Sensor sleep/suspend
+// CAM_PERF_ISPIF_FRAME_DROP : Sensor streams but ISPIF drops the frames
+// CAM_PERF_ISPIF_FRAME_SKIP : Sensor streams and ISPIF skips the frame to control frame rate
+// CAM_PERF_STATS_FPS_CONTROL : Sensor and ISPIF stream but stats module controls the frame rate
+#define DUALCAM_LPM_MAIN                   (CAM_PERF_ISPIF_FRAME_DROP)
+#define DUALCAM_LPM_AUX                    (CAM_PERF_SENSOR_SUSPEND)
+
+// This setting indicates the OIS modes for camera and camcorder modes. Possible settings are
+// listed under dual_cam_ois_setting.
+#define DUALCAM_OIS_MODE_CAM               (OIS_ACTIVE_IN_LPM)
+#define DUALCAM_OIS_MODE_CAMCORDER         (OIS_HOLD)
+
+// Dual camera sync mechanism
+// This setting indicates the mechanism used to sync the two cameras.
+// Available sync mechanisms:
+// CAM_SYNC_NO_SYNC: Absence of any sync mechanism between the two cameras.
+// CAM_SYNC_HW_SYNC: Sensor turns on hw-sync.
+// CAM_SYNC_SW_SYNC: Sensor ensures the phase difference is kept close to zero.
+// CAM_SYNC_HYBRID_SYNC: Sensor turns on hw-sync and also injects phase as needed.
+#define DUALCAM_SYNC_MECHANISM             (CAM_SYNC_HW_SYNC)
 
 
 // FOV-control settings
@@ -60,6 +81,11 @@ typedef enum {
 // If set to 0, these conditions are ignored and the forced transition from narrow FOV to
 // wide FOV camera will not take place
 #define FOVC_MAIN_CAM_FALLBACK_MECHANISM        (1)
+
+// Use external zoom translator. Setting this to 1 allows opening an external lib containing
+// implementation for custom zoom translation for user zoom to wide zoom and tele zoom. This
+// would override the default zoom translation logic present in the FOV-control.
+#define FOVC_USE_EXTERNAL_ZOOM_TRANSLATOR       (0)
 
 // camera mode settings
 
@@ -95,5 +121,18 @@ typedef enum {
 // these thresholds, camera preview will not switch from main to aux.
 #define FOVC_AUXCAM_SWITCH_LUX_MIN              (100)
 #define FOVC_AUXCAM_SWITCH_FOCUS_DIST_CM_MIN    (15)
+
+// This setting indicates the threshold for zoom stable count in terms of number of frames.
+// This is a power optimization setting. When in the transition zone, if the zoom doesn't
+// change for thse many frames, the non-master camera is put in LPM.
+#define FOVC_ZOOM_STABLE_COUNT_THRESHOLD        (15)
+
+// This setting indicates the threshold for focus distance stable count in terms of number of frames
+// This threshold is used for the macro scene focus and change the camera state accordingly.
+#define FOVC_FOCUS_DIST_STABLE_COUNT_THRESHOLD  (15)
+
+// This setting indicates the threshold for brightness stable count in terms of number of frames.
+// This threshold is used for the low light condition and change the camera state accordingly.
+#define FOVC_BRIGHTNESS_STABLE_COUNT_THRESHOLD  (15)
 
 #endif /* __QCAMERADUALCAM_H__ */

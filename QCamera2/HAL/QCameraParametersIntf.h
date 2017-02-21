@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -95,7 +95,7 @@ public:
 
 
     int32_t getStreamDimension(cam_stream_type_t streamType,
-            cam_dimension_t &dim);
+            cam_dimension_t &dim, uint32_t cam_type = MM_CAMERA_TYPE_MAIN);
 
     void getThumbnailSize(int *width, int *height) const;
     uint8_t getZSLBurstInterval();
@@ -237,7 +237,7 @@ public:
     bool isUBWCEnabled();
 
     int getBrightness();
-    int32_t updateOisValue(bool oisValue);
+    int32_t updateOisMode(cam_ois_mode_t oisMode);
     int32_t setIntEvent(cam_int_evt_params_t params);
     bool getofflineRAW();
     bool getQuadraCfa();
@@ -282,6 +282,7 @@ public:
     void setLowLightLevel(cam_low_light_mode_t value);
     cam_low_light_mode_t getLowLightLevel();
     bool getLowLightCapture();
+    bool isLinkPreviewForLiveShot();
 
     /* Dual camera specific */
     bool getDcrf();
@@ -313,12 +314,14 @@ public:
         cam_feature_mask_t featureMask,
         cam_analysis_info_t *pAnalysisInfo);
     int32_t updateDtVc(int32_t *dt, int32_t *vc);
+    bool needSnapshotPP();
     int32_t SetDualCamera(bool value);
     int32_t setCameraControls(int32_t controls);
-    int32_t setSwitchCamera();
+    int32_t setSwitchCamera(uint32_t camMaster);
     int32_t setDeferCamera(cam_dual_camera_defer_cmd_t type);
     void setBundledSnapshot(bool value);
     int32_t getDualLedCalibration();
+    bool isDCmAsymmetricSnapMode();
 private:
     QCameraParameters *mImpl;
     mutable Mutex mLock;

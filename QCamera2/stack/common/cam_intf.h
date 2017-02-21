@@ -69,6 +69,17 @@ typedef enum {
 } cam_sync_related_sensors_control_t;
 
 typedef enum {
+    /* Absence of any sync mechanism */
+    CAM_SYNC_NO_SYNC,
+    /* Sensor turns on hw-sync */
+    CAM_SYNC_HW_SYNC,
+    /* Sensor ensures the phase difference is kept close to zero */
+    CAM_SYNC_SW_SYNC,
+    /* Sensor turns on hw-sync and also injects phase as needed */
+    CAM_SYNC_HYBRID_SYNC
+} cam_sync_mechanism_t;
+
+typedef enum {
     /* Driving camera of the related camera sub-system */
     /* Certain features are enabled only for primary camera
        such as display mode for preview, autofocus etc
@@ -92,6 +103,7 @@ typedef enum {
 
 /* Enum to define different low performance modes in dual camera*/
 typedef enum {
+    CAM_PERF_NONE,
     CAM_PERF_SENSOR_SUSPEND,
     CAM_PERF_ISPIF_FRAME_DROP,
     CAM_PERF_ISPIF_FRAME_SKIP,
@@ -109,6 +121,7 @@ typedef enum {
 /* Payload for sending bundling info to backend */
 typedef struct {
     cam_sync_related_sensors_control_t sync_control;
+    cam_sync_mechanism_t sync_mechanism;
     cam_sync_type_t type;
     cam_sync_mode_t mode;
     cam_3a_sync_mode_t sync_3a_mode;
@@ -117,7 +130,6 @@ typedef struct {
        Linking will be done with this session in the
        backend */
     uint32_t related_sensor_session_id;
-    uint8_t is_frame_sync_enabled;
     /*Low power mode type. Static info per device*/
     cam_dual_camera_perf_mode_t perf_mode;
 } cam_dual_camera_bundle_info_t;
@@ -655,6 +667,7 @@ typedef enum {
     CAM_STREAM_PARAM_TYPE_GET_IMG_PROP = CAM_INTF_PARM_GET_IMG_PROP,
     CAM_STREAM_PARAM_TYPE_REQUEST_FRAMES = CAM_INTF_PARM_REQUEST_FRAMES,
     CAM_STREAM_PARAM_TYPE_REQUEST_OPS_MODE = CAM_INTF_PARM_REQUEST_OPS_MODE,
+    CAM_STREAM_PARAM_TYPE_FLUSH_FRAME = CAM_INTF_PARM_FLUSH_FRAMES,
     CAM_STREAM_PARAM_TYPE_MAX
 } cam_stream_param_type_e;
 
@@ -948,7 +961,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_SPOT_LIGHT_DETECT,            uint8_t,                     1);
     INCLUDE(CAM_INTF_META_LENS_FOCUS_RANGE,             float,                       2);
     INCLUDE(CAM_INTF_META_LENS_STATE,                   cam_af_lens_state_t,         1);
-    INCLUDE(CAM_INTF_META_LENS_OPT_STAB_MODE,           uint32_t,                    1);
+    INCLUDE(CAM_INTF_META_LENS_OPT_STAB_MODE,           cam_ois_mode_t,              1);
     INCLUDE(CAM_INTF_META_VIDEO_STAB_MODE,              uint32_t,                    1);
     INCLUDE(CAM_INTF_META_LENS_FOCUS_STATE,             uint32_t,                    1);
     INCLUDE(CAM_INTF_META_NOISE_REDUCTION_MODE,         uint32_t,                    1);
@@ -1131,6 +1144,8 @@ typedef struct {
     INCLUDE(CAM_INTF_PARM_FOV_COMP_ENABLE,              int32_t,                     1);
     INCLUDE(CAM_INTF_META_LED_CALIB_RESULT,             int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_DC_USERZOOM,                  int32_t,                     1);
+    INCLUDE(CAM_INTF_META_AEC_LUX_INDEX,                float,                       1);
+    INCLUDE(CAM_INTF_META_AF_OBJ_DIST_CM,               int32_t,                     1);
     INCLUDE(CAM_INTF_META_BINNING_CORRECTION_MODE,      cam_binning_correction_mode_t,  1);
     INCLUDE(CAM_INTF_META_OIS_READ_DATA,                cam_ois_data_t,              1);
 } metadata_data_t;

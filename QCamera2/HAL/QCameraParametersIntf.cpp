@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -163,11 +163,11 @@ int32_t QCameraParametersIntf::getStreamFormat(cam_stream_type_t streamType,
 }
 
 int32_t QCameraParametersIntf::getStreamDimension(cam_stream_type_t streamType,
-                                               cam_dimension_t &dim)
+                                               cam_dimension_t &dim, uint32_t cam_type)
 {
     Mutex::Autolock lock(mLock);
     CHECK_PARAM_INTF(mImpl);
-    return mImpl->getStreamDimension(streamType, dim);
+    return mImpl->getStreamDimension(streamType, dim, cam_type);
 }
 
 void QCameraParametersIntf::getThumbnailSize(int *width, int *height) const
@@ -1049,11 +1049,11 @@ int QCameraParametersIntf::getBrightness()
     return mImpl->getBrightness();
 }
 
-int32_t QCameraParametersIntf::updateOisValue(bool oisValue)
+int32_t QCameraParametersIntf::updateOisMode(cam_ois_mode_t oisMode)
 {
     Mutex::Autolock lock(mLock);
     CHECK_PARAM_INTF(mImpl);
-    return mImpl->updateOisValue(oisValue);
+    return mImpl->updateOisMode(oisMode);
 }
 
 int32_t QCameraParametersIntf::setIntEvent(cam_int_evt_params_t params)
@@ -1475,6 +1475,13 @@ int32_t QCameraParametersIntf::updateDtVc(int32_t *dt, int32_t *vc)
     return mImpl->updateDtVc(dt, vc);
 }
 
+bool QCameraParametersIntf::needSnapshotPP()
+{
+    Mutex::Autolock lock(mLock);
+    CHECK_PARAM_INTF(mImpl);
+    return mImpl->needSnapshotPP();
+}
+
 int32_t QCameraParametersIntf::SetDualCamera(bool value)
 {
     Mutex::Autolock lock(mLock);
@@ -1489,11 +1496,11 @@ int32_t QCameraParametersIntf::setCameraControls(int32_t controls)
     return mImpl->setCameraControls(controls);
 }
 
-int32_t QCameraParametersIntf::setSwitchCamera()
+int32_t QCameraParametersIntf::setSwitchCamera(uint32_t camMaster)
 {
     Mutex::Autolock lock(mLock);
     CHECK_PARAM_INTF(mImpl);
-    return mImpl->setSwitchCamera();
+    return mImpl->setSwitchCamera(camMaster);
 }
 
 int32_t QCameraParametersIntf::setDeferCamera(cam_dual_camera_defer_cmd_t type)
@@ -1515,6 +1522,20 @@ int32_t QCameraParametersIntf::getDualLedCalibration()
     Mutex::Autolock lock(mLock);
     CHECK_PARAM_INTF(mImpl);
     return mImpl->getDualLedCalibration();
+}
+
+bool QCameraParametersIntf::isLinkPreviewForLiveShot()
+{
+    Mutex::Autolock lock(mLock);
+    CHECK_PARAM_INTF(mImpl);
+    return mImpl->isLinkPreviewForLiveShot();
+}
+
+bool QCameraParametersIntf::isDCmAsymmetricSnapMode()
+{
+    Mutex::Autolock lock(mLock);
+    CHECK_PARAM_INTF(mImpl);
+    return mImpl->isDCmAsymmetricSnapMode();
 }
 
 }; // namespace qcamera
