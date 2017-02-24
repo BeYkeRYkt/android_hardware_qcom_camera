@@ -93,6 +93,13 @@ camera_device_ops_t QCamera2HardwareInterface::mCameraOps = {
     dump:                       QCamera2HardwareInterface::dump,
 };
 
+int getDeviceSubType() {
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.subtype", value, "0");
+    int subtype = atoi(value);
+    return subtype;
+}
+
 /*===========================================================================
  * FUNCTION   : set_preview_window
  *
@@ -1045,6 +1052,10 @@ QCamera2HardwareInterface::QCamera2HardwareInterface(uint32_t cameraId)
     mMakeUpBuf = NULL;
     memset(&mFaceRect, -1, sizeof(mFaceRect));
 #endif
+    if(getDeviceSubType() == 2){
+       mCameraId = 0;
+    }
+
     getLogLevel();
     ATRACE_CALL();
     mCameraDevice.common.tag = HARDWARE_DEVICE_TAG;
@@ -1069,7 +1080,7 @@ QCamera2HardwareInterface::QCamera2HardwareInterface(uint32_t cameraId)
 
     memset(m_channels, 0, sizeof(m_channels));
     memset(&mExifParams, 0, sizeof(mm_jpeg_exif_params_t));
-
+    ALOGD("%s: %d module not found", __func__, cameraId);
 #ifdef HAS_MULTIMEDIA_HINTS
     if (hw_get_module(POWER_HARDWARE_MODULE_ID, (const hw_module_t **)&m_pPowerModule)) {
         ALOGE("%s: %s module not found", __func__, POWER_HARDWARE_MODULE_ID);

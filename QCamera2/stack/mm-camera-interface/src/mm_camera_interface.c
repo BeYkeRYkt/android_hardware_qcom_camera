@@ -55,6 +55,13 @@ static pthread_mutex_t g_handler_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint16_t g_handler_history_count = 0; /* history count for handler */
 volatile uint32_t gMmCameraIntfLogLevel = 0;
 
+int getDeviceSubType() {
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.subtype", value, "0");
+    int subtype = atoi(value);
+    return subtype;
+}
+
 /*===========================================================================
  * FUNCTION   : mm_camera_util_generate_handler
  *
@@ -1613,7 +1620,11 @@ uint8_t get_num_of_cameras()
         close(dev_fd);
         dev_fd = 0;
     }
-    g_cam_ctrl.num_cam = num_cameras;
+    if(getDeviceSubType() == 2) {
+        g_cam_ctrl.num_cam = 2;
+    } else {
+        g_cam_ctrl.num_cam = num_cameras;
+    }
 
     get_sensor_info();
     sort_camera_info(g_cam_ctrl.num_cam);
@@ -1752,6 +1763,10 @@ mm_camera_vtbl_t * camera_open(uint8_t camera_idx)
     pthread_mutex_init(&cam_obj->cam_lock, NULL);
 
     rc = mm_camera_open(cam_obj);
+    if(getDeviceSubType() == 2) {
+        rc = 0;
+    }
+
     if(rc != 0) {
         CDBG_ERROR("%s: mm_camera_open err = %d", __func__, rc);
         pthread_mutex_destroy(&cam_obj->cam_lock);
