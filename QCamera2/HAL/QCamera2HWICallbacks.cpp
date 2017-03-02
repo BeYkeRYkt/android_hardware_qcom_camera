@@ -1432,6 +1432,10 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
         if (pme->mParameters.getVideoBatchSize() == 0) {
             timeStamp = nsecs_t(frame->ts.tv_sec) * 1000000000LL
                     + frame->ts.tv_nsec;
+            cam_frame_len_offset_t frame_offset;
+            memset(&frame_offset, 0, sizeof(cam_frame_len_offset_t));
+            stream->getFrameOffset(frame_offset);
+            add_time_water_marking_to_frame(frame, frame_offset);
             pme->dumpFrameToFile(stream, frame, QCAMERA_DUMP_FRM_VIDEO);
             videoMemObj = (QCameraVideoMemory *)frame->mem_info;
             video_mem = NULL;
@@ -1445,6 +1449,10 @@ void QCamera2HardwareInterface::video_stream_cb_routine(mm_camera_super_buf_t *s
         } else {
             //Handle video batch callback
             native_handle_t *nh = NULL;
+            cam_frame_len_offset_t frame_offset;
+            memset(&frame_offset, 0, sizeof(cam_frame_len_offset_t));
+            stream->getFrameOffset(frame_offset);
+            add_time_water_marking_to_frame(frame, frame_offset);
             pme->dumpFrameToFile(stream, frame, QCAMERA_DUMP_FRM_VIDEO);
             QCameraVideoMemory *videoMemObj = (QCameraVideoMemory *)frame->mem_info;
             if ((stream->mCurMetaMemory == NULL)

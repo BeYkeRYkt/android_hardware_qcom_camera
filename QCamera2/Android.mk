@@ -23,7 +23,10 @@ LOCAL_SRC_FILES := \
         util/QCameraQueue.cpp \
         util/QCameraCommon.cpp \
         QCamera2Hal.cpp \
-        QCamera2Factory.cpp
+        QCamera2Factory.cpp \
+        ../usbcamcore/src/QualcommUsbCamera.cpp \
+        ../usbcamcore/src/QCameraUsbParm.cpp    \
+        ../usbcamcore/src/QCameraMjpegDecode.cpp
 
 #HAL 3.0 source
 LOCAL_SRC_FILES += \
@@ -89,12 +92,14 @@ LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/stack/mm-camera-interface/inc \
         $(LOCAL_PATH)/util \
         $(LOCAL_PATH)/HAL3 \
+        $(LOCAL_PATH)/../usbcamcore/inc \
         hardware/libhardware/include/hardware \
         hardware/qcom/media/libstagefrighthw \
         hardware/qcom/media/mm-core/inc \
         system/core/include/cutils \
         system/core/include/system \
-        system/media/camera/include/system
+        system/media/camera/include/system \
+        vendor/qcom/proprietary/mm-still/jpeg2/inc
 
 #HAL 1.0 Include paths
 LOCAL_C_INCLUDES += \
@@ -124,7 +129,13 @@ LOCAL_C_INCLUDES += \
 LOCAL_SHARED_LIBRARIES := libcamera_client liblog libhardware libutils libcutils libdl libsync libgui
 LOCAL_SHARED_LIBRARIES += libmmcamera_interface libmmjpeg_interface libui libcamera_metadata
 LOCAL_SHARED_LIBRARIES += libqdMetaData libqservice libbinder
-LOCAL_SHARED_LIBRARIES += libcutils libdl
+LOCAL_SHARED_LIBRARIES += libcutils libdl libmmjpeg libqomx_core  libjpeg
+ifeq ($(strip $(USES_GEMINI)),true)
+    LOCAL_SHARED_LIBRARIES += libgemini
+else
+    LOCAL_SHARED_LIBRARIES += libjpegehw
+endif
+
 ifeq ($(TARGET_TS_MAKEUP),true)
 LOCAL_SHARED_LIBRARIES += libts_face_beautify_hal libts_detected_face_hal
 endif

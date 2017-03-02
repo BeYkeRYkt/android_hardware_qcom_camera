@@ -55,7 +55,21 @@ static const char ExifUndefinedPrefix[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 #define QCAMERA_MAX_EXP_TIME_LEVEL3      1000
 #define QCAMERA_MAX_EXP_TIME_LEVEL4      10000
 
-class QCameraParameters: private CameraParameters
+struct FPSRange{
+    int minFPS;
+    int maxFPS;
+    FPSRange(){
+        minFPS=0;
+        maxFPS=0;
+    };
+    FPSRange(int min,int max){
+        minFPS=min;
+        maxFPS=max;
+    };
+};
+
+
+class QCameraParameters: public CameraParameters
 {
 
 private:

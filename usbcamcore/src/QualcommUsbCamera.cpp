@@ -40,49 +40,54 @@
 #include <sys/resource.h>
 #include <pthread.h>
 #include <linux/uvcvideo.h>
+#include <dirent.h>
 
-#include "QCameraHAL.h"
+//#include "QCameraHAL.h"
 #include "QualcommUsbCamera.h"
 #include "QCameraUsbPriv.h"
 #include "QCameraMjpegDecode.h"
 #include "QCameraUsbParm.h"
 #include <gralloc_priv.h>
-#include <genlock.h>
+//#include <genlock.h>
+#include <media/hardware/HardwareAPI.h>
 
+#include "mm_jpeg_interface.h"
 extern "C" {
 #include <sys/time.h>
 }
 
+#include "QCameraPerf.h"
+
 camera_device_ops_t usbcam_camera_ops = {
-  set_preview_window:         android::usbcam_set_preview_window,
-  set_callbacks:              android::usbcam_set_CallBacks,
-  enable_msg_type:            android::usbcam_enable_msg_type,
-  disable_msg_type:           android::usbcam_disable_msg_type,
-  msg_type_enabled:           android::usbcam_msg_type_enabled,
+  .set_preview_window =         android::usbcam_set_preview_window,
+  .set_callbacks =              android::usbcam_set_CallBacks,
+  .enable_msg_type =            android::usbcam_enable_msg_type,
+  .disable_msg_type =           android::usbcam_disable_msg_type,
+  .msg_type_enabled =           android::usbcam_msg_type_enabled,
 
-  start_preview:              android::usbcam_start_preview,
-  stop_preview:               android::usbcam_stop_preview,
-  preview_enabled:            android::usbcam_preview_enabled,
-  store_meta_data_in_buffers: android::usbcam_store_meta_data_in_buffers,
+  .start_preview =              android::usbcam_start_preview,
+  .stop_preview =               android::usbcam_stop_preview,
+  .preview_enabled =            android::usbcam_preview_enabled,
+  .store_meta_data_in_buffers = android::usbcam_store_meta_data_in_buffers,
 
-  start_recording:            android::usbcam_start_recording,
-  stop_recording:             android::usbcam_stop_recording,
-  recording_enabled:          android::usbcam_recording_enabled,
-  release_recording_frame:    android::usbcam_release_recording_frame,
+  .start_recording =            android::usbcam_start_recording,
+  .stop_recording =             android::usbcam_stop_recording,
+  .recording_enabled =          android::usbcam_recording_enabled,
+  .release_recording_frame =    android::usbcam_release_recording_frame,
 
-  auto_focus:                 android::usbcam_auto_focus,
-  cancel_auto_focus:          android::usbcam_cancel_auto_focus,
+  .auto_focus =                 android::usbcam_auto_focus,
+  .cancel_auto_focus =          android::usbcam_cancel_auto_focus,
 
-  take_picture:               android::usbcam_take_picture,
-  cancel_picture:             android::usbcam_cancel_picture,
+  .take_picture =               android::usbcam_take_picture,
+  .cancel_picture =             android::usbcam_cancel_picture,
 
-  set_parameters:             android::usbcam_set_parameters,
-  get_parameters:             android::usbcam_get_parameters,
-  put_parameters:             android::usbcam_put_parameters,
-  send_command:               android::usbcam_send_command,
+  .set_parameters =             android::usbcam_set_parameters,
+  .get_parameters =             android::usbcam_get_parameters,
+  .put_parameters =             android::usbcam_put_parameters,
+  .send_command =               android::usbcam_send_command,
 
-  release:                    android::usbcam_release,
-  dump:                       android::usbcam_dump,
+  .release =                    android::usbcam_release,
+  .dump =                       android::usbcam_dump,
 };
 
 #define CAPTURE                 1
@@ -111,8 +116,10 @@ static int stopPreviewInternal(         camera_hardware_t *camHal);
 static int get_buf_from_cam(            camera_hardware_t *camHal);
 static int put_buf_to_cam(              camera_hardware_t *camHal);
 static int prvwThreadTakePictureInternal(camera_hardware_t *camHal);
+#if DISPLAY
 static int get_buf_from_display( camera_hardware_t *camHal, int *buffer_id);
 static int put_buf_to_display(   camera_hardware_t *camHal, int buffer_id);
+#endif
 static int convert_data_frm_cam_to_disp(camera_hardware_t *camHal, int buffer_id);
 static void * previewloop(void *);
 static void * takePictureThread(void *);
@@ -122,9 +129,26 @@ static int getPreviewCaptureFmt(camera_hardware_t *camHal);
 static int allocate_ion_memory(QCameraHalMemInfo_t *mem_info, int ion_type);
 static int deallocate_ion_memory(QCameraHalMemInfo_t *mem_info);
 static int ioctlLoop(int fd, int ioctlCmd, void *args);
+int allocatevideobuffer(camera_hardware_t *camHal,int buffenum);
+int freevideobuffer(camera_hardware_t *camHal,int buffenum);
+int getmetadatafreeHandle(camera_hardware_t *camHal,int buffer_id,int count,int timestamp);
+int mStoreMetaDataInBuffers = 0;
+void write_image(void *data, const int size, int width, int height,const char *name);
+
+typedef struct VideoNativeHandleMetadata media_metadata_buffer;
+// camera_memory_t *mMetadata[MM_CAMERA_MAX_NUM_FRAMES];
+// native_handle_t *mNativeHandle[MM_CAMERA_MAX_NUM_FRAMES];
+int mMetaBufCount = 0;
+int allocateMeta(uint8_t buf_cnt, int numFDs, int numInts,camera_hardware_t *camHal);
+void deallocateMeta(camera_hardware_t *camHal);
+int allocate(uint8_t count,camera_hardware_t *camHal);
+void deallocate(camera_hardware_t *camHal,int count);
+
+#if 0
 static int readFromFile(char* fileName, char* buffer, int bufferSize);
 static int fileDump(const char* fileName, char* data, int length, int* frm_cnt);
 static int encodeJpeg(                  camera_hardware_t *camHal);
+#endif
 void jpegEncodeCb   (jpeg_job_status_t status,
                        uint8_t thumbnailDroppedFlag,
                        uint32_t client_hdl,
@@ -145,25 +169,27 @@ void jpegEncodeCb   (jpeg_job_status_t status,
 extern "C" int usbcam_get_number_of_cameras()
 {
     /* TBR: This is hardcoded currently to 1 USB camera */
+    char devName[1024];
+    get_uvc_device(devName);
     int numCameras = 1;
     ALOGI("%s: E", __func__);
     ALOGI("%s: X", __func__);
-
     return numCameras;
 }
 
 extern "C" int usbcam_get_camera_info(int camera_id, struct camera_info *info)
 {
     int rc = -1;
-    ALOGI("%s: E", __func__);
+    ALOGI("%s: camera id: %d E", __func__, camera_id);
 
     /* TBR: This info is hardcoded currently irrespective of camera_id */
     if(info) {
         struct CameraInfo camInfo;
-        memset(&camInfo, -1, sizeof (struct CameraInfo));
+        memset((char*)&camInfo, -1, sizeof (struct CameraInfo));
 
-        info->facing = CAMERA_FACING_FRONT;//CAMERA_FACING_BACK;
+        info->facing = CAMERA_FACING_FRONT;///CAMERA_FACING_FRONT;//CAMERA_FACING_BACK;
         info->orientation = 0;
+        info->device_version = CAMERA_DEVICE_API_VERSION_1_0;
         rc = 0;
     }
     ALOGI("%s: X", __func__);
@@ -171,8 +197,7 @@ extern "C" int usbcam_get_camera_info(int camera_id, struct camera_info *info)
 }
 
 /* HAL should return NULL handle if it fails to open camera hardware. */
-extern "C" int  usbcam_camera_device_open(
-  const struct hw_module_t* module, const char* id,
+extern "C" int  usbcam_camera_device_open(int id,
           struct hw_device_t** hw_device)
 {
     int rc = -1;
@@ -180,7 +205,7 @@ extern "C" int  usbcam_camera_device_open(
     camera_hardware_t   *camHal;
     char                *dev_name;
 
-    ALOGI("%s: E", __func__);
+    ALOGI("%s: camera id: %d E", __func__, id);
 
     /* initialize return handle value to NULL */
     *hw_device = NULL;
@@ -230,7 +255,6 @@ extern "C" int  usbcam_camera_device_open(
 
     ALOGD("%s: camHal: %p", __func__, camHal);
     ALOGI("%s: X %d", __func__, rc);
-
     return rc;
 }
 
@@ -389,9 +413,11 @@ int usbcam_start_preview(struct camera_device * device)
         return 0;
     }
 
+
 #if CAPTURE
     rc = initUsbCamera(camHal, camHal->prevWidth,
                         camHal->prevHeight, getPreviewCaptureFmt(camHal));
+   //allocatevideobuffer(camHal,1);
     if(rc < 0) {
         ALOGE("%s: Failed to intialize the device", __func__);
     }else{
@@ -434,7 +460,6 @@ void usbcam_stop_preview(struct camera_device * device)
     }
 
     Mutex::Autolock autoLock(camHal->lock);
-
     rc = stopPreviewInternal(camHal);
     if(rc)
         ALOGE("%s: stopPreviewInternal returned error", __func__);
@@ -464,9 +489,17 @@ int usbcam_preview_enabled(struct camera_device * device)
 /* TBD */
 int usbcam_store_meta_data_in_buffers(struct camera_device * device, int enable)
 {
-    ALOGI("%s: E", __func__);
+    ALOGI("%s: enable = %d E", __func__, enable);
     int rc = 0;
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
+    mStoreMetaDataInBuffers = enable;
     ALOGI("%s: X", __func__);
     return rc;
 }
@@ -476,35 +509,104 @@ int usbcam_start_recording(struct camera_device * device)
 {
     int rc = 0;
     ALOGD("%s: E", __func__);
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
+    if(camHal->videorecordingEnableFlag == 0) {
+        allocate(4,camHal);
+    }
+    camHal->videorecordingEnableFlag = 1;
     ALOGD("%s: X", __func__);
-
     return rc;
 }
 
+int allocatevideobuffer(camera_hardware_t *camHal,int buffenum){
+    int rc;
+    int mvideosize = camHal->videoWidth * camHal->videoHeight * 3/2;
+    ALOGD("mvideosize = %d", mvideosize);
+    for(int cnt = 0; cnt < buffenum; cnt++){
+        camHal->videoMem.mem_info[cnt].size = mvideosize;
+        rc = allocate_ion_memory(&camHal->videoMem.mem_info[cnt], (0x1 << ION_IOMMU_HEAP_ID));
+        ERROR_CHECK_EXIT(rc, "allocate_ion_memory");
+        camHal->videoMem.camera_memory[cnt] = camHal->get_memory(
+                        camHal->videoMem.mem_info[cnt].fd, camHal->videoMem.mem_info[cnt].size, 1, camHal->cb_ctxt);
+        if(!camHal->videoMem.camera_memory[cnt]){
+            ALOGE("%s: get_mem failed", __func__);
+            return -1;
+        }
+        ALOGD("camHal->videoMem:[%d],fd=%d,size=%d",cnt,camHal->videoMem.mem_info[cnt].fd,camHal->videoMem.mem_info[cnt].size);
+    }
+    return 0;
+}
+
+int freevideobuffer(camera_hardware_t *camHal,int buffenum){
+    ALOGE("freevideobuffer");
+    int rc;
+    for(int cnt = 0; cnt < buffenum; cnt++){
+        if(camHal->videoMem.camera_memory[cnt]){
+            camHal->videoMem.camera_memory[cnt]->release(
+                camHal->videoMem.camera_memory[cnt]);
+        }
+        rc = deallocate_ion_memory(&camHal->videoMem.mem_info[cnt]);
+    }
+    return 0;
+}
 /* TBD */
 void usbcam_stop_recording(struct camera_device * device)
 {
     ALOGD("%s: E", __func__);
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return;
+    }
+    //mVideoRecordingEnale = false;
+    deallocate(camHal,4);
+    camHal->videorecordingEnableFlag = 0;
     ALOGD("%s: X", __func__);
 }
+
 
 /* TBD */
 int usbcam_recording_enabled(struct camera_device * device)
 {
-    int rc = 0;
+    //int rc = 0;
     ALOGD("%s: E", __func__);
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
     ALOGD("%s: X", __func__);
-    return rc;
+
+    return camHal->videorecordingEnableFlag;
 }
 
 /* TBD */
 void usbcam_release_recording_frame(struct camera_device * device,
                 const void *opaque)
 {
-    ALOGV("%s: E", __func__);
+    ALOGD("%s: opaque = %p E", __func__, opaque);
+    camera_hardware_t *camHal;
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return;
+    }
+    media_metadata_buffer *packet =(media_metadata_buffer *)opaque;
+    packet->pHandle = NULL;
 
     ALOGD("%s: X", __func__);
 }
@@ -514,7 +616,14 @@ int usbcam_auto_focus(struct camera_device * device)
 {
     ALOGD("%s: E", __func__);
     int rc = 0;
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
     ALOGD("%s: X", __func__);
     return rc;
 }
@@ -524,7 +633,14 @@ int usbcam_cancel_auto_focus(struct camera_device * device)
 {
     int rc = 0;
     ALOGD("%s: E", __func__);
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
     ALOGD("%s: X", __func__);
     return rc;
 }
@@ -585,7 +701,14 @@ int usbcam_cancel_picture(struct camera_device * device)
 {
     ALOGI("%s: E", __func__);
     int rc = 0;
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
     ALOGI("%s: X", __func__);
     return rc;
 }
@@ -649,8 +772,15 @@ int usbcam_send_command(struct camera_device * device,
 {
     int rc = 0;
     ALOGI("%s: E", __func__);
-    ALOGI("%d", cmd);
+    ALOGI("%d, %d, %d", cmd, arg1, arg2);
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
     ALOGI("%s: X", __func__);
     return rc;
 }
@@ -659,6 +789,14 @@ int usbcam_send_command(struct camera_device * device,
 void usbcam_release(struct camera_device * device)
 {
     ALOGI("%s: E", __func__);
+    camera_hardware_t *camHal;
+
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return;
+    }
 #if 0
     Mutex::Autolock l(&mLock);
 
@@ -688,9 +826,16 @@ void usbcam_release(struct camera_device * device)
 /* TBD */
 int usbcam_dump(struct camera_device * device, int fd)
 {
-    ALOGI("%s: E", __func__);
+    ALOGI("%s: fd = %d E", __func__, fd);
     int rc = 0;
+    camera_hardware_t *camHal;
 
+    if(device && device->priv){
+        camHal = (camera_hardware_t *)device->priv;
+    }else{
+        ALOGE("%s: Null device or device->priv", __func__);
+        return -1;
+    }
     ALOGI("%s: X", __func__);
     return rc;
 }
@@ -754,21 +899,19 @@ static int convert_YUYV_to_420_NV12(char *in_buf, char *out_buf, int wd, int ht)
  *****************************************************************************/
 static int initDisplayBuffers(camera_hardware_t *camHal)
 {
-    preview_stream_ops    *mPreviewWindow;
-    struct ion_fd_data    ion_info_fd;
-    int                   numMinUndequeuedBufs = 0;
     int                   rc = 0;
-    int                   gralloc_usage = 0;
-    int                   err;
-    int                   color=30;
-
     ALOGD("%s: E", __func__);
-
-#if DISPLAY
     if(camHal == NULL) {
         ALOGE("%s: camHal = NULL", __func__);
         return -1;
     }
+#if DISPLAY
+    preview_stream_ops    *mPreviewWindow;
+    int                   err;
+    int                   numMinUndequeuedBufs = 0;
+    //struct ion_fd_data    ion_info_fd;
+    int                   gralloc_usage = 0;
+    //int                   color=30;
 
     mPreviewWindow = camHal->window;
     if(!mPreviewWindow) {
@@ -836,8 +979,7 @@ static int initDisplayBuffers(camera_hardware_t *camHal)
     /************************************************************************/
     /* - set_usage                                                          */
     /************************************************************************/
-    gralloc_usage = CAMERA_GRALLOC_HEAP_ID | CAMERA_GRALLOC_FALLBACK_HEAP_ID |
-                    GRALLOC_USAGE_PRIVATE_UNCACHED;
+    gralloc_usage = GRALLOC_USAGE_HW_CAMERA_WRITE;
 
     if(mPreviewWindow->set_usage) {
         rc = mPreviewWindow->set_usage(mPreviewWindow, gralloc_usage);
@@ -853,7 +995,7 @@ static int initDisplayBuffers(camera_hardware_t *camHal)
     /* - dequeue all the display buffers                                    */
     /************************************************************************/
     for (int cnt = 0; cnt < camHal->previewMem.buffer_count; cnt++) {
-        int stride;
+        //int stride;
         err = mPreviewWindow->dequeue_buffer(
                 mPreviewWindow,
                 &camHal->previewMem.buffer_handle[cnt],
@@ -869,24 +1011,23 @@ static int initDisplayBuffers(camera_hardware_t *camHal)
                 ALOGD("%s: mPreviewWindow->lock_buffer success",
                      __func__);
             }
-
             // lock the buffer using genlock
             ALOGD("%s: camera call genlock_lock, hdl=%p",
                 __func__, (*camHal->previewMem.buffer_handle[cnt]));
 
-            if (GENLOCK_NO_ERROR !=
+            /*if (GENLOCK_NO_ERROR !=
                 genlock_lock_buffer(
                     (native_handle_t *) (*camHal->previewMem.buffer_handle[cnt]),
-                    GENLOCK_WRITE_LOCK, GENLOCK_MAX_TIMEOUT))
+                    GENLOCK_WRITE_LOCK, GENLOCK_MAX_TIMEOUT))*/
             {
                 ALOGE("%s: genlock_lock_buffer(WRITE) failed",
                     __func__);
-                camHal->previewMem.local_flag[cnt] = BUFFER_UNLOCKED;
-            }else {
+                camHal->previewMem.local_flag[cnt] = 0;
+            }/*else {
                 ALOGD("%s: genlock_lock_buffer hdl =%p",
                   __func__, *camHal->previewMem.buffer_handle[cnt]);
                 camHal->previewMem.local_flag[cnt] = BUFFER_LOCKED;
-            }
+            }*/
 
             /* Store this buffer details in the context */
             camHal->previewMem.private_buffer_handle[cnt] =
@@ -938,7 +1079,7 @@ static int initDisplayBuffers(camera_hardware_t *camHal)
     /* - cancel buffers: queue w/o displaying                               */
     /************************************************************************/
     for (int cnt = 0; cnt < camHal->previewMem.buffer_count; cnt++) {
-        if (GENLOCK_FAILURE == genlock_unlock_buffer(
+        /*if (GENLOCK_FAILURE == genlock_unlock_buffer(
                 (native_handle_t *)(*(camHal->previewMem.buffer_handle[cnt])))){
             ALOGE("%s: genlock_unlock_buffer failed: hdl =%p", __func__,
                 (*(camHal->previewMem.buffer_handle[cnt])) );
@@ -946,7 +1087,7 @@ static int initDisplayBuffers(camera_hardware_t *camHal)
             camHal->previewMem.local_flag[cnt] = BUFFER_UNLOCKED;
             ALOGD("%s: genlock_unlock_buffer success: hdl = %p",
                __func__, (*(camHal->previewMem.buffer_handle[cnt])));
-        }
+        }*/
 
         err = mPreviewWindow->cancel_buffer(mPreviewWindow,
             (buffer_handle_t *)camHal->previewMem.buffer_handle[cnt]);
@@ -1018,7 +1159,7 @@ static int deInitDisplayBuffers(camera_hardware_t *camHal)
 #endif
 
         /* genUnlock if buffer is genLocked */
-        if(camHal->previewMem.local_flag[cnt] == BUFFER_LOCKED){
+        /*if(camHal->previewMem.local_flag[cnt] == BUFFER_LOCKED){
             if (GENLOCK_FAILURE == genlock_unlock_buffer(
                     (native_handle_t *)(*(camHal->previewMem.buffer_handle[cnt])))){
                 ALOGE("%s: genlock_unlock_buffer failed: hdl =%p", __func__,
@@ -1028,7 +1169,7 @@ static int deInitDisplayBuffers(camera_hardware_t *camHal)
                 ALOGD("%s: genlock_unlock_buffer success: hdl = %p",
                    __func__, (*(camHal->previewMem.buffer_handle[cnt])));
             }
-        }
+        }*/
         /* cancel buffers: enqueue w/o displaying */
         rc = previewWindow->cancel_buffer(previewWindow,
             (buffer_handle_t *)camHal->previewMem.buffer_handle[cnt]);
@@ -1101,12 +1242,12 @@ static int getPreviewCaptureFmt(camera_hardware_t *camHal)
     /************************************************************************/
     //V4L2_PIX_FMT_MJPEG; V4L2_PIX_FMT_YUYV; V4L2_PIX_FMT_H264 = 0x34363248;
     camHal->captureFormat = V4L2_PIX_FMT_YUYV;
-    if(camHal->prevWidth > 640){
+    /*if(camHal->prevWidth > 640){
         if(1 == mjpegSupported)
             camHal->captureFormat = V4L2_PIX_FMT_MJPEG;
         else if(1 == h264Supported)
             camHal->captureFormat = V4L2_PIX_FMT_H264;
-    }
+    }*/
     ALOGI("%s: Capture format chosen: 0x%x. 0x%x:YUYV. 0x%x:MJPEG. 0x%x: H264",
         __func__, camHal->captureFormat, V4L2_PIX_FMT_YUYV,
         V4L2_PIX_FMT_MJPEG, V4L2_PIX_FMT_H264);
@@ -1129,10 +1270,10 @@ static int getPreviewCaptureFmt(camera_hardware_t *camHal)
  *****************************************************************************/
 static int getMjpegdOutputFormat(int dispFormat)
 {
-    int mjpegOutputFormat = YCRCBLP_H2V2;
+    int mjpegOutputFormat = MM_JPEG_COLOR_FORMAT_YCRCBLP_H2V2;
 
     if(HAL_PIXEL_FORMAT_YCrCb_420_SP == dispFormat)
-        mjpegOutputFormat = YCRCBLP_H2V2;
+        mjpegOutputFormat = MM_JPEG_COLOR_FORMAT_YCRCBLP_H2V2;
 
     return mjpegOutputFormat;
 }
@@ -1179,7 +1320,6 @@ static int ioctlLoop(int fd, int ioctlCmd, void *args)
  *****************************************************************************/
 static int initV4L2mmap(camera_hardware_t *camHal)
 {
-    int rc = -1;
     struct v4l2_requestbuffers  reqBufs;
     struct v4l2_buffer          tempBuf;
 
@@ -1237,6 +1377,7 @@ static int initV4L2mmap(camera_hardware_t *camHal)
             ALOGE("%s: mmap failed", __func__);
     }
     ALOGD("%s: X", __func__);
+
     return 0;
 }
 
@@ -1258,7 +1399,7 @@ static int unInitV4L2mmap(camera_hardware_t *camHal)
     int i, rc = 0;
     ALOGD("%s: E", __func__);
 
-    for (i = 0; i < camHal->n_buffers; i++)
+    for (i = 0; i < (int)camHal->n_buffers; i++)
         if (-1 == munmap(camHal->buffers[i].data, camHal->buffers[i].len)){
             ALOGE("%s: munmap failed for buffer: %d", __func__, i);
             rc = -1;
@@ -1293,7 +1434,7 @@ static int initUsbCamera(camera_hardware_t *camHal, int width, int height,
     struct  v4l2_cropcap        cropcap;
     struct  v4l2_crop           crop;
     struct  v4l2_format         v4l2format;
-    unsigned int                min;
+    //unsigned int                min;
 
     ALOGI("%s: E", __func__);
 
@@ -1439,7 +1580,7 @@ static int startUsbCamCapture(camera_hardware_t *camHal)
 static int stopUsbCamCapture(camera_hardware_t *camHal)
 {
     int         rc = -1;
-    unsigned    int i;
+    //unsigned    int i;
     enum        v4l2_buf_type   v4l2BufType;
     ALOGD("%s: E", __func__);
 
@@ -1636,15 +1777,14 @@ int cache_ops(QCameraHalMemInfo_t *mem_info,
                                     void *buf_ptr,
                                     unsigned int cmd)
 {
-    struct ion_flush_data cache_inv_data;
-    struct ion_custom_data custom_data;
-    int ret = MM_CAMERA_OK;
-
-#ifdef USE_ION
-    if (NULL == mem_info) {
-        ALOGE("%s: mem_info is NULL, return here", __func__);
+    //struct ion_flush_data cache_inv_data;
+    //struct ion_custom_data custom_data;
+    int ret = 0;
+    if (NULL == mem_info || NULL == buf_ptr) {
+        ALOGE("%s: mem_info is NULL, cmd = %d return here", __func__, cmd);
         return -1;
     }
+#ifdef USE_ION
 
     memset(&cache_inv_data, 0, sizeof(cache_inv_data));
     memset(&custom_data, 0, sizeof(custom_data));
@@ -1753,6 +1893,7 @@ static int put_buf_to_cam(camera_hardware_t *camHal)
     return 0;
 }
 
+#if DISPLAY
 /******************************************************************************
  * Function: put_buf_to_cam
  * Description: This funtion gets/acquires 1 display buffer from the display
@@ -1772,17 +1913,18 @@ static int put_buf_to_cam(camera_hardware_t *camHal)
 static int get_buf_from_display(camera_hardware_t *camHal, int *buffer_id)
 {
     int                     err = 0;
-    preview_stream_ops      *mPreviewWindow = NULL;
-    int                     stride = 0, cnt = 0;
-    buffer_handle_t         *buffer_handle = NULL;
-    struct private_handle_t *private_buffer_handle = NULL;
 
     ALOGD("%s: E", __func__);
 
     if (camHal == NULL) {
-        ALOGE("%s: camHal = NULL", __func__);
+        ALOGE("%s: camHal = NULL buffer_id = %p", __func__, buffer_id);
         return -1;
     }
+#if DISPLAY
+    preview_stream_ops      *mPreviewWindow = NULL;
+    int                     stride = 0, cnt = 0;
+    buffer_handle_t         *buffer_handle = NULL;
+    struct private_handle_t *private_buffer_handle = NULL;
 
     mPreviewWindow = camHal->window;
     if( mPreviewWindow == NULL) {
@@ -1804,13 +1946,13 @@ static int get_buf_from_display(camera_hardware_t *camHal, int *buffer_id)
         ALOGD("%s: camera call genlock_lock, hdl=%p",
              __func__, (*buffer_handle));
 
-        if (GENLOCK_NO_ERROR !=
+        /*if (GENLOCK_NO_ERROR !=
             genlock_lock_buffer((native_handle_t *)(*buffer_handle),
                                 GENLOCK_WRITE_LOCK, GENLOCK_MAX_TIMEOUT)) {
            ALOGE("%s: genlock_lock_buffer(WRITE) failed", __func__);
        } else {
          ALOGD("%s: genlock_lock_buffer hdl =%p", __func__, *buffer_handle);
-       }
+       }*/
 
         private_buffer_handle = (struct private_handle_t *)(*buffer_handle);
 
@@ -1830,7 +1972,9 @@ static int get_buf_from_display(camera_hardware_t *camHal, int *buffer_id)
     }
     else
         ALOGE("%s: dequeue buf failed \n", __func__);
-
+#else
+    err = 0;
+#endif
     ALOGD("%s: X", __func__);
 
     return err;
@@ -1855,7 +1999,7 @@ static int put_buf_to_display(camera_hardware_t *camHal, int buffer_id)
     int err = 0;
     preview_stream_ops    *mPreviewWindow;
 
-    ALOGD("%s: E", __func__);
+    ALOGD("%s: buffer_id = %d E", __func__, buffer_id);
 
     if (camHal == NULL) {
         ALOGE("%s: camHal = NULL", __func__);
@@ -1867,8 +2011,8 @@ static int put_buf_to_display(camera_hardware_t *camHal, int buffer_id)
         ALOGE("%s: mPreviewWindow = NULL", __func__);
         return -1;
     }
-
-    if (GENLOCK_FAILURE ==
+#if DISPLAY
+    /*if (GENLOCK_FAILURE ==
         genlock_unlock_buffer(
             (native_handle_t *)
             (*(camHal->previewMem.buffer_handle[buffer_id])))) {
@@ -1877,7 +2021,7 @@ static int put_buf_to_display(camera_hardware_t *camHal, int buffer_id)
     } else {
       ALOGD("%s: genlock_unlock_buffer success: hdl =%p",
            __func__, (*(camHal->previewMem.buffer_handle[buffer_id])) );
-    }
+    }*/
 
     /* Cache clean the output buffer so that cache is written back */
     cache_ops(&camHal->previewMem.mem_info[buffer_id],
@@ -1898,9 +2042,10 @@ static int put_buf_to_display(camera_hardware_t *camHal, int buffer_id)
              __func__, camHal->previewMem.buffer_handle[buffer_id]);
 
     ALOGD("%s: X", __func__);
-
+#endif
     return err;
 }
+#endif
 
 /******************************************************************************
  * Function: put_buf_to_display
@@ -1944,25 +2089,18 @@ static int convert_data_frm_cam_to_disp(camera_hardware_t *camHal, int buffer_id
     /* If camera buffer is MJPEG encoded, call mjpeg decode call */
     if(V4L2_PIX_FMT_MJPEG == camHal->captureFormat)
     {
-        if(NULL == camHal->mjpegd)
-        {
-            rc = mjpegDecoderInit(&camHal->mjpegd);
-            if(rc < 0)
-                ALOGE("%s: mjpegDecoderInit Error: %d", __func__, rc);
-        }
-        if(camHal->mjpegd)
-        {
-            rc = mjpegDecode(
-                (void*)camHal->mjpegd,
-                (char *)camHal->buffers[camHal->curCaptureBuf.index].data,
-                camHal->curCaptureBuf.bytesused,
-                (char *)camHal->previewMem.camera_memory[buffer_id]->data,
-                (char *)camHal->previewMem.camera_memory[buffer_id]->data +
-                    camHal->prevWidth * camHal->prevHeight,
-                getMjpegdOutputFormat(camHal->dispFormat));
-            if(rc < 0)
-                ALOGE("%s: mjpegDecode Error: %d", __func__, rc);
-        }
+        getMjpegdOutputFormat(camHal->dispFormat);
+        JpegtoYUV(
+                  (unsigned char *)camHal->buffers[camHal->curCaptureBuf.index].data,
+                  camHal->curCaptureBuf.bytesused,
+                  (unsigned char *)camHal->previewMem.camera_memory[buffer_id]->data
+                  );
+        // add_time_water_marking_to_usbcameraframe(
+        //                                           (char *)camHal->previewMem.camera_memory[buffer_id]->data,
+        //                                           camHal->prevWidth,
+        //                                           camHal->prevHeight,
+        //                                           camHal->previewMem.stride[buffer_id]
+        //                                          );
     }
     return rc;
 }
@@ -1999,6 +2137,32 @@ static int launch_preview_thread(camera_hardware_t *camHal)
     return rc;
 }
 
+
+void write_image(void *data, const int size, int width, int height,const char *name)
+{
+    char filename[80];
+    static unsigned int count = 0;
+    //unsigned int i;
+    size_t bytes;
+    FILE *fp;
+   ALOGE(" Write dump write_image");
+    snprintf(filename, sizeof(filename), "/data/misc/camera/dump_%d_%d_%03u.%s", width,
+              height, count, name);
+    fp = fopen (filename, "w+");
+    if (fp == NULL) {
+        ALOGE ("open file %s failed %s", filename, strerror (errno));
+        return ;
+    }
+    if ((bytes = fwrite (data, size, 1, fp)) < (size_t)size)
+        ALOGE (" Write less raw bytes to %s: %d, %d", filename, size, bytes);
+
+    count++;
+
+    fclose (fp);
+}
+
+
+
 /******************************************************************************
  * Function: launch_preview_thread
  * Description: This is thread funtion for preivew loop
@@ -2020,9 +2184,10 @@ static void * previewloop(void *hcamHal)
     camera_hardware_t   *camHal     = NULL;
     int                 msgType     = 0;
     camera_memory_t     *data       = NULL;
+    camera_memory_t     *videodata  = NULL;
     camera_frame_metadata_t *metadata= NULL;
     camera_memory_t     *previewMem = NULL;
-
+    int video_buffer_id = 0;
     camHal = (camera_hardware_t *)hcamHal;
     ALOGD("%s: E", __func__);
 
@@ -2079,7 +2244,8 @@ static void * previewloop(void *hcamHal)
         if (0 == r) {
             ALOGD("%s: select timeout\n", __func__);
         }
-
+        nsecs_t timestamp;
+        timestamp = systemTime();
         /* Protect the context for one iteration of preview loop */
         /* this gets unlocked at the end of the while */
         Mutex::Autolock autoLock(camHal->lock);
@@ -2139,12 +2305,17 @@ static void * previewloop(void *hcamHal)
 #if FILE_DUMP_CAMERA
         /* Debug code to dump frames from camera */
         {
-            static int frame_cnt = 0;
+            //static int frame_cnt = 0;
             /* currently hardcoded for Bytes-Per-Pixel = 1.5 */
-            fileDump("/data/USBcam.yuv",
-            (char*)camHal->buffers[camHal->curCaptureBuf.index].data,
-            camHal->prevWidth * camHal->prevHeight * 1.5,
-            &frame_cnt);
+            //fileDump("/data/USBcam.yuv",
+            //(char*)camHal->buffers[camHal->curCaptureBuf.index].data,
+            //camHal->prevWidth * camHal->prevHeight * 1.5,
+            //&frame_cnt);
+            write_image(camHal->buffers[camHal->curCaptureBuf.index].data,
+                                    camHal->prevWidth * camHal->prevHeight * 2,
+                                    camHal->prevWidth,
+                                    camHal->prevHeight,
+                                    "yuyv");
         }
 #endif
 
@@ -2203,14 +2374,14 @@ static void * previewloop(void *hcamHal)
     /* - If preview frames callback is requested, callback with prvw buffers*/
     /************************************************************************/
         /* TBD: change the 1.5 hardcoding to Bytes Per Pixel */
-        int previewBufSize = camHal->prevWidth * camHal->prevHeight * 1.5;
+        unsigned int previewBufSize = camHal->prevWidth * camHal->prevHeight * 1.5;
 
         msgType |=  CAMERA_MSG_PREVIEW_FRAME;
 
         if(previewBufSize !=
             camHal->previewMem.private_buffer_handle[buffer_id]->size) {
 
-            previewMem = camHal->get_memory(
+             previewMem = camHal->get_memory(
                 camHal->previewMem.private_buffer_handle[buffer_id]->fd,
                 previewBufSize,
                 1,
@@ -2221,8 +2392,9 @@ static void * previewloop(void *hcamHal)
               }
               else {
                   data = previewMem;
-                  ALOGD("%s: GetMemory successful. data = %p",
-                            __func__, data);
+                  //videodata = previewMem;
+                  ALOGD("%s: GetMemory successful. data = %p  camHal->videoMem.camera_memory[0] = %p",
+                            __func__, data,camHal->videoMem.camera_memory[0]);
                   ALOGD("%s: previewBufSize = %d, priv_buf_size: %d",
                     __func__, previewBufSize,
                     camHal->previewMem.private_buffer_handle[buffer_id]->size);
@@ -2230,9 +2402,13 @@ static void * previewloop(void *hcamHal)
         }
         else{
             data =   camHal->previewMem.camera_memory[buffer_id];
+            //videodata = camHal->previewMem.camera_memory[buffer_id];
             ALOGD("%s: No GetMemory, no invalid fmt. data = %p, idx=%d",
                 __func__, data, buffer_id);
         }
+
+        //videodata = camHal->get_memory(-1,previewBufSize,1,NULL);
+        //memcpy(videodata->data,previewMem->data,previewBufSize);
         /* Unlock and lock around the callback. */
         /* Sometimes 'disable_msg' is issued in the callback context, */
         /* leading to deadlock */
@@ -2243,7 +2419,49 @@ static void * previewloop(void *hcamHal)
             camHal->data_cb(msgType, data, 0,metadata, camHal->cb_ctxt);
             ALOGD("%s: after data callback: %p", __func__, camHal->data_cb);
         }
+        if(camHal->videorecordingEnableFlag){
+            videodata = camHal->videoMem.camera_memory[video_buffer_id % 4];
+            memcpy(videodata->data,previewMem->data,previewBufSize);
+            ALOGD("videodata->data =%p",videodata->data);
+            ALOGD(" %s:data_cb_timestamp buf video_buffer_id=%d  fd = %d", __func__, (video_buffer_id % 4),camHal->videoMem.mem_info[video_buffer_id % 4].fd);
+            if((camHal->msgEnabledFlag & CAMERA_MSG_VIDEO_FRAME) &&
+            camHal->data_cb_timestamp){
+                if(mStoreMetaDataInBuffers){
+                    nsecs_t old_timestamp;
+                    old_timestamp = systemTime();
+                    int test = (int)(old_timestamp -timestamp);
+                    int rc = getmetadatafreeHandle(camHal,video_buffer_id % 4,4,test);
+                    if(rc == -1){
+                        ALOGE("get metadata free buffer failed");
+                        continue;
+                    }
+                    native_handle_t *nh ;
+                    media_metadata_buffer *packet =(media_metadata_buffer *)camHal->mMetadata[rc]->data;
+                    nh = packet->pHandle;
+                    ALOGD(" mMetadata[%d] ->data= %p",rc, packet);
+                    ALOGD(" mMetadata[%d] ->data ->data = %p",rc, nh);
+                    ALOGD(" mMetadata[%d]: fd = %d.,size = %d,usga = %d,format=%d ,timestamp = %d",(rc),nh->data[0],nh->data[2],nh->data[3],nh->data[5],nh->data[4]);
+                    //nsecs_t timestamp;
+                    //timestamp = systemTime();
+                    camHal->data_cb_timestamp(timestamp,CAMERA_MSG_VIDEO_FRAME, camHal->mMetadata[rc], 0, camHal->cb_ctxt);
+                }
+                else if(mStoreMetaDataInBuffers == 0){
+                    ALOGD(" mStoreMetaDataInBuffers is flase videodata = %p", videodata);
+                    add_time_water_marking_to_usbcameraframe(
+                                                (char *)videodata->data,
+                                                 camHal->prevWidth,
+                                                 camHal->prevHeight,
+                                                 camHal->previewMem.stride[buffer_id]
+                                                 );
+                    camHal->data_cb_timestamp(timestamp,CAMERA_MSG_VIDEO_FRAME, videodata, 0, camHal->cb_ctxt);
+                }
+                 ALOGD("%s: after data_cb_timestamp, data: %p", __func__, videodata->data);
+            }
+            video_buffer_id++;
+        }
         camHal->lock.lock();
+
+        //videodata->release(videodata);
         if (previewMem)
             previewMem->release(previewMem);
 #endif
@@ -2251,6 +2469,128 @@ static void * previewloop(void *hcamHal)
     }//while(1)
     ALOGD("%s: X", __func__);
     return (void *)0;
+}
+
+int allocateMeta(uint8_t buf_cnt, int numFDs, int numInts,camera_hardware_t *camHal)
+{
+    int rc = NO_ERROR;
+    int mTotalInts = 0;
+
+    for (int i = 0; i < buf_cnt; i++) {
+        camHal->mMetadata[i] = camHal->get_memory(-1,sizeof(media_metadata_buffer), 1, camHal->cb_ctxt);
+        ALOGD("camHal->mMetadata[%d] = %p",i,camHal->mMetadata[i]);
+        if (!camHal->mMetadata[i]) {
+            ALOGE("allocation of video metadata failed.");
+            for (int j = (i - 1); j >= 0; j--) {
+                if (NULL != camHal->mNativeHandle[j]) {
+                   native_handle_delete(camHal->mNativeHandle[j]);
+                }
+                camHal->mMetadata[j]->release(camHal->mMetadata[j]);
+            }
+            return NO_MEMORY;
+        }
+        media_metadata_buffer *packet =
+                (media_metadata_buffer *)camHal->mMetadata[i]->data;
+        ALOGD("camHal->mMetadata[%d]->data = %p",i,packet);
+        mTotalInts = (numInts * numFDs);
+        camHal->mNativeHandle[i] = native_handle_create(numFDs,
+                (mTotalInts + VIDEO_METADATA_NUM_COMMON_INTS));
+        if (camHal->mNativeHandle[i] == NULL) {
+            ALOGE("Error in getting video native handle");
+            for (int j = (i - 1); j >= 0; j--) {
+               camHal->mMetadata[i]->release(camHal->mMetadata[i]);
+                if (NULL != camHal->mNativeHandle[j]) {
+                   native_handle_delete(camHal->mNativeHandle[j]);
+                }
+                camHal->mMetadata[j]->release(camHal->mMetadata[j]);
+            }
+            return NO_MEMORY;
+        } else {
+            //assign buffer index to native handle.
+            native_handle_t *nh =  camHal->mNativeHandle[i];
+            nh->data[numFDs + mTotalInts] = i;
+        }
+        packet->eType = kMetadataBufferTypeNativeHandleSource;
+        packet->pHandle = NULL;//camHal->mNativeHandle[i];
+    }
+    mMetaBufCount = buf_cnt;
+    return rc;
+}
+
+void deallocateMeta(camera_hardware_t *camHal)
+{
+    for (int i = 0; i < mMetaBufCount; i++) {
+        native_handle_t *nh = camHal->mNativeHandle[i];
+        if (NULL != nh) {
+           if (native_handle_delete(nh)) {
+               ALOGE("Unable to delete native handle");
+           }
+        } else {
+           ALOGE("native handle not available");
+        }
+        camHal->mNativeHandle[i] = NULL;
+        camHal->mMetadata[i]->release(camHal->mMetadata[i]);
+        camHal->mMetadata[i] = NULL;
+    }
+    mMetaBufCount = 0;
+}
+
+int allocate(uint8_t count,camera_hardware_t *camHal){
+    int rc;
+    rc = allocatevideobuffer(camHal,count);
+    if(rc != 0 ){
+        ALOGE("allocatevideobuffer failed.....");
+        return -1;
+    }
+    rc = allocateMeta(count,1,VIDEO_METADATA_NUM_INTS,camHal);
+    if (rc != 0) {
+        ALOGE("allocateMeta failed.....");
+        return -1;
+    }
+    for (int i = 0; i < count; i ++) {
+         native_handle_t *nh =  camHal->mNativeHandle[i];
+         if (!nh) {
+            ALOGE("Error in getting video native handle");
+            return NO_MEMORY;
+        }
+        nh->data[0] = camHal->videoMem.mem_info[i].fd;
+        nh->data[1] = 0;
+        nh->data[2] = (int)camHal->videoMem.mem_info[i].size;
+        nh->data[3] = private_handle_t::PRIV_FLAGS_ITU_R_601_FR;
+        nh->data[4] = 0; //dummy value for timestamp in non-batch mode
+        nh->data[5] = OMX_COLOR_FormatYUV420SemiPlanar;
+        ALOGD("native_handle_t: [%d]  data[0]=%d,data[1]=%d,data[2]=%d,data[3]=%d,data[4]=%d.data[5]=%d,data[6]=%d",i, nh->data[0]
+                    ,nh->data[1],
+                    nh->data[2],
+                    nh->data[3],
+                    nh->data[4],
+                    nh->data[5],
+                    nh->data[6]);
+
+    }
+    return 0;
+}
+
+int getmetadatafreeHandle(camera_hardware_t *camHal,int buffer_id,int count,int timestamp){
+    for(int i = 0; i < count; i++){
+        media_metadata_buffer *packet =
+            (media_metadata_buffer *)camHal->mMetadata[i]->data;
+        if(packet->pHandle == NULL){
+            ALOGD("pHandle is null id = %d",i);
+            packet->pHandle = camHal->mNativeHandle[buffer_id];
+            timestamp = 0;
+            packet->pHandle->data[4] = 0;
+            return i;;
+        }
+    }
+    return -1;
+}
+
+void deallocate(camera_hardware_t *camHal,int count)
+{
+    deallocateMeta(camHal);
+    freevideobuffer(camHal,count);
+    mMetaBufCount = 0;
 }
 
 /******************************************************************************
@@ -2268,13 +2608,41 @@ static void * previewloop(void *hcamHal)
  *****************************************************************************/
 static int get_uvc_device(char *devname)
 {
-    char    temp_devname[FILENAME_LENGTH];
-    FILE    *fp = NULL;
-    int     i = 0, ret = 0, fd;
+    static char    temp_devname[FILENAME_LENGTH] = {0};
+    //FILE    *fp = NULL;
+    int     i = 0, fd;
 
     ALOGD("%s: E", __func__);
+
+    if(temp_devname[0] == 0){
+        for(i = 0; i < 5; i++){
+            sprintf(temp_devname, "/dev/video%d", i);
+             ALOGD("%s:  i= %d temp_devname=%s", __func__,i,temp_devname);
+            fd = open(temp_devname, O_RDWR);
+            if(fd < 0){
+                ALOGD("%s: open temp_devname=%s  failed",__func__, temp_devname);
+                memset(temp_devname, 0, sizeof(temp_devname));
+                continue;
+            }
+            struct v4l2_fmtdesc fmtdesc;
+            memset(&fmtdesc, 0, sizeof(v4l2_fmtdesc));
+            fmtdesc.index = 0;
+            fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+             if (-1 == ioctlLoop(fd, VIDIOC_ENUM_FMT, &fmtdesc)) {
+                ALOGE("%s: ioctlLoop temp_devname=%s  VIDIOC_ENUM_FMT  failed",__func__, temp_devname);
+                memset(temp_devname, 0, sizeof(temp_devname));
+                close(fd);
+                continue;
+             }
+             else{
+                ALOGE("%s: success ,devname=%s",__func__,temp_devname);
+                close(fd);
+                break;
+             }
+         }
+    }
 #if 1
-    strncpy(devname, "/dev/video1", FILENAME_LENGTH);
+    strncpy(devname, temp_devname, FILENAME_LENGTH);
 
 /*
     struct          stat st;
@@ -2362,45 +2730,6 @@ static int get_uvc_device(char *devname)
 } /* get_uvc_device */
 
 /******************************************************************************
- * Function: fileDump
- * Description: This is a utility function to dump buffers into a file
- *
- * Input parameters:
- *  fn              - File name string
- *  data            - pointer to character buffer that needs to be dumped
- *  length          - Length of the buffer to be dumped
- *  frm_cnt         - Pointer to frame count. This count is incremented by this
- *                      function on successful file write
- * Return values:
- *      0   Success
- *      -1  Error
- * Notes: none
- *****************************************************************************/
-static int fileDump(const char* fn, char* data, int length, int* frm_cnt)
-{
-
-    FILE *fp = NULL;
-    if (0 == *frm_cnt) {
-        fp = fopen(fn, "wb");
-        if (NULL == fp) {
-            ALOGE("%s: Error in opening %s", __func__, fn);
-        }
-        fclose(fp);
-    }
-    fp = fopen(fn, "ab");
-    if (NULL == fp) {
-        ALOGE("%s: Error in opening %s", __func__, fn);
-    }
-    fwrite(data, 1, length, fp);
-    fclose(fp);
-    (*frm_cnt)++;
-    ALOGD("%s: Written %d bytes for frame:%d, in %s",
-        __func__, length, *frm_cnt, fn);
-
-    return 0;
-}
-
-/******************************************************************************
  * Function: launchTakePictureThread
  * Description: This is a wrapper function to start take picture thread
  *
@@ -2450,10 +2779,10 @@ static int launchTakePictureThread(camera_hardware_t *camHal)
 static void * takePictureThread(void *hcamHal)
 {
     int                 rc = 0;
-    int                 buffer_id   = 0;
+    //int                 buffer_id   = 0;
     pid_t               tid         = 0;
     camera_hardware_t   *camHal     = NULL;
-    int                 msgType     = 0;
+    //int                 msgType     = 0;
     int                 jpegLength  = 0;
     QCameraHalMemInfo_t *mem_info   = NULL;
 
@@ -2545,23 +2874,22 @@ static void * takePictureThread(void *hcamHal)
     else
         ALOGE("%s: get_buf_from_cam error", __func__);
 
+
     /************************************************************************/
     /* - Send capture buffer to JPEG encoder for JPEG compression           */
     /************************************************************************/
+
     mem_info = &camHal->pictMem.mem_info[0];
     mem_info->size = MAX_JPEG_BUFFER_SIZE;
-
-    rc = allocate_ion_memory(mem_info,
-                        ((0x1 << CAMERA_ZSL_ION_HEAP_ID) |
-                        (0x1 << CAMERA_ZSL_ION_FALLBACK_HEAP_ID)));
-    if(rc)
+    rc = allocate_ion_memory(&camHal->pictMem.mem_info[0],0x1 << ION_IOMMU_HEAP_ID);
+    if(rc){
         ALOGE("%s: ION memory allocation failed", __func__);
+    }
 
     camHal->pictMem.camera_memory[0] = camHal->get_memory(
                         mem_info->fd, mem_info->size, 1, camHal->cb_ctxt);
     if(!camHal->pictMem.camera_memory[0])
         ALOGE("%s: get_mem failed", __func__);
-
 #if FREAD_JPEG_PICTURE
     jpegLength = readFromFile("/data/tempVGA.jpeg",
                     (char*)camHal->pictMem.camera_memory[0]->data,
@@ -2576,8 +2904,32 @@ static void * takePictureThread(void *hcamHal)
     jpegLength = camHal->curCaptureBuf.bytesused;
 
 #else
-    rc = encodeJpeg(camHal);
-    ERROR_CHECK_EXIT_THREAD(rc, "jpeg_encode");
+    QCameraHalMemInfo_t jpegInMemInfo;
+    camera_memory_t*    jpegInMem;
+    jpegInMemInfo.mem_info.size = camHal->pictWidth*camHal->pictHeight*3/2;
+    rc = allocate_ion_memory(&jpegInMemInfo.mem_info,0x1 << ION_IOMMU_HEAP_ID);
+    if(rc){
+        ALOGE("%s: ION memory allocation failed", __func__);
+        return -1;
+    }
+    jpegInMem = camHal->get_memory(jpegInMemInfo.fd, jpegInMemInfo.size, 1, camHal->cb_ctxt);
+    if(!jpegInMem){
+        ALOGE("%s: get_mem failed", __func__);
+        return -1;
+    }
+    rc = convert_YUYV_to_420_NV12(
+        (char *)camHal->buffers[camHal->curCaptureBuf.index].data,
+        (char *)jpegInMem->data, camHal->pictWidth, camHal->pictHeight);
+    ERROR_CHECK_EXIT(rc, "convert_YUYV_to_420_NV12");
+
+    add_time_water_marking_to_usbcameraframe((char*)jpegInMem->data,camHal->pictWidth,camHal->pictHeight,camHal->pictWidth);
+
+    encodeJpeg((unsigned char*)jpegInMem->data,(unsigned char*)camHal->pictMem.camera_memory[0]->data,&jpegLength);
+    if(jpegInMem)
+        jpegInMem->release(jpegInMem);
+    rc = deallocate_ion_memory(&jpegInMemInfo);
+    if(rc)
+        ALOGE("%s: ION memory de-allocation failed", __func__);
 #endif
     if(jpegLength <= 0)
         ALOGI("%s: jpegLength : %d", __func__, jpegLength);
@@ -2604,7 +2956,7 @@ static void * takePictureThread(void *hcamHal)
         camHal->pictMem.camera_memory[0]->release(
             camHal->pictMem.camera_memory[0]);
 
-    rc = deallocate_ion_memory(mem_info);
+    rc = deallocate_ion_memory(&camHal->pictMem.mem_info[0]);
     if(rc)
         ALOGE("%s: ION memory de-allocation failed", __func__);
 
@@ -2748,216 +3100,5 @@ static int deallocate_ion_memory(QCameraHalMemInfo_t *mem_info)
   }
   return rc;
 }
-
-/******************************************************************************
- * Function: readFromFile
- * Description: This function reads data from the given file into given buffer
- *
- * Input parameters:
- *  camHal                  - camera HAL handle
- *
- * Return values:
- *   int    bytesRead
- *
- * Notes: none
- *****************************************************************************/
-static int readFromFile(char* fileName, char* buffer, int bufferSize)
-{
-    int bytesRead = 0, fileSize = 0;
-    FILE *fp;
-
-    fp = fopen(fileName, "rb");
-    if(!fp){
-        ALOGE("%s: Error in opening %s ", __func__, fileName);
-        return bytesRead;
-    }
-
-    /* If file is bigger for given buffer, exit */
-    if (fileSize > bufferSize){
-        ALOGE("%s: Error %d > %d", __func__, fileSize, bufferSize);
-        return bytesRead;
-    }
-
-    bytesRead = fread(buffer, 1, bufferSize, fp);
-    ALOGD(" %s: bytesRead: %d", __func__, bytesRead);
-
-    return bytesRead;
-}
-
-/******************************************************************************
- * Function: encodeJpeg
- * Description: This function initializes Jpeg encoder and calls jpeg encoder
- *              call and waits for the encode to complete
- *
- * Input parameters:
- *  camHal                  - camera HAL handle
- *
- * Return values:
- *   0  No Error
- *  -1  Error
- *
- * Notes: none
- *****************************************************************************/
-int encodeJpeg(camera_hardware_t *camHal)
-{
-    int                 rc = 0;
-    mm_jpeg_ops_t       mmJpegOps;
-    int                 jpegEncHdl  = 0;
-    mm_jpeg_job         mmJpegJob;
-    src_image_buffer_info   *srcBuf = NULL;
-    QCameraHalMemInfo_t jpegInMemInfo;
-    camera_memory_t*    jpegInMem;
-    uint32_t            jobId;
-
-    ALOGI("%s: E", __func__);
-
-    /************************************************************************/
-    /* - Allocate Jpeg input buffer from ION memory                         */
-    /************************************************************************/
-    jpegInMemInfo.size = camHal->pictWidth * camHal->pictHeight * 2;
-    rc = allocate_ion_memory(&jpegInMemInfo,
-                        ((0x1 << CAMERA_ZSL_ION_HEAP_ID) |
-                        (0x1 << CAMERA_ZSL_ION_FALLBACK_HEAP_ID)));
-    ERROR_CHECK_EXIT(rc, "allocate_ion_memory");
-
-    jpegInMem = camHal->get_memory(
-                        jpegInMemInfo.fd, jpegInMemInfo.size, 1, camHal->cb_ctxt);
-    if(!jpegInMem){
-        ALOGE("%s: get_mem failed", __func__);
-        return -1;
-    }
-
-    rc = convert_YUYV_to_420_NV12(
-        (char *)camHal->buffers[camHal->curCaptureBuf.index].data,
-        (char *)jpegInMem->data, camHal->pictWidth, camHal->pictHeight);
-    ERROR_CHECK_EXIT(rc, "convert_YUYV_to_420_NV12");
-    /************************************************************************/
-    /* - Populate JPEG encoding parameters from the camHal context          */
-    /************************************************************************/
-    memset(&mmJpegJob, 0, sizeof(mmJpegJob));
-
-    mmJpegJob.job_type              = JPEG_JOB_TYPE_ENCODE;
-    mmJpegJob.encode_job.jpeg_cb    = jpegEncodeCb;
-    mmJpegJob.encode_job.userdata   = (void *)camHal;
-    /* TBD: Rotation to be set from settings sent from app */
-    mmJpegJob.encode_job.encode_parm.rotation           = 0;
-    mmJpegJob.encode_job.encode_parm.exif_numEntries    = 0;
-    mmJpegJob.encode_job.encode_parm.exif_data          = NULL;
-
-    /* TBD: Add thumbnail support */
-    mmJpegJob.encode_job.encode_parm.buf_info.src_imgs.src_img_num = 1;
-    mmJpegJob.encode_job.encode_parm.buf_info.src_imgs.is_video_frame = 0;
-
-    /* Fill main image information */
-    srcBuf = &mmJpegJob.encode_job.encode_parm.buf_info.src_imgs.src_img[0];
-    srcBuf->type                = JPEG_SRC_IMAGE_TYPE_MAIN;
-    srcBuf->img_fmt             = JPEG_SRC_IMAGE_FMT_YUV;
-    /* TBD: convert from YUYV to CRCBH2V2 */
-    srcBuf->color_format        = MM_JPEG_COLOR_FORMAT_YCRCBLP_H2V2;
-    srcBuf->num_bufs            = 1;
-    srcBuf->src_image[0].fd        = jpegInMemInfo.fd;
-    srcBuf->src_image[0].buf_vaddr = (uint8_t*)jpegInMem->data;
-    //srcBuf->src_image[0].offset    = 0;
-    srcBuf->src_dim.width       = camHal->pictWidth;
-    srcBuf->src_dim.height      = camHal->pictHeight;
-    srcBuf->out_dim.width       = camHal->pictWidth;
-    srcBuf->out_dim.height      = camHal->pictHeight;
-    srcBuf->crop.offset_x       = 0;
-    srcBuf->crop.offset_y       = 0;
-    srcBuf->crop.width          = srcBuf->src_dim.width;
-    srcBuf->crop.height         = srcBuf->src_dim.height;
-    srcBuf->quality             = camHal->pictJpegQlty;
-
-    /* TBD:Fill thumbnail image information */
-
-    /* Fill out buf information */
-    mmJpegJob.encode_job.encode_parm.buf_info.sink_img.buf_vaddr =
-                            (uint8_t*)camHal->pictMem.camera_memory[0]->data;
-    mmJpegJob.encode_job.encode_parm.buf_info.sink_img.fd = 0;
-    /* TBD: hard coded for 1.5 bytes per pixel */
-    mmJpegJob.encode_job.encode_parm.buf_info.sink_img.buf_len =
-                            camHal->pictWidth * camHal->pictHeight * 1.5;
-
-    /************************************************************************/
-    /* - Initialize jpeg encoder and call Jpeg encoder start                */
-    /************************************************************************/
-    memset(&mmJpegOps, 0, sizeof(mm_jpeg_ops_t));
-    jpegEncHdl = jpeg_open(&mmJpegOps);
-    if(!jpegEncHdl){
-        ALOGE("%s: Failed to open Jpeg Encoder instance", __func__);
-    }else
-        ALOGD("%s: jpegEncHdl = %d", __func__, jpegEncHdl);
-
-    camHal->jpegEncInProgress = 1;
-    rc = mmJpegOps.start_job(jpegEncHdl, &mmJpegJob, &jobId);
-
-    /************************************************************************/
-    /* - Wait for JPEG encoder to complete encoding                         */
-    /************************************************************************/
-    pthread_mutex_init(&camHal->jpegEncMutex, NULL);
-    pthread_cond_init(&camHal->jpegEncCond, NULL);
-
-    pthread_mutex_lock(&camHal->jpegEncMutex);
-    while(camHal->jpegEncInProgress)
-        pthread_cond_wait(&camHal->jpegEncCond, &camHal->jpegEncMutex);
-    pthread_mutex_unlock(&camHal->jpegEncMutex);
-
-    /************************************************************************/
-    /* - De-allocate Jpeg input buffer from ION memory                      */
-    /************************************************************************/
-    if(jpegInMem)
-        jpegInMem->release(jpegInMem);
-
-    rc = deallocate_ion_memory(&jpegInMemInfo);
-    if(rc)
-        ALOGE("%s: ION memory de-allocation failed", __func__);
-
-    ALOGI("%s: X rc = %d", __func__, rc);
-    return rc;
-}
-
-/******************************************************************************
- * Function: jpegEncodeCb
- * Description: This is a call back function registered with JPEG encoder.
- *              Jpeg encoder calls this function on completion of encoding
- *
- * Input parameters:
- *  camHal                  - camera HAL handle
- *
- * Return values:
- *   0  No Error
- *  -1  Error
- *
- * Notes: none
- *****************************************************************************/
-void jpegEncodeCb   (jpeg_job_status_t status,
-                       uint8_t thumbnailDroppedFlag,
-                       uint32_t client_hdl,
-                       uint32_t jobId,
-                       uint8_t* out_data,
-                       uint32_t data_size,
-                       void *userData)
-{
-    int rc = 0;
-    camera_hardware_t *camHal = NULL;
-
-    ALOGI("%s: E status = %d", __func__, status);
-
-    camHal = (camera_hardware_t*) userData;
-
-    if(JPEG_JOB_STATUS_DONE == status){
-        ALOGD("%s: JPEG encode successful. out_data:%p, size: %d", __func__,
-            out_data, data_size);
-        camHal->jpegEncInProgress = 0;
-    }
-
-    pthread_mutex_lock(&camHal->jpegEncMutex);
-    pthread_cond_signal(&camHal->jpegEncCond);
-    pthread_mutex_unlock(&camHal->jpegEncMutex);
-
-    ALOGI("%s: X", __func__);
-    return;
-}
-
 /******************************************************************************/
 }; // namespace android

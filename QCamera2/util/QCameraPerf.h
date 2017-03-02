@@ -36,6 +36,11 @@
 
 // Camera dependencies
 #include "hardware/power.h"
+extern "C" {
+#include "mm_camera_interface.h"
+}
+#include <cam_types.h>
+
 
 typedef enum {
     ALL_CORES_ONLINE = 0x7FE,
@@ -52,7 +57,6 @@ typedef int64_t nsecs_t;
 using namespace android;
 
 namespace qcamera {
-
 class QCameraPerfLock {
 public:
     QCameraPerfLock();
@@ -87,6 +91,8 @@ private:
     List<power_hint_t> mActivePowerHints;   // Active/enabled power hints list
 };
 
+void add_time_water_marking_to_frame(mm_camera_buf_def_t* frame, cam_frame_len_offset_t frame_offset);
+void add_time_water_marking_to_usbcameraframe(char* input,int width,int height,int stride);
 }; // namespace qcamera
 
 #endif /* __QCAMREAPERF_H__ */
