@@ -93,11 +93,11 @@ camera_device_ops_t QCamera2HardwareInterface::mCameraOps = {
     dump:                       QCamera2HardwareInterface::dump,
 };
 
-int getDeviceSubType() {
+int getDeviceType() {
     char value[PROPERTY_VALUE_MAX];
-    property_get("persist.subtype", value, "0");
-    int subtype = atoi(value);
-    return subtype;
+    property_get("persist.isruggedphone", value, "0");
+    int isruggedphone = atoi(value);
+    return isruggedphone;
 }
 
 /*===========================================================================
@@ -1052,7 +1052,7 @@ QCamera2HardwareInterface::QCamera2HardwareInterface(uint32_t cameraId)
     mMakeUpBuf = NULL;
     memset(&mFaceRect, -1, sizeof(mFaceRect));
 #endif
-    if(getDeviceSubType() == 2){
+    if(getDeviceType() == 1){
        mCameraId = 0;
     }
 
