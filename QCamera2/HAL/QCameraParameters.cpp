@@ -57,6 +57,7 @@ extern "C" {
 #define CAMERA_DEFAULT_LONGSHOT_STAGES 4
 #define CAMERA_MIN_LONGSHOT_STAGES 2
 #define FOCUS_PERCISION 0.0000001
+#define CAMERA_MIN_SECURE_BUFFERS 2
 
 
 namespace qcamera {
@@ -185,6 +186,8 @@ const char QCameraParameters::KEY_INTERNAL_PERVIEW_RESTART[] = "internal-restart
 const char QCameraParameters::KEY_QC_RDI_MODE[] = "rdi-mode";
 const char QCameraParameters::KEY_QC_SUPPORTED_RDI_MODES[] = "rdi-mode-values";
 const char QCameraParameters::KEY_QC_SECURE_MODE[] = "secure-mode";
+const char QCameraParameters::KEY_QC_SECURE_MODE_UBWC[] = "secure-mode-ubwc";
+const char QCameraParameters::KEY_QC_SECURE_QUEUE_DEPTH[] = "secure-mode-queue-depth";
 const char QCameraParameters::KEY_QC_SUPPORTED_SECURE_MODES[] = "secure-mode-values";
 const char QCameraParameters::ISO_HJR[] = "ISO_HJR";
 const char QCameraParameters::KEY_QC_AUTO_HDR_SUPPORTED[] = "auto-hdr-supported";
@@ -979,6 +982,7 @@ QCameraParameters::QCameraParameters()
       m_bSensorHDREnabled(false),
       m_bRdiMode(false),
       m_bSecureMode(false),
+      m_bSecureModeUBWC(true),
       m_bAeBracketingEnabled(false),
       mFlashValue(CAM_FLASH_MODE_OFF),
       mFlashDaemonValue(CAM_FLASH_MODE_OFF),
@@ -1120,6 +1124,7 @@ QCameraParameters::QCameraParameters(const String8 &params)
     m_bSensorHDREnabled(false),
     m_bRdiMode(false),
     m_bSecureMode(false),
+    m_bSecureModeUBWC(true),
     m_bAeBracketingEnabled(false),
     mFlashValue(CAM_FLASH_MODE_OFF),
     mFlashDaemonValue(CAM_FLASH_MODE_OFF),
@@ -3263,8 +3268,15 @@ int32_t QCameraParameters::setVideoRotation(const QCameraParameters& params)
         int value = lookupAttr(VIDEO_ROTATION_MODES_MAP,
                 PARAM_MAP_SIZE(VIDEO_ROTATION_MODES_MAP), str);
         if (value != NAME_NOT_FOUND) {
+            if (value == 90 || value == 180 || value == 270) {
+                if (!(m_pCapability->qcom_supported_feature_mask &
+                        CAM_QCOM_FEATURE_ROTATION)) {
+                    LOGE("Video Rotation not supported for %d", value);
+                    return BAD_VALUE;
+                }
+            }
             updateParamEntry(KEY_QC_VIDEO_ROTATION, str);
-            LOGL("setVideoRotation:  %s %d: ", str, value);
+            LOGL("setVideoRotation:  %s %d", str, value);
         } else {
             LOGE("Invalid rotation value: %d", value);
             return BAD_VALUE;
@@ -4910,7 +4922,6 @@ int32_t QCameraParameters::setRdiMode(const QCameraParameters& params)
  *              NO_ERROR  -- success
  *              none-zero failure code
  *===========================================================*/
-
 int32_t QCameraParameters::setSecureMode(const QCameraParameters& params)
 {
     const char *str = params.get(KEY_QC_SECURE_MODE);
@@ -4929,7 +4940,8 @@ int32_t QCameraParameters::setSecureMode(const QCameraParameters& params)
     }
 
     if (isSecureMode() && (m_bZslMode || m_bZslMode_new)) {
-        //Enable NZSl if secure mode
+        //Force disable ZSl in secure mode
+        set(KEY_QC_ZSL, VALUE_OFF);
         setZslMode(FALSE);
         m_bNeedRestart = true;
     }
@@ -4940,6 +4952,30 @@ int32_t QCameraParameters::setSecureMode(const QCameraParameters& params)
     } else {
         LOGD("Secure steam type is CAM_STREAM_TYPE_PREVIEW");
         mSecureStraemType = CAM_STREAM_TYPE_PREVIEW;
+    }
+
+    str = params.get(KEY_QC_SECURE_MODE_UBWC);
+    prev_str = get(KEY_QC_SECURE_MODE_UBWC);
+    if (str != NULL && (prev_str == NULL || strcmp(str, prev_str) != 0)) {
+        int32_t value = lookupAttr(ENABLE_DISABLE_MODES_MAP,
+                PARAM_MAP_SIZE(ENABLE_DISABLE_MODES_MAP), str);
+        if (value != NAME_NOT_FOUND) {
+            m_bSecureModeUBWC = (value == 0)? false : true;
+        }
+        LOGD("UBWC in Secure mode set to KEY: %s (%s)", str,
+            m_bSecureModeUBWC? "true" : "false");
+        updateParamEntry(KEY_QC_SECURE_MODE_UBWC, str);
+    }
+
+    str = params.get(KEY_QC_SECURE_QUEUE_DEPTH);
+    if (str != NULL) {
+        set(KEY_QC_SECURE_QUEUE_DEPTH, str);
+    } else {
+        memset(prop, 0, sizeof(prop));
+        property_get("persist.camera.secure.queuedepth", prop, "2");
+        uint32_t queue_depth = atoi(prop);
+        set(KEY_QC_SECURE_QUEUE_DEPTH, queue_depth);
+        LOGD("Secure Queue depth: %s", prop);
     }
 
     return NO_ERROR;
@@ -5261,6 +5297,7 @@ int32_t QCameraParameters::updateParameters(const String8& p,
         goto UPDATE_PARAM_DONE;
     }
 
+    if ((rc = setSecureMode(params)))                   final_rc = rc;
     if ((rc = setPreviewSize(params)))                  final_rc = rc;
     if ((rc = setVideoSize(params)))                    final_rc = rc;
     if ((rc = setPictureSize(params)))                  final_rc = rc;
@@ -5277,7 +5314,6 @@ int32_t QCameraParameters::updateParameters(const String8& p,
     if ((rc = setSceneSelectionMode(params)))           final_rc = rc;
     if ((rc = setRecordingHint(params)))                final_rc = rc;
     if ((rc = setRdiMode(params)))                      final_rc = rc;
-    if ((rc = setSecureMode(params)))                   final_rc = rc;
     if ((rc = setPreviewFrameRate(params)))             final_rc = rc;
     if ((rc = setPreviewFpsRange(params)))              final_rc = rc;
     if ((rc = setAutoExposure(params)))                 final_rc = rc;
@@ -10763,6 +10799,24 @@ void QCameraParameters::getThumbnailSize(int *width, int *height) const
 }
 
 /*===========================================================================
+ * FUNCTION   : getSecureQueueDepth
+ *
+ * DESCRIPTION: get Secure Queue depth
+ *
+ * PARAMETERS : none
+ *
+ * RETURN     : Secure Queue depth value
+ *==========================================================================*/
+uint8_t QCameraParameters::getSecureQueueDepth()
+{
+    int qdepth = getInt(KEY_QC_SECURE_QUEUE_DEPTH);
+    if (qdepth < CAMERA_MIN_SECURE_BUFFERS) {
+        qdepth = CAMERA_MIN_SECURE_BUFFERS;
+    }
+    return (uint8_t)qdepth;
+}
+
+/*===========================================================================
  * FUNCTION   : getZSLBurstInterval
  *
  * DESCRIPTION: get ZSL burst interval setting
@@ -12673,6 +12727,19 @@ void QCameraParameters::setAuxParameters()
                     }
                 }
             }
+            for (uint32_t k = 0; k < info->num_streams; k++) {
+                LOGI("AUX STREAM INFO : type %d, wxh: %d x %d, pp_mask: 0x%llx \
+                        Format = %d, dt =%d cid =%d subformat =%d, is_type %d",
+                        info->type[k],
+                        info->stream_sizes[k].width,
+                        info->stream_sizes[k].height,
+                        info->postprocess_mask[k],
+                        info->format[k],
+                        info->dt[k],
+                        info->vc[k],
+                        info->sub_format_type[k],
+                        info->is_type[k]);
+            }
         }
     }
 }
@@ -13550,7 +13617,7 @@ int32_t QCameraParameters::updateSnapshotPpMask(cam_stream_size_info_t &stream_c
                   updatePpFeatureMask(CAM_STREAM_TYPE_SNAPSHOT);
                   stream_config_info.postprocess_mask[k] =
                       mStreamPpMask[CAM_STREAM_TYPE_SNAPSHOT];
-                  LOGI("STREAM INFO : type %d, wxh: %d x %d, pp_mask: 0x%llx \
+                  LOGI("After CPP LINK, STREAM INFO : type %d, wxh: %d x %d, pp_mask: 0x%llx \
                         Format = %d, dt =%d cid =%d subformat =%d, is_type %d",
                         stream_config_info.type[k],
                         stream_config_info.stream_sizes[k].width,
@@ -13798,7 +13865,7 @@ bool QCameraParameters::setStreamConfigure(bool isCapture,
             }
         }
     }  else if(isSecureMode()) {
-        if (mSecureStraemType == CAM_STREAM_TYPE_RAW) {
+        if (mSecureStraemType == CAM_STREAM_TYPE_RAW || isRdiMode()) {
             raw_capture = true;
             cam_dimension_t max_dim = {0,0};
             updateRAW(max_dim);
@@ -14029,8 +14096,7 @@ bool QCameraParameters::setStreamConfigure(bool isCapture,
         stream_config_info.num_streams++;
     }
 
-    //For dual camera.
-    stream_config_info.sync_type = CAM_TYPE_MAIN;
+    stream_config_info.sync_type = CAM_TYPE_STANDALONE;
 
     for (uint32_t k = 0; k < stream_config_info.num_streams; k++) {
         LOGI("STREAM INFO : type %d, wxh: %d x %d, pp_mask: 0x%llx \
@@ -14048,6 +14114,8 @@ bool QCameraParameters::setStreamConfigure(bool isCapture,
 
     if (rc == NO_ERROR && isDualCamera()) {
         //Trigger dual camera Link command before Meta info
+        //For dual camera.
+        stream_config_info.sync_type = CAM_TYPE_MAIN;
         cam_3a_sync_mode_t sync_3a_mode = CAM_3A_SYNC_FOLLOW;
         char prop[PROPERTY_VALUE_MAX];
         memset(prop, 0, sizeof(prop));
@@ -14855,6 +14923,12 @@ bool QCameraParameters::isUBWCEnabled()
     if (prop_value) {
         return FALSE;
     }
+
+    //Get UBWC status in secure use cases
+    if (isSecureMode()) {
+        return m_bSecureModeUBWC;
+    }
+
     return TRUE;
 #else
     return FALSE;
@@ -15800,8 +15874,7 @@ bool QCameraParameters::needSnapshotPP()
     maxPicSize = (stillWidth == maxWidth) && (stillHeight == maxHeight);
     // Disable Snapshot Postprocessing if any of the below features are enabled
     if (!maxPicSize || m_bLongshotEnabled || m_bRecordingHint ||
-            (mFlashValue != CAM_FLASH_MODE_OFF) || m_bRedEyeReduction ||
-            isAdvCamFeaturesEnabled() || getQuadraCfa()) {
+            m_bRedEyeReduction || isAdvCamFeaturesEnabled() || getQuadraCfa()) {
         return false;
     } else {
         return true;
@@ -15882,6 +15955,15 @@ int32_t QCameraParameters::setDeferCamera(cam_dual_camera_defer_cmd_t type)
     int32_t rc = NO_ERROR;
     char prop[PROPERTY_VALUE_MAX];
     int value = 0;
+
+    property_get("persist.camera.raw_yuv", prop, "0");
+    value = atoi(prop);
+    if (value) {
+        //In RAW + YUV, we need to query for RAW size. Cannot defer camera
+        return rc;
+    } else {
+        memset(prop, 0, sizeof(prop));
+    }
 
     property_get("persist.dualcam.defer.cam", prop, "1");
     value = atoi(prop);
@@ -16035,6 +16117,7 @@ void QCameraParameters::setAsymmetricSnapMode()
 
     if ((maxWidth * maxHeight) < (width * height)) {
         mAsymmetricSnapMode = true;
+        LOGD("Asymmetric Snap mode is set since the MAIN max res < Picture res");
         return;
     }
 
@@ -16042,6 +16125,7 @@ void QCameraParameters::setAsymmetricSnapMode()
     maxHeight = m_pCapability->aux_cam_cap->picture_sizes_tbl[0].height;
     if ((maxWidth * maxHeight) < (width * height)) {
         mAsymmetricSnapMode = true;
+        LOGD("Asymmetric Snap mode is set since the Aux max res < Picture res");
         return;
     }
     mAsymmetricSnapMode = false;

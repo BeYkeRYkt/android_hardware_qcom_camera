@@ -47,7 +47,7 @@ namespace qcamera {
 static const char ExifAsciiPrefix[] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };          // "ASCII\0\0\0"
 static const char ExifUndefinedPrefix[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };   // "\0\0\0\0\0\0\0\0"
 
-#define FOCAL_LENGTH_DECIMAL_PRECISION   100
+#define FOCAL_LENGTH_DECIMAL_PRECISION   1000
 
 #define CAMERA_MIN_BATCH_COUNT           4
 
@@ -506,6 +506,8 @@ private:
     static const char KEY_QC_RDI_MODE[];
     static const char KEY_QC_SUPPORTED_RDI_MODES[];
     static const char KEY_QC_SECURE_MODE[];
+    static const char KEY_QC_SECURE_MODE_UBWC[];
+    static const char KEY_QC_SECURE_QUEUE_DEPTH[];
     static const char KEY_QC_SUPPORTED_SECURE_MODES[];
 
     // Values for SKIN TONE ENHANCEMENT
@@ -664,6 +666,7 @@ public:
             cam_dimension_t &dim, uint32_t cam_type = MM_CAMERA_TYPE_MAIN);
     void getThumbnailSize(int *width, int *height) const;
 
+    uint8_t getSecureQueueDepth();
 
     uint8_t getZSLBurstInterval();
     uint8_t getZSLQueueDepth();
@@ -1247,6 +1250,7 @@ private:
     bool m_bSensorHDREnabled;             // if HDR is enabled
     bool m_bRdiMode;                // if RDI mode
     bool m_bSecureMode;
+    bool m_bSecureModeUBWC;
     bool m_bAeBracketingEnabled;
     int32_t mFlashValue;
     int32_t mFlashDaemonValue;
