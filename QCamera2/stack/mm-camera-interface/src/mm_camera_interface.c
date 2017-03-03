@@ -55,11 +55,11 @@ static pthread_mutex_t g_handler_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint16_t g_handler_history_count = 0; /* history count for handler */
 volatile uint32_t gMmCameraIntfLogLevel = 0;
 
-int getDeviceSubType() {
+int getDeviceType() {
     char value[PROPERTY_VALUE_MAX];
-    property_get("persist.subtype", value, "0");
-    int subtype = atoi(value);
-    return subtype;
+    property_get("persist.isruggedphone", value, "0");
+    int isruggedphone = atoi(value);
+    return isruggedphone;
 }
 
 /*===========================================================================
@@ -1620,7 +1620,7 @@ uint8_t get_num_of_cameras()
         close(dev_fd);
         dev_fd = 0;
     }
-    if(getDeviceSubType() == 2) {
+    if(getDeviceType() == 1) {
         g_cam_ctrl.num_cam = 2;
     } else {
         g_cam_ctrl.num_cam = num_cameras;
@@ -1763,7 +1763,7 @@ mm_camera_vtbl_t * camera_open(uint8_t camera_idx)
     pthread_mutex_init(&cam_obj->cam_lock, NULL);
 
     rc = mm_camera_open(cam_obj);
-    if(getDeviceSubType() == 2) {
+    if(getDeviceType() == 1) {
         rc = 0;
     }
 
