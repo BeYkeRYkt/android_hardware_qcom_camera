@@ -6710,6 +6710,16 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_TEMPORAL_DENOISE_PROCESS_TYPE, &tnr_process_type, 1);
     }
 
+    IF_META_AVAILABLE(float, tnr_intensity, CAM_INTF_META_TNR_INTENSITY, metadata) {
+        camMetadata.update(QCAMERA3_TNR_INTENSITY, tnr_intensity, 1);
+    }
+
+    IF_META_AVAILABLE(float, motion_detection_sensitivity,
+            CAM_INTF_META_TNR_MOTION_SENSITIVITY, metadata) {
+        camMetadata.update(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
+                motion_detection_sensitivity, 1);
+    }
+
     // Reprocess crop data
     IF_META_AVAILABLE(cam_crop_data_t, crop_data, CAM_INTF_META_CROP_DATA, metadata) {
         uint8_t cnt = crop_data->num_of_streams;
@@ -9097,6 +9107,11 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     wnr_range[1] = gCamCapability[cameraId]->wnr_range.max;
     staticInfo.update(QCAMERA3_WNR_RANGE, wnr_range,
             sizeof(wnr_range)/sizeof(wnr_range[0]));
+    float tnr_range[2] = {0.0f,0.0f};
+    tnr_range[0] = gCamCapability[cameraId]->tnr_tuning_ctrl.min;
+    tnr_range[1] = gCamCapability[cameraId]->tnr_tuning_ctrl.max;
+    staticInfo.update(QCAMERA3_TNR_TUNING_RANGE, tnr_range,
+            sizeof(tnr_range)/sizeof(tnr_range[0]));
 
     if (gCamCapability[cameraId]->supported_ir_mode_cnt > 0) {
         int32_t avail_ir_modes[CAM_IR_MODE_MAX];
@@ -9777,6 +9792,11 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
 
     /*transform matrix mode*/
     settings.update(ANDROID_TONEMAP_MODE, &tonemap_mode, 1);
+
+    settings.update(QCAMERA3_TNR_INTENSITY,
+            &gCamCapability[mCameraId]->tnr_tuning_ctrl.def_tnr_intensity, 1);
+    settings.update(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
+            &gCamCapability[mCameraId]->tnr_tuning_ctrl.def_md_sensitivity, 1);
 
     int32_t scaler_crop_region[4];
     scaler_crop_region[0] = 0;
@@ -11153,6 +11173,35 @@ int QCamera3HardwareInterface::translateToHalMetadata
         rc = setVideoHdrMode(mParameters, vhdr);
         if (rc != NO_ERROR) {
             LOGE("setVideoHDR is failed");
+        }
+    }
+
+    // TNR
+    if (frame_settings.exists(QCAMERA3_TNR_INTENSITY)) {
+        float value = frame_settings.find(QCAMERA3_TNR_INTENSITY).data.f[0];
+        if ((gCamCapability[mCameraId]->tnr_tuning_ctrl.max < value) ||
+                (gCamCapability[mCameraId]->tnr_tuning_ctrl.min > value)) {
+            LOGE("%s: Invalid TNR sensitivity value %f!", __func__, value);
+        }
+        else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                CAM_INTF_META_TNR_INTENSITY, value)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY)) {
+        float value = frame_settings.find(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY).data.f[0];
+        if ((gCamCapability[mCameraId]->tnr_tuning_ctrl.max < value) ||
+                (gCamCapability[mCameraId]->tnr_tuning_ctrl.min > value)) {
+            LOGE("%s: Invalid motion detection sensitivity value %f!", __func__, value);
+        }
+        else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_META_TNR_MOTION_SENSITIVITY, value)) {
+                rc = BAD_VALUE;
+            }
         }
     }
 

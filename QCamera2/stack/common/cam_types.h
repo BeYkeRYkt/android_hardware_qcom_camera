@@ -2428,6 +2428,10 @@ typedef enum {
     CAM_INTF_META_BINNING_CORRECTION_MODE,
     /* Read Sensor OIS data */
     CAM_INTF_META_OIS_READ_DATA,
+    /* TNR Intensity */
+    CAM_INTF_META_TNR_INTENSITY,
+    /* Motion Detection Sensitivity */
+    CAM_INTF_META_TNR_MOTION_SENSITIVITY,
     /*event to flush stream buffers*/
     CAM_INTF_PARM_FLUSH_FRAMES,
     /* For camera exposure info */
@@ -2712,6 +2716,13 @@ typedef struct {
     uint8_t flash_bracketing[CAM_MAX_FLASH_BRACKETING];
     uint8_t metadata_index;
 } cam_chroma_flash_t;
+
+typedef struct {
+    float max;
+    float min;
+    float def_tnr_intensity;
+    float def_md_sensitivity;
+} cam_tnr_tuning_t;
 
 typedef enum {
     CAM_HDR_MODE_SINGLEFRAME,    /* Single frame HDR mode which does only tone mapping */

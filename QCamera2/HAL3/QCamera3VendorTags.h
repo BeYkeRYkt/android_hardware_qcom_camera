@@ -68,6 +68,7 @@ enum qcamera3_ext_section {
     QCAMERA3_STATS,
     QCAMERA3_WNR,
     QCAMERA3_EXPOSURE_DATA,
+    QCAMERA3_TNR_TUNING,
     QCAMERA3_SECTIONS_END
 };
 
@@ -97,7 +98,8 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_BINNING_CORRECTION_START = QCAMERA3_BINNING_CORRECTION << 16,
     QCAMERA3_STATS_START = QCAMERA3_STATS << 16,
     QCAMERA3_WNR_START = QCAMERA3_WNR << 16,
-    QCAMERA3_EXPOSURE_DATA_START = QCAMERA3_EXPOSURE_DATA << 16
+    QCAMERA3_EXPOSURE_DATA_START = QCAMERA3_EXPOSURE_DATA << 16,
+    QCAMERA3_TNR_TUNING_START = QCAMERA3_TNR_TUNING << 16
 };
 
 enum qcamera3_ext_tags {
@@ -426,7 +428,27 @@ enum qcamera3_ext_tags {
        number of pixel whose color value are included in gb_sum
     */
     QCAMERA3_EXPOSURE_DATA_GB_NUM,
-    QCAMERA3_EXPOSURE_DATA_END
+    QCAMERA3_EXPOSURE_DATA_END,
+    // QCAMERA3_TNR
+
+    /* Property Name:  org.codeaurora.qcamera3.tnr_tuning.tnr_intensity
+       Type: float
+       Description: Tnr intensity
+    */
+    QCAMERA3_TNR_INTENSITY = QCAMERA3_TNR_TUNING_START,
+    /* Property Name:  org.codeaurora.qcamera3.tnr_tuning.motion_detection_sensitivity
+       Type: float
+       Description: Motion detection sensitivity
+    */
+    QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
+    /* Property Name:  org.codeaurora.qcamera3.tnr_tuning.tnr_tuning_range
+       Type: float[2]
+       Description: Tnr tuning range
+       tnr_tuning_range[0] = Minimum tuning value
+       tnr_tuning_range[1] = Maximum tuning value
+    */
+    QCAMERA3_TNR_TUNING_RANGE,
+    QCAMERA3_TNR_TUNING_END
 };
 
 // QCAMERA3_OPAQUE_RAW_FORMAT
