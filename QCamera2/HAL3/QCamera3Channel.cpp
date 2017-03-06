@@ -3055,9 +3055,9 @@ bool QCamera3YUVChannel::needsFramePostprocessing(metadata_buffer_t *meta)
     }
 
     //wnr
-    IF_META_AVAILABLE(uint32_t, noiseRedMode,
+    IF_META_AVAILABLE(cam_denoise_param_t, denoise_config,
             CAM_INTF_META_NOISE_REDUCTION_MODE, meta) {
-        mNoiseRedMode = *noiseRedMode;
+        mNoiseRedMode = ((cam_denoise_param_t *)denoise_config)->denoise_enable;
     }
 
     //crop region

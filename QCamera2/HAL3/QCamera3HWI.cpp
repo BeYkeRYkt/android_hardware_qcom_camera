@@ -5912,9 +5912,11 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         LOGD("EIS result default to OFF mode");
     }
 
-    IF_META_AVAILABLE(uint32_t, noiseRedMode, CAM_INTF_META_NOISE_REDUCTION_MODE, metadata) {
-        uint8_t fwk_noiseRedMode = (uint8_t) *noiseRedMode;
-        camMetadata.update(ANDROID_NOISE_REDUCTION_MODE, &fwk_noiseRedMode, 1);
+    IF_META_AVAILABLE(cam_denoise_param_t, denoise_config, CAM_INTF_META_NOISE_REDUCTION_MODE,
+            metadata) {
+        cam_denoise_param_t fwk_noiseRedMode = *((cam_denoise_param_t *)denoise_config);
+        camMetadata.update(ANDROID_NOISE_REDUCTION_MODE, &fwk_noiseRedMode.denoise_enable, 1);
+        camMetadata.update(ANDROID_NOISE_REDUCTION_STRENGTH, &fwk_noiseRedMode.strength, 1);
     }
 
     IF_META_AVAILABLE(float, effectiveExposureFactor, CAM_INTF_META_EFFECTIVE_EXPOSURE_FACTOR, metadata) {
@@ -9039,6 +9041,12 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         LOGW("Warning: ANDROID_SENSOR_OPAQUE_RAW_SIZE is using rough estimation(2 bytes/pixel)");
 #endif
 
+    uint8_t wnr_range[2] = {0, 0};
+    wnr_range[0] = gCamCapability[cameraId]->wnr_range.min;
+    wnr_range[1] = gCamCapability[cameraId]->wnr_range.max;
+    staticInfo.update(QCAMERA3_WNR_RANGE, wnr_range,
+            sizeof(wnr_range)/sizeof(wnr_range[0]));
+
     if (gCamCapability[cameraId]->supported_ir_mode_cnt > 0) {
         int32_t avail_ir_modes[CAM_IR_MODE_MAX];
         size = 0;
@@ -9704,7 +9712,10 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
 
     /*noise reduction mode*/
     settings.update(ANDROID_NOISE_REDUCTION_MODE, &noise_red_mode, 1);
-
+    if (noise_red_mode != ANDROID_NOISE_REDUCTION_MODE_OFF) {
+        settings.update(ANDROID_NOISE_REDUCTION_STRENGTH,
+                &gCamCapability[mCameraId]->wnr_range.default_val, 1);
+    }
     /*color correction mode*/
     static const uint8_t color_correct_mode = ANDROID_COLOR_CORRECTION_MODE_FAST;
     settings.update(ANDROID_COLOR_CORRECTION_MODE, &color_correct_mode, 1);
@@ -10786,9 +10797,26 @@ int QCamera3HardwareInterface::translateToHalMetadata
 
 
     if (frame_settings.exists(ANDROID_NOISE_REDUCTION_MODE)) {
-        uint8_t noiseRedMode = frame_settings.find(ANDROID_NOISE_REDUCTION_MODE).data.u8[0];
+        cam_denoise_param_t wnr_noise_config;
+        memset(&wnr_noise_config, 0, sizeof(wnr_noise_config));
+        wnr_noise_config.denoise_enable =
+                frame_settings.find(ANDROID_NOISE_REDUCTION_MODE).data.u8[0];
+        if (wnr_noise_config.denoise_enable != ANDROID_NOISE_REDUCTION_MODE_OFF) {
+            if (frame_settings.exists(ANDROID_NOISE_REDUCTION_STRENGTH)) {
+                wnr_noise_config.strength =
+                        frame_settings.find(ANDROID_NOISE_REDUCTION_STRENGTH).data.u8[0];
+                if (wnr_noise_config.strength < gCamCapability[mCameraId]->wnr_range.min ||
+                        wnr_noise_config.strength > gCamCapability[mCameraId]->wnr_range.max) {
+                    wnr_noise_config.strength =
+                            gCamCapability[mCameraId]->wnr_range.default_val;
+                }
+            }
+            else {
+                wnr_noise_config.strength = gCamCapability[mCameraId]->wnr_range.default_val;
+            }
+        }
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_NOISE_REDUCTION_MODE,
-                noiseRedMode)) {
+                wnr_noise_config)) {
             rc = BAD_VALUE;
         }
     }
