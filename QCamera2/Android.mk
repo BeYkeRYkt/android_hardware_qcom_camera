@@ -40,6 +40,11 @@ LOCAL_SRC_FILES += \
 
 LOCAL_CFLAGS := -Wall -Wextra -Werror
 
+ifeq ($(DRONE_TARGET),true)
+LOCAL_CFLAGS += -D_DRONE_
+endif
+
+
 #HAL 1.0 source
 
 ifeq ($(TARGET_SUPPORT_HAL1),false)
