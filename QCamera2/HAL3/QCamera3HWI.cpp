@@ -297,6 +297,13 @@ const QCamera3HardwareInterface::QCameraMap<
     { ANDROID_SENSOR_TEST_PATTERN_MODE_CUSTOM1,      CAM_TEST_PATTERN_CUSTOM1},
 };
 
+const QCamera3HardwareInterface::QCameraMap<
+        camera_metadata_enum_android_exposure_t,
+        cam_exposure_data_enb_t> QCamera3HardwareInterface::EXPOSURE_MAP[] = {
+    { QCAMERA3_EXPOSURE_DATA_OFF,  CAM_EXPOSURE_DATA_OFF },
+    { QCAMERA3_EXPOSURE_DATA_ON,   CAM_EXPOSURE_DATA_ON }
+};
+
 /* Since there is no mapping for all the options some Android enum are not listed.
  * Also, the order in this list is important because while mapping from HAL to Android it will
  * traverse from lower to higher index which means that for HAL values that are map to different
@@ -6629,6 +6636,50 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_IR_MODE, &fwk_ir, 1);
     }
 
+    IF_META_AVAILABLE(cam_exposure_data_t, exposure, CAM_INTF_META_EXPOSURE_INFO, metadata) {
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_ENABLE,
+            (int32_t *)&(exposure->enable), 1);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_REGION_H_NUM,
+            (int32_t *)&(exposure->exp_region_h_num), 1);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_REGION_V_NUM,
+            (int32_t *)&(exposure->exp_region_v_num), 1);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_REGION_PIXEL_CNT,
+            (int32_t *)&(exposure->region_pixel_cnt), 1);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_REGION_HEIGHT,
+            (int32_t *)&(exposure->exp_region_height), 1);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_REGION_WIDTH,
+            (int32_t *)&(exposure->exp_region_width), 1);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_R_SUM,
+            (int32_t *)&(exposure->exp_r_sum), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_B_SUM,
+            (int32_t *)&(exposure->exp_b_sum), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_GR_SUM,
+            (int32_t *)&(exposure->exp_gr_sum), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_GB_SUM,
+            (int32_t *)&(exposure->exp_gb_sum), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_R_NUM,
+            (int32_t *)&(exposure->exp_r_num), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_B_NUM,
+            (int32_t *)&(exposure->exp_b_num), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_GR_NUM,
+            (int32_t *)&(exposure->exp_gr_num), STATS_MAX_EXPOSURE_NUM);
+        camMetadata.update(QCAMERA3_EXPOSURE_DATA_GB_NUM,
+            (int32_t *)&(exposure->exp_gb_num), STATS_MAX_EXPOSURE_NUM);
+
+        LOGD("enable =%d", exposure->enable);
+        LOGD("h_num =%d v_num =%d", exposure->exp_region_h_num,exposure->exp_region_v_num);
+        LOGD("region_pixel_cnt =%d", exposure->region_pixel_cnt);
+        LOGD("height =%d width =%d", exposure->exp_region_height, exposure->exp_region_width);
+        LOGD("r_sum = %x  %x", exposure->exp_r_sum[0], exposure->exp_r_sum[1]);
+        LOGD("b_sum = %x  %x", exposure->exp_b_sum[0], exposure->exp_b_sum[1]);
+        LOGD("gr_sum = %x  %x", exposure->exp_gr_sum[0], exposure->exp_gr_sum[1]);
+        LOGD("gb_sum = %x  %x", exposure->exp_gb_sum[0], exposure->exp_gb_sum[1]);
+        LOGD("r_num = %x  %x", exposure->exp_r_num[0], exposure->exp_r_num[1]);
+        LOGD("b_num = %x  %x", exposure->exp_b_num[0], exposure->exp_b_num[1]);
+        LOGD("gr_num = %x  %x", exposure->exp_gr_num[0], exposure->exp_gr_num[1]);
+        LOGD("gb_num = %x  %x", exposure->exp_gb_num[0], exposure->exp_gb_num[1]);
+    }
+
     // AEC SPEED
     IF_META_AVAILABLE(float, aec, CAM_INTF_META_AEC_CONVERGENCE_SPEED, metadata) {
         camMetadata.update(QCAMERA3_AEC_CONVERGENCE_SPEED, aec, 1);
@@ -9158,6 +9209,10 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     staticInfo.update(QCAMERA3_STATS_IS_HDR_SCENE_CONFIDENCE_RANGE,
             is_hdr_confidence_range, 2);
 
+    int32_t enable[] = {QCAMERA3_EXPOSURE_DATA_ON, QCAMERA3_EXPOSURE_DATA_OFF};
+    size = sizeof(enable) / sizeof (enable[0]);
+    staticInfo.update(QCAMERA3_EXPOSURE_DATA_ENABLE, enable, size);
+
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
 }
@@ -11309,6 +11364,18 @@ int QCamera3HardwareInterface::translateToHalMetadata
         dim.width = frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[0];
         dim.height = frame_settings.find(ANDROID_JPEG_THUMBNAIL_SIZE).data.i32[1];
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_JPEG_THUMB_SIZE, dim)) {
+            rc = BAD_VALUE;
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_EXPOSURE_DATA_ENABLE)) {
+        cam_exposure_data_t exposure_data;
+        exposure_data.enable = (cam_exposure_data_enb_t)lookupHalName(EXPOSURE_MAP,
+                METADATA_MAP_SIZE(EXPOSURE_MAP),
+                frame_settings.find(QCAMERA3_EXPOSURE_DATA_ENABLE).data.i32[0]);
+
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_EXPOSURE_INFO,
+                (cam_exposure_data_t)exposure_data)) {
             rc = BAD_VALUE;
         }
     }

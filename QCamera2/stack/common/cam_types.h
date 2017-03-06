@@ -45,6 +45,7 @@
 #define BHIST_STATS_DEBUG_DATA_SIZE       (70000)
 #define TUNING_INFO_DEBUG_DATA_SIZE       (4)
 #define OIS_DATA_MAX_SIZE                 (32)
+#define STATS_MAX_EXPOSURE_NUM            (3888)
 
 #define CEILING64(X) (((X) + 0x0003F) & 0xFFFFFFC0)
 #define CEILING32(X) (((X) + 0x0001F) & 0xFFFFFFE0)
@@ -2429,6 +2430,8 @@ typedef enum {
     CAM_INTF_META_OIS_READ_DATA,
     /*event to flush stream buffers*/
     CAM_INTF_PARM_FLUSH_FRAMES,
+    /* For camera exposure info */
+    CAM_INTF_META_EXPOSURE_INFO, /* cam_exposure_data_t */
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2971,6 +2974,28 @@ typedef enum {
     CAM_ANALYSIS_INFO_PAAF,       /*Analysis requirements for PAAF*/
     CAM_ANALYSIS_INFO_MAX,     /*Max number*/
 } cam_analysis_info_type;
+
+typedef enum {
+    CAM_EXPOSURE_DATA_OFF,
+    CAM_EXPOSURE_DATA_ON,
+} cam_exposure_data_enb_t;
+
+typedef struct {
+    cam_exposure_data_enb_t enable;
+    uint32_t exp_region_h_num;
+    uint32_t exp_region_v_num;
+    uint32_t region_pixel_cnt;
+    uint32_t exp_region_height;
+    uint32_t exp_region_width;
+    uint32_t exp_r_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_b_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gr_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gb_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_r_num[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_b_num[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gr_num[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gb_num[STATS_MAX_EXPOSURE_NUM];
+} cam_exposure_data_t;
 
 typedef struct {
     /* Whether the information here is valid or not */
