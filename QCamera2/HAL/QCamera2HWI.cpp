@@ -1648,6 +1648,7 @@ uint8_t QCamera2HardwareInterface::getBufNumRequired(cam_stream_type_t stream_ty
  *              NULL if failed
  *==========================================================================*/
 QCameraMemory *QCamera2HardwareInterface::allocateStreamBuf(cam_stream_type_t stream_type,
+                                                            cam_is_type_t is_type,
                                                             int size,
                                                             int stride,
                                                             int scanline,
@@ -1666,6 +1667,9 @@ QCameraMemory *QCamera2HardwareInterface::allocateStreamBuf(cam_stream_type_t st
                                               bCachedMem,
                                               &m_memoryPool,
                                               stream_type);
+                if ((is_type == IS_TYPE_MVDG) || (is_type == IS_TYPE_MVDG_HIGH)) {
+                   size = 1920 * 1088 * 1.5f;
+                }
             } else {
 #ifdef _ANDROID_
                 cam_dimension_t dim;
