@@ -45,6 +45,7 @@
 #define BHIST_STATS_DEBUG_DATA_SIZE       (70000)
 #define TUNING_INFO_DEBUG_DATA_SIZE       (4)
 #define OIS_DATA_MAX_SIZE                 (32)
+#define STATS_MAX_EXPOSURE_NUM            (3888)
 
 #define CEILING64(X) (((X) + 0x0003F) & 0xFFFFFFC0)
 #define CEILING32(X) (((X) + 0x0001F) & 0xFFFFFFE0)
@@ -955,6 +956,12 @@ typedef enum {
 } cam_binning_correction_mode_t;
 
 typedef struct {
+    int32_t min;
+    int32_t max;
+    int32_t default_val;
+} cam_wnr_intensity_range_t;
+
+typedef struct {
     uint32_t size;
     uint8_t data[OIS_DATA_MAX_SIZE];
 } cam_ois_data_t;
@@ -1141,6 +1148,7 @@ typedef enum {
 typedef struct {
     uint8_t denoise_enable;
     cam_denoise_process_type_t process_plates;
+    uint8_t strength;
 } cam_denoise_param_t;
 
 #define CAM_FACE_PROCESS_MASK_DETECTION     (1U<<0)
@@ -2420,8 +2428,14 @@ typedef enum {
     CAM_INTF_META_BINNING_CORRECTION_MODE,
     /* Read Sensor OIS data */
     CAM_INTF_META_OIS_READ_DATA,
+    /* TNR Intensity */
+    CAM_INTF_META_TNR_INTENSITY,
+    /* Motion Detection Sensitivity */
+    CAM_INTF_META_TNR_MOTION_SENSITIVITY,
     /*event to flush stream buffers*/
     CAM_INTF_PARM_FLUSH_FRAMES,
+    /* For camera exposure info */
+    CAM_INTF_META_EXPOSURE_INFO, /* cam_exposure_data_t */
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2703,6 +2717,13 @@ typedef struct {
     uint8_t metadata_index;
 } cam_chroma_flash_t;
 
+typedef struct {
+    float max;
+    float min;
+    float def_tnr_intensity;
+    float def_md_sensitivity;
+} cam_tnr_tuning_t;
+
 typedef enum {
     CAM_HDR_MODE_SINGLEFRAME,    /* Single frame HDR mode which does only tone mapping */
     CAM_HDR_MODE_MULTIFRAME,     /* Multi frame HDR mode which needs two frames with 0.5x and 2x exposure respectively */
@@ -2964,6 +2985,28 @@ typedef enum {
     CAM_ANALYSIS_INFO_PAAF,       /*Analysis requirements for PAAF*/
     CAM_ANALYSIS_INFO_MAX,     /*Max number*/
 } cam_analysis_info_type;
+
+typedef enum {
+    CAM_EXPOSURE_DATA_OFF,
+    CAM_EXPOSURE_DATA_ON,
+} cam_exposure_data_enb_t;
+
+typedef struct {
+    cam_exposure_data_enb_t enable;
+    uint32_t exp_region_h_num;
+    uint32_t exp_region_v_num;
+    uint32_t region_pixel_cnt;
+    uint32_t exp_region_height;
+    uint32_t exp_region_width;
+    uint32_t exp_r_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_b_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gr_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gb_sum[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_r_num[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_b_num[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gr_num[STATS_MAX_EXPOSURE_NUM];
+    uint32_t exp_gb_num[STATS_MAX_EXPOSURE_NUM];
+} cam_exposure_data_t;
 
 typedef struct {
     /* Whether the information here is valid or not */

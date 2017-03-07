@@ -66,7 +66,10 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_SHARPNESS_END,
         QCAMERA3_HISTOGRAM_END,
         QCAMERA3_BINNING_CORRECTION_END,
-        QCAMERA3_STATS_END
+        QCAMERA3_STATS_END,
+        QCAMERA3_WNR_END,
+        QCAMERA3_EXPOSURE_DATA_END,
+        QCAMERA3_TNR_TUNING_END
 };
 
 typedef struct vendor_tag_info {
@@ -99,7 +102,10 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.sharpness",
     "org.codeaurora.qcamera3.histogram",
     "org.codeaurora.qcamera3.binning_correction",
-    "org.codeaurora.qcamera3.stats"
+    "org.codeaurora.qcamera3.stats",
+    "org.codeaurora.qcamera3.wnr",
+    "org.codeaurora.qcamera3.exposure",
+    "org.codeaurora.qcamera3.tnr_tuning"
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -260,6 +266,36 @@ vendor_tag_info_t qcamera3_stats[QCAMERA3_STATS_END -
     { "gaze_degree", TYPE_BYTE }
 };
 
+vendor_tag_info_t qcamera3_wnr[QCAMERA3_WNR_END -
+        QCAMERA3_WNR_START] = {
+    { "range", TYPE_BYTE }
+};
+
+vendor_tag_info_t qcamera3_exposure[QCAMERA3_EXPOSURE_DATA_END -
+        QCAMERA3_EXPOSURE_DATA_START] = {
+    { "enable", TYPE_INT32 },
+    { "region_h_num", TYPE_INT32 },
+    { "region_v_num", TYPE_INT32 },
+    { "region_pixel_cnt", TYPE_INT32 },
+    { "region_height", TYPE_INT32 },
+    { "region_width", TYPE_INT32 },
+    { "r_sum", TYPE_INT32 },
+    { "b_sum", TYPE_INT32 },
+    { "gr_sum", TYPE_INT32 },
+    { "gb_sum", TYPE_INT32 },
+    { "r_num", TYPE_INT32 },
+    { "b_num", TYPE_INT32 },
+    { "gr_num", TYPE_INT32 },
+    { "gb_num", TYPE_INT32 },
+};
+
+vendor_tag_info_t qcamera3_tnr_tuning[QCAMERA3_TNR_TUNING_END -
+        QCAMERA3_TNR_TUNING_START] = {
+      { "tnr_intensity", TYPE_FLOAT },
+      { "motion_detection_sensitivity", TYPE_FLOAT },
+      { "tnr_tuning_range", TYPE_FLOAT }
+};
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -285,7 +321,10 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_sharpness,
     qcamera3_histogram,
     qcamera3_binning_correction,
-    qcamera3_stats
+    qcamera3_stats,
+    qcamera3_wnr,
+    qcamera3_exposure,
+    qcamera3_tnr_tuning
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -394,6 +433,30 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_STATS_GAZE_ANGLE,
     (uint32_t)QCAMERA3_STATS_GAZE_DIRECTION,
     (uint32_t)QCAMERA3_STATS_GAZE_DEGREE,
+
+    // QCAMERA3_WNR
+    (uint32_t)QCAMERA3_WNR_RANGE,
+
+    // QCAMERA3_EXPOSURE_DATA_START
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_ENABLE,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_REGION_H_NUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_REGION_V_NUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_REGION_PIXEL_CNT,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_REGION_HEIGHT,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_REGION_WIDTH,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_R_SUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_B_SUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_GR_SUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_GB_SUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_R_NUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_B_NUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_GR_NUM,
+    (uint32_t)QCAMERA3_EXPOSURE_DATA_GB_NUM,
+
+    // QCAMERA3_TNR
+    (uint32_t)QCAMERA3_TNR_INTENSITY,
+    (uint32_t)QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
+    (uint32_t)QCAMERA3_TNR_TUNING_RANGE,
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;
