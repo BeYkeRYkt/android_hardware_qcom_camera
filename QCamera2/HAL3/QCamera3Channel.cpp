@@ -79,7 +79,7 @@ QCamera3Channel::QCamera3Channel(uint32_t cam_handle,
     m_camOps = cam_ops;
     m_bIsActive = false;
     m_bUBWCenable = true;
-
+    mDewarpType = DEWARP_NONE;
     m_numStreams = 0;
     memset(mStreams, 0, sizeof(mStreams));
     mUserData = userData;
@@ -643,8 +643,42 @@ void QCamera3Channel::setUBWCEnabled(bool val)
     m_bUBWCenable = val;
 }
 
+
 /*===========================================================================
- * FUNCTION   : getStreamDefaultFormat
+ * FUNCTION   : setDewarpType
+ *
+ * DESCRIPTION: set dewarp type
+ *
+ * PARAMETERS : dewarp type values
+ *
+ * RETURN     : none
+ *
+ *==========================================================================*/
+void QCamera3Channel::setDewarpType(cam_dewarp_type_t val)
+{
+    mDewarpType = val;
+}
+
+
+/*===========================================================================
+ * FUNCTION   : getDewarpType
+ *
+ * DESCRIPTION: get dewarp type
+ *
+ * PARAMETERS : none
+ *
+ * RETURN     : dewarp type
+ *
+ *==========================================================================*/
+
+cam_dewarp_type_t QCamera3Channel::getDewarpType()
+{
+    return mDewarpType;
+}
+
+
+/*===========================================================================
+* FUNCTION   : getStreamDefaultFormat
  *
  * DESCRIPTION: return default buffer format for the stream
  *

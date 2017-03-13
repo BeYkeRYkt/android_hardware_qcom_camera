@@ -351,6 +351,15 @@ const QCamera3HardwareInterface::QCameraMap<
 };
 
 const QCamera3HardwareInterface::QCameraMap<
+        camera_metadata_enum_ext_dewarp_type_t,
+        cam_dewarp_type_t> QCamera3HardwareInterface::DEWARP_TYPE_MAP [] = {
+    {QCAMERA3_DEWARP_NONE,  DEWARP_NONE},
+    {QCAMERA3_DEWARP_LDC, DEWARP_LDC},
+    {QCAMERA3_DEWARP_CUSTOM, DEWARP_CUSTOM},
+    {QCAMERA3_DEWARP_LDC_CUSTOM, DEWARP_LDC_CUSTOM}
+};
+
+const QCamera3HardwareInterface::QCameraMap<
         qcamera3_ext_exposure_meter_mode_t,
         cam_auto_exposure_mode_type> QCamera3HardwareInterface::AEC_MODES_MAP[] = {
     { QCAMERA3_EXP_METER_MODE_FRAME_AVERAGE, CAM_AEC_MODE_FRAME_AVERAGE },
@@ -4240,6 +4249,7 @@ int QCamera3HardwareInterface::processCaptureRequest(
         mPerfLockMgr.acquirePerfLock(PERF_LOCK_START_PREVIEW);
         /* get eis information for stream configuration */
         cam_is_type_t isTypeVideo, isTypePreview, is_type=IS_TYPE_NONE;
+        cam_dewarp_type_t dewarp_type = DEWARP_NONE;
         char is_type_value[PROPERTY_VALUE_MAX];
         property_get("persist.camera.is_type", is_type_value, "4");
         isTypeVideo = static_cast<cam_is_type_t>(atoi(is_type_value));
@@ -4265,9 +4275,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
             setInstantAEC(meta);
         }
         uint8_t fwkVideoStabMode=0;
+        char ds_prop[PROPERTY_VALUE_MAX];
+        memset(ds_prop, 0, sizeof(ds_prop));
+        property_get("persist.camera.video.stab", ds_prop, "0");
+        fwkVideoStabMode = (uint8_t)atoi(ds_prop);
         if (meta.exists(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE)) {
-            fwkVideoStabMode = meta.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE).data.u8[0];
+            fwkVideoStabMode |= meta.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE).data.u8[0];
         }
+
 
         // If EIS setprop is enabled & if first capture setting has EIS enabled then only
         // turn it on for video/preview
@@ -4278,7 +4293,8 @@ int QCamera3HardwareInterface::processCaptureRequest(
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_DIS_ENABLE, vsMode)) {
             rc = BAD_VALUE;
         }
-        LOGD("setEis %d", setEis);
+        LOGD("setEis %d EisEnable:%d fwkVideoStabMode:%d EisSizesSupported:%d isTypeVideo:%d",
+                setEis,m_bEisEnable,fwkVideoStabMode,m_bEisSupportedSize,isTypeVideo);
         bool eis3Supported = false;
         size_t count = IS_TYPE_MAX;
         count = MIN(gCamCapability[mCameraId]->supported_is_types_cnt, count);
@@ -4287,6 +4303,19 @@ int QCamera3HardwareInterface::processCaptureRequest(
                 eis3Supported = true;
                 break;
             }
+        }
+        int32_t fwkDeWarpType = DEWARP_NONE;
+        memset(ds_prop, 0, sizeof(ds_prop));
+        property_get("persist.camera.dewarp.type", ds_prop, "0");
+        fwkDeWarpType = (uint8_t)atoi(ds_prop);
+
+        if (fwkDeWarpType == 0 && meta.exists(QCAMERA3_DEWARP_MODE)) {
+            fwkDeWarpType = meta.find(QCAMERA3_DEWARP_MODE).data.i32[0];
+        }
+
+        if((setEis == 1) && (isTypeVideo != IS_TYPE_EIS_DG) && (fwkDeWarpType != DEWARP_NONE)) {
+            fwkDeWarpType = DEWARP_NONE;
+            LOGE("Failed to set Dewarp type in EIS mode :%d",isTypeVideo);
         }
 
         //IS type will be 0 unless EIS is supported. If EIS is supported
@@ -4299,15 +4328,25 @@ int QCamera3HardwareInterface::processCaptureRequest(
                     if ( (isTypeVideo == IS_TYPE_EIS_3_0) && (eis3Supported == FALSE) ) {
                         LOGW(" EIS_3.0 is not supported and so setting EIS_2.0");
                         is_type = IS_TYPE_EIS_2_0;
-                    } else {
+                    } else if (isTypeVideo == IS_TYPE_EIS_DG) {
+                        LOGD(" EIS type is set to EIS_DG");
+                        is_type = IS_TYPE_EIS_DG;
+                    }
+                    else {
                         is_type = isTypeVideo;
                     }
                 } else {
                     is_type = IS_TYPE_NONE;
                 }
                  mStreamConfigInfo.is_type[i] = is_type;
+                 mStreamConfigInfo.dewarp_type[i] = (cam_dewarp_type_t)fwkDeWarpType;
             } else {
                  mStreamConfigInfo.is_type[i] = IS_TYPE_NONE;
+                 if (mStreamConfigInfo.type[i] == CAM_STREAM_TYPE_VIDEO ) {
+                     mStreamConfigInfo.dewarp_type[i] = (cam_dewarp_type_t)fwkDeWarpType;
+                 } else {
+                     mStreamConfigInfo.dewarp_type[i] = DEWARP_NONE;
+                 }
             }
         }
 
@@ -4405,13 +4444,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
         LOGD("set_parms META_STREAM_INFO " );
         for (uint32_t i = 0; i < mStreamConfigInfo.num_streams; i++) {
             LOGI("STREAM INFO : type %d, wxh: %d x %d, pp_mask: 0x%" PRIx64
-                    ", Format:%d is_type: %d",
+                    "Format:%d is_type: %d, dewarp_type:%d",
                     mStreamConfigInfo.type[i],
                     mStreamConfigInfo.stream_sizes[i].width,
                     mStreamConfigInfo.stream_sizes[i].height,
                     mStreamConfigInfo.postprocess_mask[i],
                     mStreamConfigInfo.format[i],
-                    mStreamConfigInfo.is_type[i]);
+                    mStreamConfigInfo.is_type[i],
+                    mStreamConfigInfo.dewarp_type[i]);
         }
 
         rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
@@ -4457,16 +4497,21 @@ int QCamera3HardwareInterface::processCaptureRequest(
             it != mStreamInfo.end(); it++) {
             QCamera3Channel *channel = (QCamera3Channel *)(*it)->stream->priv;
             if ((((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask()) ||
-               ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask())) &&
-               setEis) {
+                       ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()))) {
                 for (size_t i = 0; i < mStreamConfigInfo.num_streams; i++) {
                     if ( (1U << mStreamConfigInfo.type[i]) == channel->getStreamTypeMask() ) {
-                        is_type = mStreamConfigInfo.is_type[i];
+                        if(setEis)
+                            is_type = mStreamConfigInfo.is_type[i];
+                        else
+                            is_type = IS_TYPE_NONE;
+                        dewarp_type = mStreamConfigInfo.dewarp_type[i];
                         break;
                     }
                 }
+                channel->setDewarpType(dewarp_type);
                 rc = channel->initialize(is_type);
             } else {
+                channel->setDewarpType(DEWARP_NONE);
                 rc = channel->initialize(IS_TYPE_NONE);
             }
             if (NO_ERROR != rc) {
@@ -6881,6 +6926,15 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                 sizeof(mm_jpeg_debug_exif_params_t));
     }
 
+
+    // DeWarp Modes
+    IF_META_AVAILABLE(cam_dewarp_type_t, dwarp, CAM_INTF_META_DEWARP_MODE, metadata) {
+        int32_t fwk_dewarp = (int32_t) *dwarp;
+        fwk_dewarp = (int32_t) *dwarp;
+        camMetadata.update(QCAMERA3_DEWARP_MODE, &fwk_dewarp, 1);
+    }
+
+
     // Reprocess and DDM debug data through vendor tag
     cam_reprocess_info_t repro_info;
     memset(&repro_info, 0, sizeof(cam_reprocess_info_t));
@@ -9181,6 +9235,23 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
                 avail_binning_modes, size);
     }
 
+    if (gCamCapability[cameraId]->supported_dewarp_mode_cnt > 0) {
+        int32_t avail_dewarp_modes[DEWARP_MAX];
+        size = 0;
+        count = DEWARP_MAX;
+        count = MIN(gCamCapability[cameraId]->supported_dewarp_mode_cnt, count);
+        for (size_t i = 0; i < count; i++) {
+            int val = lookupFwkName(DEWARP_TYPE_MAP, METADATA_MAP_SIZE(DEWARP_TYPE_MAP),
+                     gCamCapability[cameraId]->supported_dewarp_modes[i]);
+            if (NAME_NOT_FOUND != val) {
+                avail_dewarp_modes[size] = (int32_t)val;
+                size++;
+            }
+        staticInfo.update(QCAMERA3_DEWARP_AVAILABLE_MODES,
+                avail_dewarp_modes, size);
+        }
+    }
+
     if (gCamCapability[cameraId]->supported_aec_modes_cnt > 0) {
         int32_t available_aec_modes[CAM_AEC_MODE_MAX];
         size = 0;
@@ -9238,6 +9309,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     int32_t enable[] = {QCAMERA3_EXPOSURE_DATA_ON, QCAMERA3_EXPOSURE_DATA_OFF};
     size = sizeof(enable) / sizeof (enable[0]);
     staticInfo.update(QCAMERA3_EXPOSURE_DATA_ENABLE, enable, size);
+
 
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
@@ -11493,6 +11565,21 @@ int QCamera3HardwareInterface::translateToHalMetadata
             rc = BAD_VALUE;
         }
     }
+
+    // Dewarp
+    if (frame_settings.exists(QCAMERA3_DEWARP_MODE)) {
+        cam_dewarp_type_t dewarp_type = (cam_dewarp_type_t )
+                frame_settings.find(QCAMERA3_DEWARP_MODE).data.i32[0];
+        if ((CAM_IR_MODE_MAX <= dewarp_type) || (0 > dewarp_type)) {
+            LOGE("Invalid DEWARP type %d!", dewarp_type);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata,
+                    CAM_INTF_META_DEWARP_MODE, dewarp_type)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
 
     // EV step
     if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_EV_STEP,

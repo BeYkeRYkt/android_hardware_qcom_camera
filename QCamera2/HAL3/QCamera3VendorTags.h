@@ -69,6 +69,7 @@ enum qcamera3_ext_section {
     QCAMERA3_WNR,
     QCAMERA3_EXPOSURE_DATA,
     QCAMERA3_TNR_TUNING,
+    QCAMERA3_DEWARP,
     QCAMERA3_SECTIONS_END
 };
 
@@ -99,7 +100,8 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_STATS_START = QCAMERA3_STATS << 16,
     QCAMERA3_WNR_START = QCAMERA3_WNR << 16,
     QCAMERA3_EXPOSURE_DATA_START = QCAMERA3_EXPOSURE_DATA << 16,
-    QCAMERA3_TNR_TUNING_START = QCAMERA3_TNR_TUNING << 16
+    QCAMERA3_TNR_TUNING_START = QCAMERA3_TNR_TUNING << 16,
+    QCAMERA3_DEWARP_START = QCAMERA3_DEWARP << 16
 };
 
 enum qcamera3_ext_tags {
@@ -448,7 +450,11 @@ enum qcamera3_ext_tags {
        tnr_tuning_range[1] = Maximum tuning value
     */
     QCAMERA3_TNR_TUNING_RANGE,
-    QCAMERA3_TNR_TUNING_END
+    QCAMERA3_TNR_TUNING_END,
+
+    QCAMERA3_DEWARP_MODE = QCAMERA3_DEWARP_START,
+    QCAMERA3_DEWARP_AVAILABLE_MODES,
+    QCAMERA3_DEWARP_END
 };
 
 // QCAMERA3_OPAQUE_RAW_FORMAT
@@ -526,6 +532,14 @@ typedef enum {
      */
     QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE = 0x8000,
 } QCamera3VendorStreamConfiguration;
+
+// QCAMERA3_DEWARP_MODE
+typedef enum camera_metadata_enum_ext_dewarp_type {
+    QCAMERA3_DEWARP_NONE,
+    QCAMERA3_DEWARP_LDC,
+    QCAMERA3_DEWARP_CUSTOM,
+    QCAMERA3_DEWARP_LDC_CUSTOM
+} camera_metadata_enum_ext_dewarp_type_t;
 
 class QCamera3VendorTags {
 
