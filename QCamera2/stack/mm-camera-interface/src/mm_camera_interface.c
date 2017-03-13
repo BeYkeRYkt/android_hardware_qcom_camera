@@ -3356,6 +3356,7 @@ int mm_camera_module_event_handler(uint32_t session_id, cam_event_t *event)
        case CAM_EVENT_TYPE_CAC_DONE:
        case CAM_EVENT_TYPE_DAEMON_DIED:
        case CAM_EVENT_TYPE_INT_TAKE_JPEG:
+       case CAM_EVENT_TYPE_RESTART:
        case CAM_EVENT_TYPE_INT_TAKE_RAW:
            mm_camera_enqueue_evt(my_obj, &evt);
            break;

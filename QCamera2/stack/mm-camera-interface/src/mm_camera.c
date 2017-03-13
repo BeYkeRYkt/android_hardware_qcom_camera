@@ -181,6 +181,7 @@ static void mm_camera_event_notify(void* user_data)
                 break;
             case CAM_EVENT_TYPE_INT_TAKE_JPEG:
             case CAM_EVENT_TYPE_INT_TAKE_RAW:
+            case CAM_EVENT_TYPE_RESTART:
                 {
                     evt.server_event_type = msm_evt->command;
                     mm_camera_enqueue_evt(my_obj, &evt);
