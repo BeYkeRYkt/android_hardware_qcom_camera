@@ -1017,6 +1017,7 @@ typedef enum {
     CAM_EVENT_TYPE_INT_TAKE_RAW    = (1<<5),
     CAM_EVENT_TYPE_DAEMON_PULL_REQ = (1<<6),
     CAM_EVENT_TYPE_CAC_DONE        = (1<<7),
+    CAM_EVENT_TYPE_RESTART         = (1<<8),
     CAM_EVENT_TYPE_MAX
 } cam_event_type_t;
 

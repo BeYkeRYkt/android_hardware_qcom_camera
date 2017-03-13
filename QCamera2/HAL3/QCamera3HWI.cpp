@@ -761,6 +761,11 @@ void QCamera3HardwareInterface::camEvtHandle(uint32_t /*camera_handle*/,
                 pthread_mutex_unlock(&obj->mMutex);
                 break;
 
+            case CAM_EVENT_TYPE_RESTART:
+                LOGE("Got RESTART EVENT ");
+                obj->flush(true);
+                break;
+
             default:
                 LOGW("Warning: Unhandled event %d",
                         evt->server_event_type);
@@ -5335,7 +5340,7 @@ int QCamera3HardwareInterface::flush(bool restartChannels)
     KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_STOP_PREVIEW);
     int32_t rc = NO_ERROR;
 
-    LOGD("Unblocking Process Capture Request");
+    LOGE("Unblocking Process Capture Request");
     pthread_mutex_lock(&mMutex);
     mFlush = true;
     pthread_mutex_unlock(&mMutex);
