@@ -8923,6 +8923,9 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     int32_t io_format_map[] = {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, 2,
             HAL_PIXEL_FORMAT_BLOB, HAL_PIXEL_FORMAT_YCbCr_420_888,
             HAL_PIXEL_FORMAT_YCbCr_420_888, 2, HAL_PIXEL_FORMAT_BLOB,
+            HAL_PIXEL_FORMAT_YCbCr_420_888, HAL_PIXEL_FORMAT_RAW10, 2,
+            HAL_PIXEL_FORMAT_BLOB, HAL_PIXEL_FORMAT_YCbCr_420_888,
+            HAL_PIXEL_FORMAT_RAW12, 2, HAL_PIXEL_FORMAT_BLOB,
             HAL_PIXEL_FORMAT_YCbCr_420_888};
     staticInfo.update(ANDROID_SCALER_AVAILABLE_INPUT_OUTPUT_FORMATS_MAP,
                       io_format_map, sizeof(io_format_map)/sizeof(io_format_map[0]));
