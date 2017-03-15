@@ -493,6 +493,7 @@ int mm_app_open(mm_camera_app_t *cam_app,
 {
     int32_t rc;
     cam_frame_len_offset_t offset_info;
+    cam_capability_t *camera_cap = NULL;
 
     CDBG("%s:BEGIN\n", __func__);
 
@@ -579,6 +580,14 @@ int mm_app_open(mm_camera_app_t *cam_app,
         rc = -MM_CAMERA_E_GENERAL;
         goto error_after_getparm_buf_map;
     }
+
+    camera_cap = (cam_capability_t *) test_obj->cap_buf.mem_info.data;
+    if (camera_cap->padding_info.plane_padding == 0)
+        camera_cap->padding_info.plane_padding = CAM_PAD_TO_4K;
+    CDBG("%s: camera padding info (w %d, h %d, plane %d)", __func__,
+        camera_cap->padding_info.width_padding,
+        camera_cap->padding_info.height_padding,
+        camera_cap->padding_info.plane_padding);
 
     return rc;
 
