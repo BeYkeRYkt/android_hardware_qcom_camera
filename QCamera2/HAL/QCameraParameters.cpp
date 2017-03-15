@@ -4576,6 +4576,11 @@ int32_t QCameraParameters::initDefaultParameters()
     set(KEY_JPEG_QUALITY, 85);
     set(KEY_JPEG_THUMBNAIL_QUALITY, 85);
 
+    // set no-display-mode by default
+    set(KEY_QC_NO_DISPLAY_MODE, "1");
+    m_bNoDisplayMode = true;
+
+
     // Set FPS ranges
     if (m_pCapability->fps_ranges_tbl_cnt > 0 &&
         m_pCapability->fps_ranges_tbl_cnt <= MAX_SIZES_CNT) {
