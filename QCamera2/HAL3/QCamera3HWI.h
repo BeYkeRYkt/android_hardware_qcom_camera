@@ -317,6 +317,7 @@ private:
         CONFIGURED,
         STARTED,
         ERROR,
+        RESTART,
         DEINIT
     } State;
 
