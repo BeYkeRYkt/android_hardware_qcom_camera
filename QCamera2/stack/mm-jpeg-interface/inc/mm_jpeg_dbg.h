@@ -31,7 +31,7 @@
 #define __MM_JPEG_DBG_H__
 
 #define LOG_DEBUG 1
-#define MINIMUM_JPEG_LOG_LEVEL 1
+#define MINIMUM_JPEG_LOG_LEVEL 0U
 
 /* Choose debug log level. This will not affect the error logs
    0: turns off CDBG and CDBG_HIGH logs

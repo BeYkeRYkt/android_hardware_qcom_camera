@@ -814,7 +814,7 @@ OMX_ERRORTYPE mm_jpeg_meta_enc_key(
   lKey.keyLen = p_session->meta_enc_keylen;
 
   if ((!lKey.metaKey) || (!lKey.keyLen)){
-    CDBG_ERROR("%s:%d] Key is invalid", __func__, __LINE__);
+    CDBG("%s:%d] Key is invalid", __func__, __LINE__);
     return OMX_ErrorNone;
   }
 
@@ -1539,7 +1539,7 @@ static OMX_ERRORTYPE mm_jpeg_configure_job_params(
   work_buffer.fd = p_session->work_buffer.p_pmem_fd;
   work_buffer.vaddr = p_session->work_buffer.addr;
   work_buffer.length = (uint32_t)p_session->work_buffer.size;
-  CDBG_ERROR("%s:%d] Work buffer info %d %p WorkBufSize: %d invalidate", __func__, __LINE__,
+  CDBG("%s:%d] Work buffer info %d %p WorkBufSize: %d invalidate", __func__, __LINE__,
     work_buffer.fd, work_buffer.vaddr, work_buffer.length);
 
   buffer_invalidate(&p_session->work_buffer);
