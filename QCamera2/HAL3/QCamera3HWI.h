@@ -274,6 +274,7 @@ public:
     bool isMainCamera() {return mIsMainCamera;}
     uint32_t getSensorMountAngle();
     const cam_related_system_calibration_data_t *getRelatedCalibrationData();
+    int getCameraId() {return mCameraId;}
 
     template <typename fwkType, typename halType> struct QCameraMap {
         fwkType fwk_name;
@@ -285,7 +286,7 @@ public:
         cam_cds_mode_type_t val;
     } QCameraPropMap;
 
-
+    uint32_t getCameraID() {return mCameraId;}
 private:
 
     // State transition conditions:
@@ -316,6 +317,7 @@ private:
         CONFIGURED,
         STARTED,
         ERROR,
+        RESTART,
         DEINIT
     } State;
 

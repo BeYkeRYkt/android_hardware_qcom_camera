@@ -82,7 +82,15 @@ namespace qcamera {
 
 #define MAX_RAW_STREAMS        1
 #define MAX_STALLING_STREAMS   1
+
+/* DONOT Increase MAX_PROCESSED_STREAMS for LA as it will
+   result in CTS Failtures */
+#ifdef _LE_CAMERA_
+#define MAX_PROCESSED_STREAMS  6
+#else
 #define MAX_PROCESSED_STREAMS  3
+#endif
+
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #define PREVIEW_FPS_FOR_HFR    (30)
@@ -768,6 +776,11 @@ void QCamera3HardwareInterface::camEvtHandle(uint32_t /*camera_handle*/,
                 obj->mWokenUpByDaemon = true;
                 obj->unblockRequestIfNecessary();
                 pthread_mutex_unlock(&obj->mMutex);
+                break;
+
+            case CAM_EVENT_TYPE_RESTART:
+                LOGE("Got RESTART EVENT ");
+                obj->flush(true);
                 break;
 
             default:
@@ -4813,6 +4826,7 @@ no_error:
     }
 
     if (blob_request) {
+        LOGI("[KPI Perf] : PROFILE_SNAPSHOT_REQUEST_RECEIVED");
         KPI_ATRACE_CAMSCOPE_INT("SNAPSHOT", CAMSCOPE_HAL3_SNAPSHOT, 1);
         mPerfLockMgr.acquirePerfLock(PERF_LOCK_TAKE_SNAPSHOT);
     }
@@ -5380,7 +5394,7 @@ int QCamera3HardwareInterface::flush(bool restartChannels)
     KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_STOP_PREVIEW);
     int32_t rc = NO_ERROR;
 
-    LOGD("Unblocking Process Capture Request");
+    LOGE("Unblocking Process Capture Request");
     pthread_mutex_lock(&mMutex);
     mFlush = true;
     pthread_mutex_unlock(&mMutex);
