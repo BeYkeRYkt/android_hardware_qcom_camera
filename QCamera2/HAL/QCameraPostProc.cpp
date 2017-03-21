@@ -41,9 +41,11 @@
 #include "QCameraTrace.h"
 #include "QCameraPprocManager.h"
 
+
 extern "C" {
 #include "mm_camera_dbg.h"
 }
+
 
 namespace qcamera {
 
@@ -1239,6 +1241,7 @@ int32_t QCameraPostProcessor::processRawData(mm_camera_super_buf_t *frame)
  *==========================================================================*/
 int32_t QCameraPostProcessor::processJpegEvt(qcamera_jpeg_evt_payload_t *evt)
 {
+
     if (m_bInited == FALSE) {
         LOGE("postproc not initialized yet");
         return UNKNOWN_ERROR;
@@ -1340,7 +1343,6 @@ int32_t QCameraPostProcessor::processJpegEvt(qcamera_jpeg_evt_payload_t *evt)
                 &release_data,
                 frame_idx);
         m_parent->setOutputImageCount(m_parent->getOutputImageCount() + 1);
-
 end:
         if (rc != NO_ERROR) {
             // send error msg to upper layer
@@ -2843,6 +2845,7 @@ int32_t QCameraPostProcessor::encodeData(qcamera_jpeg_data_t *jpeg_job_data,
     }
 
     LOGI("[KPI Perf] : PROFILE_JPEG_JOB_START");
+
     ret = mJpegHandle.start_job(&jpg_job, &jobId);
     if (jpg_job.encode_job.cam_exif_params.debug_params) {
         free(jpg_job.encode_job.cam_exif_params.debug_params);
@@ -3116,6 +3119,7 @@ void *QCameraPostProcessor::dataSaveRoutine(void *data)
                     release_data.data = jpeg_mem;
                     release_data.unlinkFile = true;
                     LOGI("[KPI Perf]: PROFILE_JPEG_CB ");
+
                     ret = pme->sendDataNotify(CAMERA_MSG_COMPRESSED_IMAGE,
                             jpeg_mem,
                             0,
