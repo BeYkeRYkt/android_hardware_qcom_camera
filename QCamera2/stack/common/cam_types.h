@@ -1782,9 +1782,10 @@ typedef enum {
 } cam_sync_type_t;
 
 typedef enum {
-    CAM_3A_SYNC_NONE,     /* Default for single camera, not link */
-    CAM_3A_SYNC_FOLLOW,   /* Master->Slave: Master updates slave */
-    CAM_3A_SYNC_ALGO_CTRL,/* Algorithm updated cameras directly */
+    CAM_3A_SYNC_NONE,       /* Default for single camera, not link */
+    CAM_3A_SYNC_FOLLOW,     /* Master->Slave: Master updates slave */
+    CAM_3A_SYNC_ALGO_CTRL,  /* Algorithm updated cameras directly */
+    CAM_3A_SYNC_360_CAMERA, /* 360 degree camera mode */
 } cam_3a_sync_mode_t;
 
 typedef enum {
