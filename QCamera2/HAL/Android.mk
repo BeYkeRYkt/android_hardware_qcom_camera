@@ -18,14 +18,14 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS = -Wall -Wextra -Werror
 LOCAL_CFLAGS += -DHAS_MULTIMEDIA_HINTS
-
+LOCAL_COPY_HEADERS = ../../QCamera_Intf.h
 #use media extension
-#ifeq ($(TARGET_USES_MEDIA_EXTENSIONS), true)
+ifeq ($(TARGET_USES_MEDIA_EXTENSIONS), true)
 LOCAL_CFLAGS += -DUSE_MEDIA_EXTENSIONS
-#endif
+endif
 
 #Debug logs are enabled
-#LOCAL_CFLAGS += -DDISABLE_DEBUG_LOG
+
 
 #ifeq ($(TARGET_USE_VENDOR_CAMERA_EXT),true)
 #LOCAL_CFLAGS += -DUSE_VENDOR_CAMERA_EXT
@@ -41,11 +41,12 @@ endif
 
 LOCAL_C_INCLUDES := \
         $(LOCAL_PATH)/../stack/common \
-        frameworks/native/include/media/openmax \
-        hardware/qcom/display/msm8909/libgralloc \
-        hardware/qcom/display/msm8909/libqdutils \
-        hardware/qcom/media/libstagefrighthw \
-        system/media/camera/include \
+        $(WORKSPACE)/frameworks/native/include/media/openmax \
+        $(WORKSPACE)/display/display-hal/libgralloc \
+        $(WORKSPACE)/display/display-hal/libqdutils \
+        $(WORKSPACE)/display/display-hal/libqservice \
+        $(WORKSPACE)/hardware/qcom/media/libstagefrighthw \
+        $(WORKSPACE)/system/media/camera/include \
         $(LOCAL_PATH)/../../mm-image-codec/qexif \
         $(LOCAL_PATH)/../../mm-image-codec/qomx_core \
         $(LOCAL_PATH)/../util \
@@ -59,28 +60,29 @@ endif
 
 LOCAL_C_INCLUDES += \
         $(TARGET_OUT_HEADERS)/qcom/display
-LOCAL_C_INCLUDES += \
-        hardware/qcom/display/msm8909/libqservice
 
 #ifeq ($(TARGET_USE_VENDOR_CAMERA_EXT),true)
 #LOCAL_C_INCLUDES += hardware/qcom/display/msm8974/libgralloc
 #else
-LOCAL_C_INCLUDES += hardware/qcom/display/msm8909/libgralloc
+#LOCAL_C_INCLUDES += hardware/qcom/display/msm8909/libgralloc
 #endif
+
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include/media
+
 ifeq ($(TARGET_TS_MAKEUP),true)
 LOCAL_CFLAGS += -DTARGET_TS_MAKEUP
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/tsMakeuplib/include
 endif
+
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
 LOCAL_SHARED_LIBRARIES := libcamera_client liblog libhardware libutils libcutils libdl
-LOCAL_SHARED_LIBRARIES += libmmcamera_interface libmmjpeg_interface libqdMetaData
+LOCAL_SHARED_LIBRARIES += libmmcamera_interface libmmjpeg_interface #libqdMetaData
 ifeq ($(TARGET_TS_MAKEUP),true)
 LOCAL_SHARED_LIBRARIES += libts_face_beautify_hal libts_detected_face_hal
 endif
-LOCAL_SHARED_LIBRARIES += libqdMetaData libqservice libbinder
+LOCAL_SHARED_LIBRARIES += libbinder #libqdMetaData libqservice
 
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE := camera.$(TARGET_BOARD_PLATFORM)
@@ -91,5 +93,5 @@ LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
 
 ifeq ($(TARGET_USES_AOSP),false)
-include $(LOCAL_PATH)/test/Android.mk
+#include $(LOCAL_PATH)/test/Android.mk
 endif

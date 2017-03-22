@@ -17,6 +17,9 @@ OMX_HEADER_DIR := frameworks/native/include/media/openmax
 
 LOCAL_C_INCLUDES := $(OMX_HEADER_DIR)
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../qexif
+LOCAL_COPY_HEADERS = ../qexif/qexif.h
+LOCAL_COPY_HEADERS += qomx_core.h
+LOCAL_COPY_HEADERS += QOMX_JpegExtensions.h
 
 LOCAL_SRC_FILES := qomx_core.c
 

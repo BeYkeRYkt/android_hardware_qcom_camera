@@ -39,6 +39,8 @@
 #include <sys/sysinfo.h>
 #include "QCamera2HWI.h"
 #include "QCameraParameters.h"
+#include <glib.h>
+#include <glibconfig.h>
 
 #define PI 3.14159265
 #define ASPECT_TOLERANCE 0.001

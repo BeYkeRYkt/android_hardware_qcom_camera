@@ -36,7 +36,7 @@
 #include <utils/Errors.h>
 #include <utils/Trace.h>
 #include <gralloc_priv.h>
-#include <QComOMXMetadata.h>
+#include <libstagefrighthw/QComOMXMetadata.h>
 #include <qdMetaData.h>
 
 #include "QCamera2HWI.h"
@@ -48,7 +48,7 @@
 #include <media/hardware/HardwareAPI.h>
 typedef struct VideoNativeHandleMetadata media_metadata_buffer;
 #else
-#include "QComOMXMetadata.h"
+#include <libstagefrighthw/QComOMXMetadata.h>
 typedef struct encoder_media_buffer_type media_metadata_buffer;
 #endif
 

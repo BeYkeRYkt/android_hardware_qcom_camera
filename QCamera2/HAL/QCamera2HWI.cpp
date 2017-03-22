@@ -37,7 +37,7 @@
 #include <utils/Errors.h>
 #include <utils/Trace.h>
 #include <gralloc_priv.h>
-#include <gui/Surface.h>
+//#include <gui/Surface.h>
 
 #include <binder/Parcel.h>
 #include <binder/IServiceManager.h>
@@ -46,6 +46,8 @@
 
 #include "QCamera2HWI.h"
 #include "QCameraMem.h"
+#include <glib.h>
+#include <glibconfig.h>
 
 #define MAP_TO_DRIVER_COORDINATE(val, base, scale, offset) \
   ((int32_t)val * (int32_t)scale / (int32_t)base + (int32_t)offset)

@@ -37,6 +37,8 @@
 #include <utils/Trace.h>
 #include <utils/Timers.h>
 #include "QCamera2HWI.h"
+#include <glib.h>
+#include <glibconfig.h>
 
 namespace qcamera {
 
