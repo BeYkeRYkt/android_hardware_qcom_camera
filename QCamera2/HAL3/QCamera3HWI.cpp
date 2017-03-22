@@ -77,8 +77,8 @@ namespace qcamera {
 #define VIDEO_4K_WIDTH  3840
 #define VIDEO_4K_HEIGHT 2160
 
-#define MAX_EIS_WIDTH 1920
-#define MAX_EIS_HEIGHT 1080
+#define MAX_EIS_WIDTH 3840
+#define MAX_EIS_HEIGHT 2160
 
 #define MAX_RAW_STREAMS        1
 #define MAX_STALLING_STREAMS   1
@@ -1657,8 +1657,10 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     property_get("persist.camera.eis.enable", eis_prop, "1");
     eis_prop_set = (uint8_t)atoi(eis_prop);
 
-    m_bEisEnable = eis_prop_set && (!oisSupported && m_bEisSupported) &&
-            (mOpMode != CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE);
+    //m_bEisEnable = eis_prop_set && (!oisSupported && m_bEisSupported) &&
+    //        (mOpMode != CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE);
+
+    m_bEisEnable = eis_prop_set && (!oisSupported && m_bEisSupported);
 
     LOGD("m_bEisEnable: %d, eis_prop_set: %d, m_bEisSupported: %d, oisSupported:%d ",
             m_bEisEnable, eis_prop_set, m_bEisSupported, oisSupported);
@@ -4338,6 +4340,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
             fwkVideoStabMode |= meta.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE).data.u8[0];
         }
 
+        if (meta.exists(ANDROID_CONTROL_AE_TARGET_FPS_RANGE)) {
+            int32_t fps_max =
+                    (int32_t) meta.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE).data.i32[1];
+            if (CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == mOpMode) {
+                if(fps_max > 60)
+                    m_bEisEnable = false;
+            }
+        }
 
         // If EIS setprop is enabled & if first capture setting has EIS enabled then only
         // turn it on for video/preview
