@@ -588,15 +588,15 @@ QCamera3HardwareInterface::~QCamera3HardwareInterface()
         if (mIsMainCamera == 1) {
             m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            // related session id should be session id of linked session
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         } else {
             m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         }
+
+        m_pRelCamSyncBuf->sync_3a_mode = mDualCam3ASyncMode;
+        // related session id should be session id of linked session
+        m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+
         pthread_mutex_unlock(&gCamLock);
 
         rc = mCameraHandle->ops->set_dual_cam_cmd(
@@ -4603,6 +4603,68 @@ int QCamera3HardwareInterface::processCaptureRequest(
             }
         }
 
+        // Backward compatibility:
+        // Default Dual Camera sync mode is set to follow.
+        mDualCam3ASyncMode = CAM_3A_SYNC_FOLLOW;
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE)) {
+            uint8_t syncMode =
+                meta.find(QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE).data.u8[0];
+
+            switch (syncMode) {
+            case QCAMERA3_DUALCAM_LINK_3A_SYNC_NONE:
+                mDualCam3ASyncMode = CAM_3A_SYNC_NONE;
+                break;
+            case QCAMERA3_DUALCAM_LINK_3A_SYNC_FOLLOW:
+                mDualCam3ASyncMode = CAM_3A_SYNC_FOLLOW;
+                break;
+            case QCAMERA3_DUALCAM_LINK_3A_ALGO_CTRL:
+                mDualCam3ASyncMode = CAM_3A_SYNC_ALGO_CTRL;
+                break;
+            case QCAMERA3_DUALCAM_LINK_3A_360_CAMERA:
+                mDualCam3ASyncMode = CAM_3A_SYNC_360_CAMERA;
+                break;
+            default:
+                LOGE("Dualcam: 3ASyncMode %d is invalid, current cam id = %d",
+                    mDualCam3ASyncMode, mCameraId);
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+            LOGH("Dualcam: 3ASyncMode = %d id =%d",
+                mDualCam3ASyncMode, mCameraId);
+        }
+
+        // Backward compatibility:
+        // Default Camera role for main is bayer, for aux camera is mono
+        mDualCamRole = mIsMainCamera ? CAM_ROLE_BAYER : CAM_ROLE_MONO;
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_CAMERA_ROLE)) {
+            uint8_t camRole =
+                meta.find(QCAMERA3_DUALCAM_LINK_CAMERA_ROLE).data.u8[0];
+
+            switch (camRole) {
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_DEFAULT:
+                mDualCamRole = CAM_ROLE_DEFAULT;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_BAYER:
+                mDualCamRole = CAM_ROLE_BAYER;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_MONO:
+                mDualCamRole = CAM_ROLE_MONO;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_WIDE:
+                mDualCamRole = CAM_ROLE_WIDE;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_TELE:
+                mDualCamRole = CAM_ROLE_TELE;
+                break;
+            default:
+                LOGE("Dualcam: mDualCameraRole %d is invalid, current cam id = %d",
+                    camRole, mCameraId);
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+            LOGH("Dualcam: Camera role = %d id =%d", mDualCamRole, mCameraId);
+        }
+
         // add bundle related cameras
         LOGH("%s: Dualcam: id =%d, mIsDeviceLinked=%d", __func__,mCameraId, mIsDeviceLinked);
         if (meta.exists(QCAMERA3_DUALCAM_LINK_ENABLE)) {
@@ -4626,17 +4688,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
             if (mIsMainCamera == 1) {
                 m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
                 m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-                m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-                m_pRelCamSyncBuf->cam_role = CAM_ROLE_BAYER;
-                // related session id should be session id of linked session
-                m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
             } else {
                 m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
                 m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-                m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-                m_pRelCamSyncBuf->cam_role = CAM_ROLE_MONO;
-                m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
             }
+            m_pRelCamSyncBuf->sync_3a_mode = mDualCam3ASyncMode;
+            m_pRelCamSyncBuf->cam_role = mDualCamRole;
+            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+
             pthread_mutex_unlock(&gCamLock);
 
             rc = mCameraHandle->ops->set_dual_cam_cmd(
@@ -5411,15 +5470,15 @@ int QCamera3HardwareInterface::flush(bool restartChannels)
         if (mIsMainCamera == 1) {
             m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            // related session id should be session id of linked session
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         } else {
             m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         }
+
+        m_pRelCamSyncBuf->sync_3a_mode = mDualCam3ASyncMode;
+        // related session id should be session id of linked session
+        m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+
         pthread_mutex_unlock(&gCamLock);
 
         rc = mCameraHandle->ops->set_dual_cam_cmd(
