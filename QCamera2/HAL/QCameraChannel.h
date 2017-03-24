@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2015, 2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -76,6 +76,7 @@ public:
     int32_t UpdateStreamBasedParameters(QCameraParameters &param);
     void deleteChannel();
 
+    virtual int32_t releaseFrame(const void *opaque, bool isMetaData);
 protected:
     uint32_t m_camHandle;
     mm_camera_ops_t *m_camOps;
@@ -113,7 +114,7 @@ public:
     virtual ~QCameraVideoChannel();
     int32_t takePicture(uint8_t num_of_snapshot);
     int32_t cancelPicture();
-    int32_t releaseFrame(const void *opaque, bool isMetaData);
+    virtual int32_t releaseFrame(const void *opaque, bool isMetaData);
 };
 
 // reprocess channel class

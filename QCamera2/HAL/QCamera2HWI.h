@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014,2016 The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2014,2016-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,6 +47,7 @@
 #include "QCameraThermalAdapter.h"
 #include "QCameraMem.h"
 #include "cam_intf.h"
+#include "QCamera2_Ext.h"
 #ifdef TARGET_TS_MAKEUP
 #include "ts_makeup_engine.h"
 #include "ts_detectface_engine.h"
@@ -218,7 +219,7 @@ class QCamera2HardwareInterface : public QCameraAllocator,
 {
 public:
     /* static variable and functions accessed by camera service */
-    static camera_device_ops_t mCameraOps;
+    static camera_device_ops_ext mCameraOps;
 
     static int set_preview_window(struct camera_device *,
         struct preview_stream_ops *window);
@@ -239,6 +240,7 @@ public:
     static void stop_recording(struct camera_device *);
     static int recording_enabled(struct camera_device *);
     static void release_recording_frame(struct camera_device *, const void *opaque);
+    static void release_preview_frame(struct camera_device *, const void *opaque);
     static int auto_focus(struct camera_device *);
     static int cancel_auto_focus(struct camera_device *);
     static int take_picture(struct camera_device *);
@@ -307,6 +309,7 @@ private:
     int startRecording();
     int stopRecording();
     int releaseRecordingFrame(const void *opaque);
+    int releasePreviewFrame(const void *opaque);
     int autoFocus();
     int cancelAutoFocus();
     int takePicture();
@@ -487,6 +490,9 @@ private:
                                             void *userdata);
     static void dual_reproc_channel_cb_routine(mm_camera_super_buf_t *recvd_frame,
                                             void *userdata);
+    static void nodisplay_preview_stream_raw_cb_routine(mm_camera_super_buf_t *frame,
+                                                    QCameraStream *stream,
+                                                    void *userdata);
     static void nodisplay_preview_stream_cb_routine(mm_camera_super_buf_t *frame,
                                                     QCameraStream *stream,
                                                     void *userdata);
