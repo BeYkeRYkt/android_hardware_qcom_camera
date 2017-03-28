@@ -773,8 +773,7 @@ private:
     int32_t setVtEnable(const QCameraParameters& );
     int32_t setZoom(const QCameraParameters& );
     int32_t setISOValue(const QCameraParameters& );
-    int32_t setExposureManualValue(const QCameraParameters& );
-    int32_t setGainManualValue(const QCameraParameters& );
+    int32_t setManualExposure(const QCameraParameters& );
     int32_t setContinuousISO(const QCameraParameters& );
     int32_t setExposureTime(const QCameraParameters& );
     int32_t setRotation(const QCameraParameters& );
@@ -846,8 +845,7 @@ private:
     int32_t setVtEnable(const char *vtEnable);
     int32_t setZoom(int zoom_level);
     int32_t setISOValue(const char *isoValue);
-    int32_t setExposureManualValue(const char *exposureManual);
-    int32_t setGainManualValue(const char *gainManual);
+    int32_t setManualExposure(const char * exp_line, const char * gain);
     int32_t setContinuousISO(const char *isoValue);
     int32_t setExposureTime(const char *expTimeStr);
     int32_t setFlash(const char *flashStr);

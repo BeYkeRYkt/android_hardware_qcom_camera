@@ -484,8 +484,7 @@ typedef union {
     INCLUDE(CAM_INTF_PARM_BRIGHTNESS,               int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_ISO,                      int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_EXPOSURE_TIME,            uint64_t,                    1);
-    INCLUDE(CAM_INTF_PARM_EXPOSURE_MANUAL,          int32_t,                     1);
-    INCLUDE(CAM_INTF_PARM_GAIN_MANUAL,              int32_t,                     1);
+    INCLUDE(CAM_INTF_PARM_RAW_MANUAL_EXPOSURE,      cam_manual_exposure_t,       1);
     INCLUDE(CAM_INTF_PARM_ZOOM,                     int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_ROLLOFF,                  int32_t,                     1);
     INCLUDE(CAM_INTF_PARM_MODE,                     int32_t,                     1);

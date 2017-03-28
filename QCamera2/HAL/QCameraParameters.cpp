@@ -738,6 +738,8 @@ const QCameraParameters::QCameraMap<cam_cds_mode_type_t>
 #define MIN_PP_BUF_CNT 1
 #define TOTAL_RAM_SIZE_512MB 536870912
 #define PARAM_MAP_SIZE(MAP) (sizeof(MAP)/sizeof(MAP[0]))
+#define DEFAULT_INIT_MANUAL_EXPOSURE_LINECNT 500
+#define DEFAULT_INIT_MANUAL_EXPOSURE_GAIN 256 //real gain is 1.0
 
 
 /*===========================================================================
@@ -2742,35 +2744,9 @@ int32_t  QCameraParameters::setExposureTime(const QCameraParameters& params)
 }
 
 /*===========================================================================
- * FUNCTION   : setExposureManualvalue
+ * FUNCTION   : setManualExposure
  *
- * DESCRIPTION: set manual exposure value from user setting
- *
- * PARAMETERS :
- *   @params  : user setting parameters
- *
- * RETURN     : int32_t type of status
- *              NO_ERROR  -- success
- *              none-zero failure code
- *==========================================================================*/
-int32_t  QCameraParameters::setExposureManualValue(const QCameraParameters& params)
-{
-    const char *str = params.get(KEY_QC_EXPOSURE_MANUAL);
-    const char *prev_str = get(KEY_QC_EXPOSURE_MANUAL);
-
-    if (str != NULL) {
-        if (prev_str == NULL ||
-            strcmp(str, prev_str) != 0) {
-            return setExposureManualValue(str);
-        }
-    }
-    return NO_ERROR;
-}
-
-/*===========================================================================
- * FUNCTION   : setGainManualvalue
- *
- * DESCRIPTION: set manual gain value from user setting
+ * DESCRIPTION: set manual exposure time and gain from user setting
  *
  * PARAMETERS :
  *   @params  : user setting parameters
@@ -2779,17 +2755,31 @@ int32_t  QCameraParameters::setExposureManualValue(const QCameraParameters& para
  *              NO_ERROR  -- success
  *              none-zero failure code
  *==========================================================================*/
-int32_t  QCameraParameters::setGainManualValue(const QCameraParameters& params)
+int32_t  QCameraParameters::setManualExposure(const QCameraParameters& params)
 {
-    const char *str = params.get(KEY_QC_GAIN_MANUAL);
-    const char *prev_str = get(KEY_QC_GAIN_MANUAL);
+    const char *exp_str = params.get(KEY_QC_EXPOSURE_MANUAL);
+    const char *prev_exp_str = get(KEY_QC_EXPOSURE_MANUAL);
+    const char *gain_str = params.get(KEY_QC_GAIN_MANUAL);
+    const char *prev_gain_str = get(KEY_QC_GAIN_MANUAL);
 
-    if (str != NULL) {
-        if (prev_str == NULL ||
-            strcmp(str, prev_str) != 0) {
-            return setGainManualValue(str);
+    //we have give init vaule for KEY_QC_EXPOSURE_MANUAL and KEY_QC_GAIN_MANUAL,
+    //so no need to check again here.
+    if (exp_str != NULL && gain_str != NULL) {
+        if ((strcmp(exp_str, prev_exp_str) != 0) || (strcmp(gain_str, prev_gain_str) != 0)) {
+            return setManualExposure(exp_str, gain_str);
+        }
+    } else if (exp_str != NULL) {
+        // gain_str is NULL, use previous gain
+        if (strcmp(exp_str, prev_exp_str) != 0){
+            return setManualExposure(exp_str, prev_gain_str);
+        }
+    } else if (gain_str != NULL) {
+        // exp_str is NULL, use previous exposure line
+        if (strcmp(gain_str, prev_gain_str) != 0){
+            return setManualExposure(prev_exp_str, gain_str);
         }
     }
+
     return NO_ERROR;
 }
 
@@ -4369,8 +4359,7 @@ int32_t QCameraParameters::updateParameters(QCameraParameters& params,
     if ((rc = setISOValue(params)))                     final_rc = rc;
     if ((rc = setContinuousISO(params)))                final_rc = rc;
     if ((rc = setExposureTime(params)))                 final_rc = rc;
-    if ((rc = setExposureManualValue(params)))          final_rc = rc;
-    if ((rc = setGainManualValue(params)))              final_rc = rc;
+    if ((rc = setManualExposure(params)))               final_rc = rc;
     if ((rc = setSkinToneEnhancement(params)))          final_rc = rc;
     if ((rc = setFlash(params)))                        final_rc = rc;
     if ((rc = setAecLock(params)))                      final_rc = rc;
@@ -5218,6 +5207,10 @@ int32_t QCameraParameters::initDefaultParameters()
         set(KEY_QC_LOW_POWER_MODE_SUPPORTED, VALUE_FALSE);
     }
     setLowPowerMode(VALUE_DISABLE);
+
+    //set default exposure gain and linecnt
+    set(KEY_QC_EXPOSURE_MANUAL, DEFAULT_INIT_MANUAL_EXPOSURE_LINECNT);
+    set(KEY_QC_GAIN_MANUAL, DEFAULT_INIT_MANUAL_EXPOSURE_GAIN);
 
     int32_t rc = commitParameters();
     if (rc == NO_ERROR) {
@@ -6181,47 +6174,32 @@ int32_t  QCameraParameters::setExposureTime(const char *expTimeStr)
 }
 
 /*===========================================================================
- * FUNCTION   : setExposureManualValue
+ * FUNCTION   : setManualExposure
  *
- * DESCRIPTION: set Exposure Manual value
+ * DESCRIPTION: set RAW Manual Exposure linecnt and gain
  *
  * PARAMETERS :
- *   @isoValue : Exposure value string
+ *   @exp_line : Exposure line count
+ *   @gain     : Exposure gain
  *
  * RETURN     : int32_t type of status
  *              NO_ERROR  -- success
  *              none-zero failure code
  *==========================================================================*/
-int32_t  QCameraParameters::setExposureManualValue(const char *exposureValue)
+int32_t  QCameraParameters::setManualExposure(const char * exp_line, const char * gain)
 {
-    int32_t exposure = atoi(exposureValue);
+    cam_manual_exposure_t manual_exp;
 
+    manual_exp.linecnt = (int32_t)(atoi(exp_line));
+    manual_exp.gain = (uint32_t)(atoi(gain)) / 256.0;
+
+    updateParamEntry(KEY_QC_EXPOSURE_MANUAL, exp_line);
+    updateParamEntry(KEY_QC_GAIN_MANUAL, gain);
+    CDBG_HIGH("%s: linecnt %d, gain %f", __func__, manual_exp.linecnt, manual_exp.gain);
     return AddSetParmEntryToBatch(m_pParamBuf,
-                                      CAM_INTF_PARM_EXPOSURE_MANUAL,
-                                      sizeof(exposure),
-                                      &exposure);
-}
-
-/*===========================================================================
- * FUNCTION   : setGainManualValue
- *
- * DESCRIPTION: set Gain Manual value
- *
- * PARAMETERS :
- *   @isoValue : Gain value string
- *
- * RETURN     : int32_t type of status
- *              NO_ERROR  -- success
- *              none-zero failure code
- *==========================================================================*/
-int32_t  QCameraParameters::setGainManualValue(const char *gainValue)
-{
-    int32_t gain = atoi(gainValue);
-
-    return AddSetParmEntryToBatch(m_pParamBuf,
-                                      CAM_INTF_PARM_GAIN_MANUAL,
-                                      sizeof(gain),
-                                      &gain);
+                                      CAM_INTF_PARM_RAW_MANUAL_EXPOSURE,
+                                      sizeof(cam_manual_exposure_t),
+                                      &manual_exp);
 }
 
 /*===========================================================================
