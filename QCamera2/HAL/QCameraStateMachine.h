@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2014, 2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -66,6 +66,7 @@ typedef enum {
     QCAMERA_SM_EVT_STOP_RECORDING,           // stop recording
     QCAMERA_SM_EVT_RECORDING_ENABLED,        // query if recording is running
     QCAMERA_SM_EVT_RELEASE_RECORIDNG_FRAME,  // release recording frame
+    QCAMERA_SM_EVT_RELEASE_PREVIEW_FRAME,    // release preview frame
 
     QCAMERA_SM_EVT_PREPARE_SNAPSHOT,         // prepare snapshot in case LED needs to be flashed
     QCAMERA_SM_EVT_TAKE_PICTURE,             // take picutre (zsl, regualr capture, live snapshot
