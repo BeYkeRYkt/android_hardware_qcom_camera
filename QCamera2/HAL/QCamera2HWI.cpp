@@ -1690,6 +1690,8 @@ uint8_t QCamera2HardwareInterface::getBufNumRequired(cam_stream_type_t stream_ty
         }
         break;
     case CAM_STREAM_TYPE_RAW:
+    //port ov7251 raw stream
+#if 0
         if (mParameters.isZSLMode()) {
             bufferCnt = zslQBuffers + minCircularBufNum;
             if (getSensorType() == CAM_SENSOR_YUV &&
@@ -1708,6 +1710,9 @@ uint8_t QCamera2HardwareInterface::getBufNumRequired(cam_stream_type_t stream_ty
                 bufferCnt = maxStreamBuf;
             }
         }
+#else
+        bufferCnt = 10;
+#endif
         break;
     case CAM_STREAM_TYPE_VIDEO:
         {
@@ -1953,7 +1958,6 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
            streamInfo->dim.height, streamInfo->num_bufs);
     switch (stream_type) {
     case CAM_STREAM_TYPE_SNAPSHOT:
-    case CAM_STREAM_TYPE_RAW:
         if ((mParameters.isZSLMode() && mParameters.getRecordingHintValue() != true) ||
                  mLongshotEnabled) {
             streamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
@@ -1965,6 +1969,10 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
                         - mParameters.getNumOfExtraHDROutBufsIfNeeded()
                         + mParameters.getNumOfExtraBuffersForImageProc());
         }
+        break;
+   //port ov7251 raw stream
+   case CAM_STREAM_TYPE_RAW:
+        streamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
         break;
     case CAM_STREAM_TYPE_POSTVIEW:
         if (mLongshotEnabled) {
@@ -4736,8 +4744,7 @@ int32_t QCamera2HardwareInterface::addStreamToChannel(QCameraChannel *pChannel,
 
     if ( ( streamType == CAM_STREAM_TYPE_SNAPSHOT ||
             streamType == CAM_STREAM_TYPE_POSTVIEW ||
-            streamType == CAM_STREAM_TYPE_METADATA ||
-            streamType == CAM_STREAM_TYPE_RAW) &&
+            streamType == CAM_STREAM_TYPE_METADATA) &&
             !isZSLMode() &&
             !isLongshotEnabled() &&
             !mParameters.getRecordingHintValue()) {
