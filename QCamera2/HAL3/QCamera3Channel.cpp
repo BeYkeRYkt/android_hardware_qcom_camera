@@ -79,7 +79,7 @@ QCamera3Channel::QCamera3Channel(uint32_t cam_handle,
     m_camOps = cam_ops;
     m_bIsActive = false;
     m_bUBWCenable = true;
-
+    mDewarpType = DEWARP_NONE;
     m_numStreams = 0;
     memset(mStreams, 0, sizeof(mStreams));
     mUserData = userData;
@@ -643,8 +643,42 @@ void QCamera3Channel::setUBWCEnabled(bool val)
     m_bUBWCenable = val;
 }
 
+
 /*===========================================================================
- * FUNCTION   : getStreamDefaultFormat
+ * FUNCTION   : setDewarpType
+ *
+ * DESCRIPTION: set dewarp type
+ *
+ * PARAMETERS : dewarp type values
+ *
+ * RETURN     : none
+ *
+ *==========================================================================*/
+void QCamera3Channel::setDewarpType(cam_dewarp_type_t val)
+{
+    mDewarpType = val;
+}
+
+
+/*===========================================================================
+ * FUNCTION   : getDewarpType
+ *
+ * DESCRIPTION: get dewarp type
+ *
+ * PARAMETERS : none
+ *
+ * RETURN     : dewarp type
+ *
+ *==========================================================================*/
+
+cam_dewarp_type_t QCamera3Channel::getDewarpType()
+{
+    return mDewarpType;
+}
+
+
+/*===========================================================================
+* FUNCTION   : getStreamDefaultFormat
  *
  * DESCRIPTION: return default buffer format for the stream
  *
@@ -882,10 +916,12 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
        if(hal_obj->mStreamConfig == true) {
           switch (stream->getMyType()) {
               case CAM_STREAM_TYPE_PREVIEW:
-                  LOGH("[KPI Perf] : PROFILE_FIRST_PREVIEW_FRAME");
+                  LOGI("[KPI Perf] : PROFILE_FIRST_PREVIEW_FRAME camera id %d",
+                        hal_obj->getCameraID());
                   break;
               case CAM_STREAM_TYPE_VIDEO:
-                  LOGH("[KPI Perf] : PROFILE_FIRST_VIDEO_FRAME");
+                  LOGI("[KPI Perf] : PROFILE_FIRST_VIDEO_FRAME camera id %d ",
+                        hal_obj->getCameraID());
                   break;
               default:
                   break;
@@ -1704,6 +1740,14 @@ void QCamera3ProcessingChannel::issueChannelCb(buffer_handle_t *resultBuffer,
  *==========================================================================*/
 void QCamera3ProcessingChannel::showDebugFPS(int32_t streamType)
 {
+    QCamera3HardwareInterface* hal_obj = (QCamera3HardwareInterface*)mUserData;
+    int cameraId = -1;
+    if (hal_obj != NULL) {
+        cameraId = hal_obj->getCameraId();
+    } else {
+        LOGE("Failed to get hal obj for cameraId");
+    }
+
     double fps = 0;
     mFrameCount++;
     nsecs_t now = systemTime();
@@ -1713,20 +1757,20 @@ void QCamera3ProcessingChannel::showDebugFPS(int32_t streamType)
                 (double)(s2ns(1))) / (double)diff;
         switch(streamType) {
             case CAM_STREAM_TYPE_PREVIEW:
-                LOGH("PROFILE_PREVIEW_FRAMES_PER_SECOND : %.4f: mFrameCount=%d",
-                         fps, mFrameCount);
+                LOGH("PROFILE_PREVIEW_FRAMES_PER_SECOND CAMERA %d: %.4f: mFrameCount=%d",
+                         cameraId, fps, mFrameCount);
                 break;
             case CAM_STREAM_TYPE_VIDEO:
-                LOGH("PROFILE_VIDEO_FRAMES_PER_SECOND : %.4f",
-                         fps);
+                LOGH("PROFILE_VIDEO_FRAMES_PER_SECOND CAMERA %d: %.4f",
+                         cameraId, fps);
                 break;
             case CAM_STREAM_TYPE_CALLBACK:
-                LOGH("PROFILE_CALLBACK_FRAMES_PER_SECOND : %.4f",
-                         fps);
+                LOGH("PROFILE_CALLBACK_FRAMES_PER_SECOND CAMERA %d: %.4f",
+                         cameraId, fps);
                 break;
             case CAM_STREAM_TYPE_RAW:
-                LOGH("PROFILE_RAW_FRAMES_PER_SECOND : %.4f",
-                         fps);
+                LOGH("PROFILE_RAW_FRAMES_PER_SECOND CAMERA %d: %.4f",
+                         cameraId, fps);
                 break;
             default:
                 LOGH("logging not supported for the stream");

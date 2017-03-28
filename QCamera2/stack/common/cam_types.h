@@ -708,6 +708,15 @@ typedef enum {
 } cam_ae_mode_type;
 
 typedef enum {
+    DEWARP_NONE,
+    DEWARP_LDC,
+    DEWARP_CUSTOM,
+    DEWARP_LDC_CUSTOM,
+    DEWARP_MAX
+} cam_dewarp_type_t;
+
+
+typedef enum {
     CAM_FOCUS_ALGO_AUTO,
     CAM_FOCUS_ALGO_SPOT,
     CAM_FOCUS_ALGO_CENTER_WEIGHTED,
@@ -992,6 +1001,7 @@ typedef enum {
     IS_TYPE_GA_DIS,
     IS_TYPE_EIS_2_0,
     IS_TYPE_EIS_3_0,
+    IS_TYPE_EIS_DG,
     IS_TYPE_MAX
 } cam_is_type_t;
 
@@ -1017,6 +1027,7 @@ typedef enum {
     CAM_EVENT_TYPE_INT_TAKE_RAW    = (1<<5),
     CAM_EVENT_TYPE_DAEMON_PULL_REQ = (1<<6),
     CAM_EVENT_TYPE_CAC_DONE        = (1<<7),
+    CAM_EVENT_TYPE_RESTART         = (1<<8),
     CAM_EVENT_TYPE_MAX
 } cam_event_type_t;
 
@@ -1772,9 +1783,10 @@ typedef enum {
 } cam_sync_type_t;
 
 typedef enum {
-    CAM_3A_SYNC_NONE,     /* Default for single camera, not link */
-    CAM_3A_SYNC_FOLLOW,   /* Master->Slave: Master updates slave */
-    CAM_3A_SYNC_ALGO_CTRL,/* Algorithm updated cameras directly */
+    CAM_3A_SYNC_NONE,       /* Default for single camera, not link */
+    CAM_3A_SYNC_FOLLOW,     /* Master->Slave: Master updates slave */
+    CAM_3A_SYNC_ALGO_CTRL,  /* Algorithm updated cameras directly */
+    CAM_3A_SYNC_360_CAMERA, /* 360 degree camera mode */
 } cam_3a_sync_mode_t;
 
 typedef enum {
@@ -1790,6 +1802,7 @@ typedef struct {
     cam_feature_mask_t postprocess_mask[MAX_NUM_STREAMS];
     cam_buffer_info_t buffer_info;
     cam_is_type_t is_type[MAX_NUM_STREAMS];
+    cam_dewarp_type_t dewarp_type[MAX_NUM_STREAMS];
     cam_hfr_mode_t hfr_mode;
     cam_format_t format[MAX_NUM_STREAMS];
     cam_rotation_t rotation[MAX_NUM_STREAMS];
@@ -1838,6 +1851,7 @@ typedef struct {
     uint32_t streamID;
     uint32_t buf_index;
 } cam_stream_request_t;
+
 
 typedef struct {
     uint32_t num_streams;
@@ -2436,6 +2450,9 @@ typedef enum {
     CAM_INTF_PARM_FLUSH_FRAMES,
     /* For camera exposure info */
     CAM_INTF_META_EXPOSURE_INFO, /* cam_exposure_data_t */
+
+    /* De warp type info */
+    CAM_INTF_META_DEWARP_MODE,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 

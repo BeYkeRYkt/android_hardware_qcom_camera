@@ -82,7 +82,15 @@ namespace qcamera {
 
 #define MAX_RAW_STREAMS        1
 #define MAX_STALLING_STREAMS   1
+
+/* DONOT Increase MAX_PROCESSED_STREAMS for LA as it will
+   result in CTS Failtures */
+#ifdef _LE_CAMERA_
+#define MAX_PROCESSED_STREAMS  6
+#else
 #define MAX_PROCESSED_STREAMS  3
+#endif
+
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #define PREVIEW_FPS_FOR_HFR    (30)
@@ -351,6 +359,15 @@ const QCamera3HardwareInterface::QCameraMap<
 };
 
 const QCamera3HardwareInterface::QCameraMap<
+        camera_metadata_enum_ext_dewarp_type_t,
+        cam_dewarp_type_t> QCamera3HardwareInterface::DEWARP_TYPE_MAP [] = {
+    {QCAMERA3_DEWARP_NONE,  DEWARP_NONE},
+    {QCAMERA3_DEWARP_LDC, DEWARP_LDC},
+    {QCAMERA3_DEWARP_CUSTOM, DEWARP_CUSTOM},
+    {QCAMERA3_DEWARP_LDC_CUSTOM, DEWARP_LDC_CUSTOM}
+};
+
+const QCamera3HardwareInterface::QCameraMap<
         qcamera3_ext_exposure_meter_mode_t,
         cam_auto_exposure_mode_type> QCamera3HardwareInterface::AEC_MODES_MAP[] = {
     { QCAMERA3_EXP_METER_MODE_FRAME_AVERAGE, CAM_AEC_MODE_FRAME_AVERAGE },
@@ -571,15 +588,15 @@ QCamera3HardwareInterface::~QCamera3HardwareInterface()
         if (mIsMainCamera == 1) {
             m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            // related session id should be session id of linked session
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         } else {
             m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         }
+
+        m_pRelCamSyncBuf->sync_3a_mode = mDualCam3ASyncMode;
+        // related session id should be session id of linked session
+        m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+
         pthread_mutex_unlock(&gCamLock);
 
         rc = mCameraHandle->ops->set_dual_cam_cmd(
@@ -759,6 +776,11 @@ void QCamera3HardwareInterface::camEvtHandle(uint32_t /*camera_handle*/,
                 obj->mWokenUpByDaemon = true;
                 obj->unblockRequestIfNecessary();
                 pthread_mutex_unlock(&obj->mMutex);
+                break;
+
+            case CAM_EVENT_TYPE_RESTART:
+                LOGE("Got RESTART EVENT ");
+                obj->flush(true);
                 break;
 
             default:
@@ -4240,6 +4262,7 @@ int QCamera3HardwareInterface::processCaptureRequest(
         mPerfLockMgr.acquirePerfLock(PERF_LOCK_START_PREVIEW);
         /* get eis information for stream configuration */
         cam_is_type_t isTypeVideo, isTypePreview, is_type=IS_TYPE_NONE;
+        cam_dewarp_type_t dewarp_type = DEWARP_NONE;
         char is_type_value[PROPERTY_VALUE_MAX];
         property_get("persist.camera.is_type", is_type_value, "4");
         isTypeVideo = static_cast<cam_is_type_t>(atoi(is_type_value));
@@ -4265,9 +4288,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
             setInstantAEC(meta);
         }
         uint8_t fwkVideoStabMode=0;
+        char ds_prop[PROPERTY_VALUE_MAX];
+        memset(ds_prop, 0, sizeof(ds_prop));
+        property_get("persist.camera.video.stab", ds_prop, "0");
+        fwkVideoStabMode = (uint8_t)atoi(ds_prop);
         if (meta.exists(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE)) {
-            fwkVideoStabMode = meta.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE).data.u8[0];
+            fwkVideoStabMode |= meta.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE).data.u8[0];
         }
+
 
         // If EIS setprop is enabled & if first capture setting has EIS enabled then only
         // turn it on for video/preview
@@ -4278,7 +4306,8 @@ int QCamera3HardwareInterface::processCaptureRequest(
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_DIS_ENABLE, vsMode)) {
             rc = BAD_VALUE;
         }
-        LOGD("setEis %d", setEis);
+        LOGD("setEis %d EisEnable:%d fwkVideoStabMode:%d EisSizesSupported:%d isTypeVideo:%d",
+                setEis,m_bEisEnable,fwkVideoStabMode,m_bEisSupportedSize,isTypeVideo);
         bool eis3Supported = false;
         size_t count = IS_TYPE_MAX;
         count = MIN(gCamCapability[mCameraId]->supported_is_types_cnt, count);
@@ -4287,6 +4316,19 @@ int QCamera3HardwareInterface::processCaptureRequest(
                 eis3Supported = true;
                 break;
             }
+        }
+        int32_t fwkDeWarpType = DEWARP_NONE;
+        memset(ds_prop, 0, sizeof(ds_prop));
+        property_get("persist.camera.dewarp.type", ds_prop, "0");
+        fwkDeWarpType = (uint8_t)atoi(ds_prop);
+
+        if (fwkDeWarpType == 0 && meta.exists(QCAMERA3_DEWARP_MODE)) {
+            fwkDeWarpType = meta.find(QCAMERA3_DEWARP_MODE).data.i32[0];
+        }
+
+        if((setEis == 1) && (isTypeVideo != IS_TYPE_EIS_DG) && (fwkDeWarpType != DEWARP_NONE)) {
+            fwkDeWarpType = DEWARP_NONE;
+            LOGE("Failed to set Dewarp type in EIS mode :%d",isTypeVideo);
         }
 
         //IS type will be 0 unless EIS is supported. If EIS is supported
@@ -4299,15 +4341,25 @@ int QCamera3HardwareInterface::processCaptureRequest(
                     if ( (isTypeVideo == IS_TYPE_EIS_3_0) && (eis3Supported == FALSE) ) {
                         LOGW(" EIS_3.0 is not supported and so setting EIS_2.0");
                         is_type = IS_TYPE_EIS_2_0;
-                    } else {
+                    } else if (isTypeVideo == IS_TYPE_EIS_DG) {
+                        LOGD(" EIS type is set to EIS_DG");
+                        is_type = IS_TYPE_EIS_DG;
+                    }
+                    else {
                         is_type = isTypeVideo;
                     }
                 } else {
                     is_type = IS_TYPE_NONE;
                 }
                  mStreamConfigInfo.is_type[i] = is_type;
+                 mStreamConfigInfo.dewarp_type[i] = (cam_dewarp_type_t)fwkDeWarpType;
             } else {
                  mStreamConfigInfo.is_type[i] = IS_TYPE_NONE;
+                 if (mStreamConfigInfo.type[i] == CAM_STREAM_TYPE_VIDEO ) {
+                     mStreamConfigInfo.dewarp_type[i] = (cam_dewarp_type_t)fwkDeWarpType;
+                 } else {
+                     mStreamConfigInfo.dewarp_type[i] = DEWARP_NONE;
+                 }
             }
         }
 
@@ -4405,13 +4457,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
         LOGD("set_parms META_STREAM_INFO " );
         for (uint32_t i = 0; i < mStreamConfigInfo.num_streams; i++) {
             LOGI("STREAM INFO : type %d, wxh: %d x %d, pp_mask: 0x%" PRIx64
-                    ", Format:%d is_type: %d",
+                    "Format:%d is_type: %d, dewarp_type:%d",
                     mStreamConfigInfo.type[i],
                     mStreamConfigInfo.stream_sizes[i].width,
                     mStreamConfigInfo.stream_sizes[i].height,
                     mStreamConfigInfo.postprocess_mask[i],
                     mStreamConfigInfo.format[i],
-                    mStreamConfigInfo.is_type[i]);
+                    mStreamConfigInfo.is_type[i],
+                    mStreamConfigInfo.dewarp_type[i]);
         }
 
         rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
@@ -4457,16 +4510,21 @@ int QCamera3HardwareInterface::processCaptureRequest(
             it != mStreamInfo.end(); it++) {
             QCamera3Channel *channel = (QCamera3Channel *)(*it)->stream->priv;
             if ((((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask()) ||
-               ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask())) &&
-               setEis) {
+                       ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()))) {
                 for (size_t i = 0; i < mStreamConfigInfo.num_streams; i++) {
                     if ( (1U << mStreamConfigInfo.type[i]) == channel->getStreamTypeMask() ) {
-                        is_type = mStreamConfigInfo.is_type[i];
+                        if(setEis)
+                            is_type = mStreamConfigInfo.is_type[i];
+                        else
+                            is_type = IS_TYPE_NONE;
+                        dewarp_type = mStreamConfigInfo.dewarp_type[i];
                         break;
                     }
                 }
+                channel->setDewarpType(dewarp_type);
                 rc = channel->initialize(is_type);
             } else {
+                channel->setDewarpType(DEWARP_NONE);
                 rc = channel->initialize(IS_TYPE_NONE);
             }
             if (NO_ERROR != rc) {
@@ -4545,6 +4603,68 @@ int QCamera3HardwareInterface::processCaptureRequest(
             }
         }
 
+        // Backward compatibility:
+        // Default Dual Camera sync mode is set to follow.
+        mDualCam3ASyncMode = CAM_3A_SYNC_FOLLOW;
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE)) {
+            uint8_t syncMode =
+                meta.find(QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE).data.u8[0];
+
+            switch (syncMode) {
+            case QCAMERA3_DUALCAM_LINK_3A_SYNC_NONE:
+                mDualCam3ASyncMode = CAM_3A_SYNC_NONE;
+                break;
+            case QCAMERA3_DUALCAM_LINK_3A_SYNC_FOLLOW:
+                mDualCam3ASyncMode = CAM_3A_SYNC_FOLLOW;
+                break;
+            case QCAMERA3_DUALCAM_LINK_3A_ALGO_CTRL:
+                mDualCam3ASyncMode = CAM_3A_SYNC_ALGO_CTRL;
+                break;
+            case QCAMERA3_DUALCAM_LINK_3A_360_CAMERA:
+                mDualCam3ASyncMode = CAM_3A_SYNC_360_CAMERA;
+                break;
+            default:
+                LOGE("Dualcam: 3ASyncMode %d is invalid, current cam id = %d",
+                    mDualCam3ASyncMode, mCameraId);
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+            LOGH("Dualcam: 3ASyncMode = %d id =%d",
+                mDualCam3ASyncMode, mCameraId);
+        }
+
+        // Backward compatibility:
+        // Default Camera role for main is bayer, for aux camera is mono
+        mDualCamRole = mIsMainCamera ? CAM_ROLE_BAYER : CAM_ROLE_MONO;
+        if (meta.exists(QCAMERA3_DUALCAM_LINK_CAMERA_ROLE)) {
+            uint8_t camRole =
+                meta.find(QCAMERA3_DUALCAM_LINK_CAMERA_ROLE).data.u8[0];
+
+            switch (camRole) {
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_DEFAULT:
+                mDualCamRole = CAM_ROLE_DEFAULT;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_BAYER:
+                mDualCamRole = CAM_ROLE_BAYER;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_MONO:
+                mDualCamRole = CAM_ROLE_MONO;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_WIDE:
+                mDualCamRole = CAM_ROLE_WIDE;
+                break;
+            case QCAMERA3_DUALCAM_LINK_CAMERA_ROLE_TELE:
+                mDualCamRole = CAM_ROLE_TELE;
+                break;
+            default:
+                LOGE("Dualcam: mDualCameraRole %d is invalid, current cam id = %d",
+                    camRole, mCameraId);
+                pthread_mutex_unlock(&mMutex);
+                goto error_exit;
+            }
+            LOGH("Dualcam: Camera role = %d id =%d", mDualCamRole, mCameraId);
+        }
+
         // add bundle related cameras
         LOGH("%s: Dualcam: id =%d, mIsDeviceLinked=%d", __func__,mCameraId, mIsDeviceLinked);
         if (meta.exists(QCAMERA3_DUALCAM_LINK_ENABLE)) {
@@ -4568,17 +4688,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
             if (mIsMainCamera == 1) {
                 m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
                 m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-                m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-                m_pRelCamSyncBuf->cam_role = CAM_ROLE_BAYER;
-                // related session id should be session id of linked session
-                m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
             } else {
                 m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
                 m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-                m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-                m_pRelCamSyncBuf->cam_role = CAM_ROLE_MONO;
-                m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
             }
+            m_pRelCamSyncBuf->sync_3a_mode = mDualCam3ASyncMode;
+            m_pRelCamSyncBuf->cam_role = mDualCamRole;
+            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+
             pthread_mutex_unlock(&gCamLock);
 
             rc = mCameraHandle->ops->set_dual_cam_cmd(
@@ -4768,6 +4885,7 @@ no_error:
     }
 
     if (blob_request) {
+        LOGI("[KPI Perf] : PROFILE_SNAPSHOT_REQUEST_RECEIVED");
         KPI_ATRACE_CAMSCOPE_INT("SNAPSHOT", CAMSCOPE_HAL3_SNAPSHOT, 1);
         mPerfLockMgr.acquirePerfLock(PERF_LOCK_TAKE_SNAPSHOT);
     }
@@ -5335,7 +5453,7 @@ int QCamera3HardwareInterface::flush(bool restartChannels)
     KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_STOP_PREVIEW);
     int32_t rc = NO_ERROR;
 
-    LOGD("Unblocking Process Capture Request");
+    LOGE("Unblocking Process Capture Request");
     pthread_mutex_lock(&mMutex);
     mFlush = true;
     pthread_mutex_unlock(&mMutex);
@@ -5352,15 +5470,15 @@ int QCamera3HardwareInterface::flush(bool restartChannels)
         if (mIsMainCamera == 1) {
             m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            // related session id should be session id of linked session
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         } else {
             m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
-            m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         }
+
+        m_pRelCamSyncBuf->sync_3a_mode = mDualCam3ASyncMode;
+        // related session id should be session id of linked session
+        m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
+
         pthread_mutex_unlock(&gCamLock);
 
         rc = mCameraHandle->ops->set_dual_cam_cmd(
@@ -6880,6 +6998,15 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                 (uint8_t *)(void *)mExifParams.debug_params,
                 sizeof(mm_jpeg_debug_exif_params_t));
     }
+
+
+    // DeWarp Modes
+    IF_META_AVAILABLE(cam_dewarp_type_t, dwarp, CAM_INTF_META_DEWARP_MODE, metadata) {
+        int32_t fwk_dewarp = (int32_t) *dwarp;
+        fwk_dewarp = (int32_t) *dwarp;
+        camMetadata.update(QCAMERA3_DEWARP_MODE, &fwk_dewarp, 1);
+    }
+
 
     // Reprocess and DDM debug data through vendor tag
     cam_reprocess_info_t repro_info;
@@ -9181,6 +9308,23 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
                 avail_binning_modes, size);
     }
 
+    if (gCamCapability[cameraId]->supported_dewarp_mode_cnt > 0) {
+        int32_t avail_dewarp_modes[DEWARP_MAX];
+        size = 0;
+        count = DEWARP_MAX;
+        count = MIN(gCamCapability[cameraId]->supported_dewarp_mode_cnt, count);
+        for (size_t i = 0; i < count; i++) {
+            int val = lookupFwkName(DEWARP_TYPE_MAP, METADATA_MAP_SIZE(DEWARP_TYPE_MAP),
+                     gCamCapability[cameraId]->supported_dewarp_modes[i]);
+            if (NAME_NOT_FOUND != val) {
+                avail_dewarp_modes[size] = (int32_t)val;
+                size++;
+            }
+        staticInfo.update(QCAMERA3_DEWARP_AVAILABLE_MODES,
+                avail_dewarp_modes, size);
+        }
+    }
+
     if (gCamCapability[cameraId]->supported_aec_modes_cnt > 0) {
         int32_t available_aec_modes[CAM_AEC_MODE_MAX];
         size = 0;
@@ -9238,6 +9382,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     int32_t enable[] = {QCAMERA3_EXPOSURE_DATA_ON, QCAMERA3_EXPOSURE_DATA_OFF};
     size = sizeof(enable) / sizeof (enable[0]);
     staticInfo.update(QCAMERA3_EXPOSURE_DATA_ENABLE, enable, size);
+
 
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
@@ -11493,6 +11638,21 @@ int QCamera3HardwareInterface::translateToHalMetadata
             rc = BAD_VALUE;
         }
     }
+
+    // Dewarp
+    if (frame_settings.exists(QCAMERA3_DEWARP_MODE)) {
+        cam_dewarp_type_t dewarp_type = (cam_dewarp_type_t )
+                frame_settings.find(QCAMERA3_DEWARP_MODE).data.i32[0];
+        if ((CAM_IR_MODE_MAX <= dewarp_type) || (0 > dewarp_type)) {
+            LOGE("Invalid DEWARP type %d!", dewarp_type);
+        } else {
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata,
+                    CAM_INTF_META_DEWARP_MODE, dewarp_type)) {
+                rc = BAD_VALUE;
+            }
+        }
+    }
+
 
     // EV step
     if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_EV_STEP,
