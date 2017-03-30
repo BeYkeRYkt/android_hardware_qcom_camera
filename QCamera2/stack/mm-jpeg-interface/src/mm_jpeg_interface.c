@@ -354,7 +354,9 @@ uint32_t jpeg_open(mm_jpeg_ops_t *ops, mm_jpeg_mpo_ops_t *mpo_ops,
   /* Highest log level among hal.logs and global.logs is selected */
   if (gMmJpegIntfLogLevel < globalLogLevel)
       gMmJpegIntfLogLevel = globalLogLevel;
-  if (gMmJpegIntfLogLevel < MINIMUM_JPEG_LOG_LEVEL)
+  /* if MINIMUM_JPEG_LOG_LEVE is 0 adding of 1 is work around for
+     error: comparison of unsigned expression < 0 is always false */
+  if ((gMmJpegIntfLogLevel + 1) < (MINIMUM_JPEG_LOG_LEVEL + 1))
       gMmJpegIntfLogLevel = MINIMUM_JPEG_LOG_LEVEL;
 
   pthread_mutex_lock(&g_intf_lock);
