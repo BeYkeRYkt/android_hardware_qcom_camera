@@ -28,6 +28,7 @@
 */
 #include "QCameraHAL3SnapshotTest.h"
 #include "QCameraHAL3MainTestContext.h"
+#include <sys/mman.h>
 
 
 namespace qcamera {
@@ -154,6 +155,7 @@ void QCameraHAL3SnapshotTest::snapshotTestEnd(
     camera3_device_t *device_handle = my_test_obj->device;
     device_handle->ops->flush(my_test_obj->device);
     LOGD("%s Closing Camera %d", __func__, camid);
+    munmap(mCaptureMemInfo.vaddr, mCaptureMemInfo.size);
     ioctl(mCaptureMemInfo.ion_fd, ION_IOC_FREE, &mCaptureMemInfo.ion_handle);
     close(mCaptureMemInfo.ion_fd);
     mCaptureMemInfo.ion_fd = -1;
