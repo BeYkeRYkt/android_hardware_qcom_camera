@@ -2947,7 +2947,7 @@ void QCamera3HardwareInterface::handleBatchMetadata(
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER_VALID, metadata);
     uint32_t *p_frame_number =
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER, metadata);
-    int64_t *p_capture_time =
+    cam_sensor_timestamp_t *p_sen_timestamp =
             POINTER_OF_META(CAM_INTF_META_SENSOR_TIMESTAMP, metadata);
     int32_t *p_urgent_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_URGENT_FRAME_NUMBER_VALID, metadata);
@@ -2955,14 +2955,14 @@ void QCamera3HardwareInterface::handleBatchMetadata(
             POINTER_OF_META(CAM_INTF_META_URGENT_FRAME_NUMBER, metadata);
 
     if ((NULL == p_frame_number_valid) || (NULL == p_frame_number) ||
-            (NULL == p_capture_time) || (NULL == p_urgent_frame_number_valid) ||
+            (NULL == p_sen_timestamp) || (NULL == p_urgent_frame_number_valid) ||
             (NULL == p_urgent_frame_number)) {
         LOGE("Invalid metadata");
         invalid_metadata = true;
     } else {
         frame_number_valid = *p_frame_number_valid;
         last_frame_number = *p_frame_number;
-        last_frame_capture_time = *p_capture_time;
+        last_frame_capture_time = p_sen_timestamp->exposure_start;
         urgent_frame_number_valid = *p_urgent_frame_number_valid;
         last_urgent_frame_number = *p_urgent_frame_number;
     }
@@ -3063,8 +3063,10 @@ void QCamera3HardwareInterface::handleBatchMetadata(
                         (((loopCount - 1) * NSEC_PER_SEC) / (double) mHFRVideoFps);
                 capture_time =
                         first_frame_capture_time + (i * NSEC_PER_SEC / (double) mHFRVideoFps);
+                cam_sensor_timestamp_t sen_timestamp;
+                sen_timestamp.exposure_start = capture_time;
                 ADD_SET_PARAM_ENTRY_TO_BATCH(metadata,
-                        CAM_INTF_META_SENSOR_TIMESTAMP, capture_time);
+                        CAM_INTF_META_SENSOR_TIMESTAMP, sen_timestamp);
                 LOGD("batch capture_time: %lld, capture_time: %lld",
                          last_frame_capture_time, capture_time);
             }
@@ -3139,7 +3141,8 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
     int32_t *p_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER_VALID, metadata);
     uint32_t *p_frame_number = POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER, metadata);
-    int64_t *p_capture_time = POINTER_OF_META(CAM_INTF_META_SENSOR_TIMESTAMP, metadata);
+    cam_sensor_timestamp_t *p_sen_timestamp =
+            POINTER_OF_META(CAM_INTF_META_SENSOR_TIMESTAMP, metadata);
     int32_t *p_urgent_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_URGENT_FRAME_NUMBER_VALID, metadata);
     uint32_t *p_urgent_frame_number =
@@ -3150,7 +3153,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
                  *p_frame_number_valid, *p_frame_number);
     }
 
-    if ((NULL == p_frame_number_valid) || (NULL == p_frame_number) || (NULL == p_capture_time) ||
+    if ((NULL == p_frame_number_valid) || (NULL == p_frame_number) || (NULL == p_sen_timestamp) ||
             (NULL == p_urgent_frame_number_valid) || (NULL == p_urgent_frame_number)) {
         LOGE("Invalid metadata");
         if (free_and_bufdone_meta_buf) {
@@ -3161,7 +3164,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
     }
     frame_number_valid =        *p_frame_number_valid;
     frame_number =              *p_frame_number;
-    capture_time =              *p_capture_time;
+    capture_time =              p_sen_timestamp->exposure_start;
     urgent_frame_number_valid = *p_urgent_frame_number_valid;
     urgent_frame_number =       *p_urgent_frame_number;
     currentSysTime =            systemTime(CLOCK_MONOTONIC);
@@ -6763,6 +6766,16 @@ QCamera3HardwareInterface::translateFromHalMetadata(
               mCurrFeatureState &= ~CAM_QCOM_FEATURE_IR;
         }
         camMetadata.update(QCAMERA3_IR_MODE, &fwk_ir, 1);
+    }
+    IF_META_AVAILABLE(cam_sensor_timestamp_t, p_sen_timestamp,
+                      CAM_INTF_META_SENSOR_TIMESTAMP, metadata) {
+        camMetadata.update(QCAMERA3_SENSOR_START_FRAME_READOUT,
+                           (int64_t *)&(p_sen_timestamp->start_frame_readout), 4);
+        camMetadata.update(QCAMERA3_SENSOR_FRAME_READOUT_DURATION,
+                           (int64_t *)&(p_sen_timestamp->frame_readout_duration), 4);
+        LOGD("sof_timestamp: %lld, frame_readout_duration: %lld",
+             p_sen_timestamp->start_frame_readout,
+             p_sen_timestamp->frame_readout_duration);
     }
 
     IF_META_AVAILABLE(cam_exposure_data_t, exposure, CAM_INTF_META_EXPOSURE_INFO, metadata) {
