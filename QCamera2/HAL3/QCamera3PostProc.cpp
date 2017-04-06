@@ -623,9 +623,10 @@ bool QCamera3PostProcessor::needsReprocess(qcamera_fwk_input_pp_data_t *frame)
     }
 
     // noise reduction
-    IF_META_AVAILABLE(uint32_t, noiseRedMode,
-            CAM_INTF_META_NOISE_REDUCTION_MODE, meta) {
-        noiseRedModeOn = (CAM_NOISE_REDUCTION_MODE_OFF != *noiseRedMode);
+    IF_META_AVAILABLE(cam_denoise_param_t, denoise_config,
+        CAM_INTF_META_NOISE_REDUCTION_MODE, meta) {
+        noiseRedModeOn = (CAM_NOISE_REDUCTION_MODE_OFF !=
+                ((cam_denoise_param_t *)denoise_config)->denoise_enable);
     }
 
     IF_META_AVAILABLE(uint8_t, reprocess_flags,

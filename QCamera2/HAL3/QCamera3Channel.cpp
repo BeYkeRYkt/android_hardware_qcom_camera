@@ -79,7 +79,7 @@ QCamera3Channel::QCamera3Channel(uint32_t cam_handle,
     m_camOps = cam_ops;
     m_bIsActive = false;
     m_bUBWCenable = true;
-
+    mDewarpType = DEWARP_NONE;
     m_numStreams = 0;
     memset(mStreams, 0, sizeof(mStreams));
     mUserData = userData;
@@ -643,8 +643,42 @@ void QCamera3Channel::setUBWCEnabled(bool val)
     m_bUBWCenable = val;
 }
 
+
 /*===========================================================================
- * FUNCTION   : getStreamDefaultFormat
+ * FUNCTION   : setDewarpType
+ *
+ * DESCRIPTION: set dewarp type
+ *
+ * PARAMETERS : dewarp type values
+ *
+ * RETURN     : none
+ *
+ *==========================================================================*/
+void QCamera3Channel::setDewarpType(cam_dewarp_type_t val)
+{
+    mDewarpType = val;
+}
+
+
+/*===========================================================================
+ * FUNCTION   : getDewarpType
+ *
+ * DESCRIPTION: get dewarp type
+ *
+ * PARAMETERS : none
+ *
+ * RETURN     : dewarp type
+ *
+ *==========================================================================*/
+
+cam_dewarp_type_t QCamera3Channel::getDewarpType()
+{
+    return mDewarpType;
+}
+
+
+/*===========================================================================
+* FUNCTION   : getStreamDefaultFormat
  *
  * DESCRIPTION: return default buffer format for the stream
  *
@@ -657,6 +691,7 @@ cam_format_t QCamera3Channel::getStreamDefaultFormat(cam_stream_type_t type,
         uint32_t width, uint32_t height)
 {
     cam_format_t streamFormat;
+    QCamera3HardwareInterface* hal_obj = (QCamera3HardwareInterface*)mUserData;
 
     switch (type) {
     case CAM_STREAM_TYPE_PREVIEW:
@@ -708,7 +743,7 @@ cam_format_t QCamera3Channel::getStreamDefaultFormat(cam_stream_type_t type,
         streamFormat = CALLBACK_STREAM_FORMAT;
         break;
     case CAM_STREAM_TYPE_RAW:
-        streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG;
+        streamFormat = hal_obj->mRdiModeFmt;
         break;
     default:
         streamFormat = CAM_FORMAT_YUV_420_NV21;
@@ -881,10 +916,12 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
        if(hal_obj->mStreamConfig == true) {
           switch (stream->getMyType()) {
               case CAM_STREAM_TYPE_PREVIEW:
-                  LOGH("[KPI Perf] : PROFILE_FIRST_PREVIEW_FRAME");
+                  LOGI("[KPI Perf] : PROFILE_FIRST_PREVIEW_FRAME camera id %d",
+                        hal_obj->getCameraID());
                   break;
               case CAM_STREAM_TYPE_VIDEO:
-                  LOGH("[KPI Perf] : PROFILE_FIRST_VIDEO_FRAME");
+                  LOGI("[KPI Perf] : PROFILE_FIRST_VIDEO_FRAME camera id %d ",
+                        hal_obj->getCameraID());
                   break;
               default:
                   break;
@@ -1517,7 +1554,12 @@ int32_t QCamera3ProcessingChannel::translateStreamTypeAndFormat(camera3_stream_t
         case HAL_PIXEL_FORMAT_RAW16:
         case HAL_PIXEL_FORMAT_RAW10:
             streamType = CAM_STREAM_TYPE_RAW;
-            streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG;
+            streamFormat = getStreamDefaultFormat(CAM_STREAM_TYPE_RAW,
+                    stream->width, stream->height);
+            break;
+        case HAL_PIXEL_FORMAT_RAW12:
+            streamType = CAM_STREAM_TYPE_RAW;
+            streamFormat = CAM_FORMAT_BAYER_MIPI_RAW_12BPP_RGGB;
             break;
         default:
             return -EINVAL;
@@ -1567,6 +1609,7 @@ int32_t QCamera3ProcessingChannel::setReprocConfig(reprocess_config_t &reproc_cf
     reproc_cfg.output_stream_dim.width = mCamera3Stream->width;
     reproc_cfg.output_stream_dim.height = mCamera3Stream->height;
     reproc_cfg.reprocess_type = getReprocessType();
+    reproc_cfg.output_stream_format = streamFormat;
 
     //offset calculation
     if (NULL != pInputBuffer) {
@@ -1697,6 +1740,14 @@ void QCamera3ProcessingChannel::issueChannelCb(buffer_handle_t *resultBuffer,
  *==========================================================================*/
 void QCamera3ProcessingChannel::showDebugFPS(int32_t streamType)
 {
+    QCamera3HardwareInterface* hal_obj = (QCamera3HardwareInterface*)mUserData;
+    int cameraId = -1;
+    if (hal_obj != NULL) {
+        cameraId = hal_obj->getCameraId();
+    } else {
+        LOGE("Failed to get hal obj for cameraId");
+    }
+
     double fps = 0;
     mFrameCount++;
     nsecs_t now = systemTime();
@@ -1706,20 +1757,20 @@ void QCamera3ProcessingChannel::showDebugFPS(int32_t streamType)
                 (double)(s2ns(1))) / (double)diff;
         switch(streamType) {
             case CAM_STREAM_TYPE_PREVIEW:
-                LOGH("PROFILE_PREVIEW_FRAMES_PER_SECOND : %.4f: mFrameCount=%d",
-                         fps, mFrameCount);
+                LOGH("PROFILE_PREVIEW_FRAMES_PER_SECOND CAMERA %d: %.4f: mFrameCount=%d",
+                         cameraId, fps, mFrameCount);
                 break;
             case CAM_STREAM_TYPE_VIDEO:
-                LOGH("PROFILE_VIDEO_FRAMES_PER_SECOND : %.4f",
-                         fps);
+                LOGH("PROFILE_VIDEO_FRAMES_PER_SECOND CAMERA %d: %.4f",
+                         cameraId, fps);
                 break;
             case CAM_STREAM_TYPE_CALLBACK:
-                LOGH("PROFILE_CALLBACK_FRAMES_PER_SECOND : %.4f",
-                         fps);
+                LOGH("PROFILE_CALLBACK_FRAMES_PER_SECOND CAMERA %d: %.4f",
+                         cameraId, fps);
                 break;
             case CAM_STREAM_TYPE_RAW:
-                LOGH("PROFILE_RAW_FRAMES_PER_SECOND : %.4f",
-                         fps);
+                LOGH("PROFILE_RAW_FRAMES_PER_SECOND CAMERA %d: %.4f",
+                         cameraId, fps);
                 break;
             default:
                 LOGH("logging not supported for the stream");
@@ -3052,9 +3103,9 @@ bool QCamera3YUVChannel::needsFramePostprocessing(metadata_buffer_t *meta)
     }
 
     //wnr
-    IF_META_AVAILABLE(uint32_t, noiseRedMode,
+    IF_META_AVAILABLE(cam_denoise_param_t, denoise_config,
             CAM_INTF_META_NOISE_REDUCTION_MODE, meta) {
-        mNoiseRedMode = *noiseRedMode;
+        mNoiseRedMode = ((cam_denoise_param_t *)denoise_config)->denoise_enable;
     }
 
     //crop region
@@ -3251,7 +3302,7 @@ void QCamera3PicChannel::jpegEvtHandle(jpeg_job_status_t status,
                     }
 
                     size_t jpeg_eof_offset =
-                            (size_t)(maxJpegSize - (ssize_t)sizeof(jpegHeader));
+                            (size_t)(maxJpegSize - (ssize_t)sizeof(jpegHeader) - 1);
                     char *jpeg_eof = &jpeg_buf[jpeg_eof_offset];
                     memcpy(jpeg_eof, &jpegHeader, sizeof(jpegHeader));
                     obj->mMemory.cleanInvalidateCache(bufIdx);
@@ -4926,6 +4977,7 @@ int32_t QCamera3ReprocessChannel::addReprocStreamsFromSource(cam_pp_feature_conf
     cam_stream_type_t streamType;
 
     cam_dimension_t streamDim = src_config.output_stream_dim;
+    cam_format_t streamFormat = src_config.output_stream_format;
 
     if (NULL != src_config.src_channel) {
         QCamera3Stream *pSrcStream = src_config.src_channel->getStreamByIndex(0);
@@ -4957,7 +5009,7 @@ int32_t QCamera3ReprocessChannel::addReprocStreamsFromSource(cam_pp_feature_conf
         return NO_MEMORY;
     }
 
-    rc = pStream->init(streamType, src_config.stream_format,
+    rc = pStream->init(streamType, streamFormat,
             streamDim, ROTATE_0, &reprocess_config,
             (uint8_t)mNumBuffers,
             reprocess_config.pp_feature_config.feature_mask,

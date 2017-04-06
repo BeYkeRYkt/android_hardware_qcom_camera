@@ -647,6 +647,8 @@ typedef struct cam_capability{
     size_t supported_binning_correction_mode_cnt;
     cam_binning_correction_mode_t supported_binning_modes[CAM_BINNING_CORRECTION_MODE_MAX];
 
+    cam_wnr_intensity_range_t wnr_range;
+
     /*camera index*/
     uint32_t camera_index;
 
@@ -657,6 +659,12 @@ typedef struct cam_capability{
 
     /*Available Spatial Alignment solutions*/
     uint32_t avail_spatial_align_solns;
+
+    /* tnr tuning */
+    cam_tnr_tuning_t tnr_tuning_ctrl;
+    /* Supported DeWarp Mode */
+    size_t supported_dewarp_mode_cnt;
+    cam_dewarp_type_t supported_dewarp_modes[DEWARP_MAX];
 } cam_capability_t;
 
 typedef enum {
@@ -767,6 +775,9 @@ typedef struct cam_stream_info {
 
     /* Image Stabilization type */
     cam_is_type_t is_type;
+
+    /* Dewarping Type */
+    cam_dewarp_type_t dewarp_type;
 
     /* Signifies Secure stream mode */
     cam_stream_secure_t is_secure;
@@ -964,7 +975,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_LENS_OPT_STAB_MODE,           cam_ois_mode_t,              1);
     INCLUDE(CAM_INTF_META_VIDEO_STAB_MODE,              uint32_t,                    1);
     INCLUDE(CAM_INTF_META_LENS_FOCUS_STATE,             uint32_t,                    1);
-    INCLUDE(CAM_INTF_META_NOISE_REDUCTION_MODE,         uint32_t,                    1);
+    INCLUDE(CAM_INTF_META_NOISE_REDUCTION_MODE,         cam_denoise_param_t,         1);
     INCLUDE(CAM_INTF_META_NOISE_REDUCTION_STRENGTH,     uint32_t,                    1);
     INCLUDE(CAM_INTF_META_SCALER_CROP_REGION,           cam_crop_region_t,           1);
     INCLUDE(CAM_INTF_META_SCENE_FLICKER,                uint32_t,                    1);
@@ -1148,6 +1159,10 @@ typedef struct {
     INCLUDE(CAM_INTF_META_AF_OBJ_DIST_CM,               int32_t,                     1);
     INCLUDE(CAM_INTF_META_BINNING_CORRECTION_MODE,      cam_binning_correction_mode_t,  1);
     INCLUDE(CAM_INTF_META_OIS_READ_DATA,                cam_ois_data_t,              1);
+    INCLUDE(CAM_INTF_META_EXPOSURE_INFO,                cam_exposure_data_t,         1);
+    INCLUDE(CAM_INTF_META_TNR_INTENSITY,                float,                       1);
+    INCLUDE(CAM_INTF_META_TNR_MOTION_SENSITIVITY,       float,                       1);
+    INCLUDE(CAM_INTF_META_DEWARP_MODE,                  cam_dewarp_type_t,  1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to

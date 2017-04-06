@@ -274,6 +274,7 @@ public:
     bool isMainCamera() {return mIsMainCamera;}
     uint32_t getSensorMountAngle();
     const cam_related_system_calibration_data_t *getRelatedCalibrationData();
+    int getCameraId() {return mCameraId;}
 
     template <typename fwkType, typename halType> struct QCameraMap {
         fwkType fwk_name;
@@ -285,7 +286,7 @@ public:
         cam_cds_mode_type_t val;
     } QCameraPropMap;
 
-
+    uint32_t getCameraID() {return mCameraId;}
 private:
 
     // State transition conditions:
@@ -316,6 +317,7 @@ private:
         CONFIGURED,
         STARTED,
         ERROR,
+        RESTART,
         DEINIT
     } State;
 
@@ -545,6 +547,7 @@ public:
     uint32_t mOpMode;
     bool mStreamConfig;
     QCameraCommon   mCommon;
+    cam_format_t mRdiModeFmt;
 private:
     uint32_t mFirstFrameNumberInBatch;
     camera3_stream_t mDummyBatchStream;
@@ -598,6 +601,8 @@ private:
             cam_test_pattern_mode_t> TEST_PATTERN_MAP[];
     static const QCameraMap<camera_metadata_enum_android_video_hdr_mode_t,
             cam_video_hdr_mode_t> VIDEO_HDR_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_android_exposure_t,
+            cam_exposure_data_enb_t> EXPOSURE_MAP[];
     static const QCameraMap<camera_metadata_enum_android_sensor_reference_illuminant1_t,
             cam_illuminat_t> REFERENCE_ILLUMINANT_MAP[];
     static const QCameraMap<int32_t,
@@ -612,6 +617,8 @@ private:
             cam_auto_exposure_mode_type> AEC_MODES_MAP[];
     static const QCameraMap<qcamera3_ext_iso_mode_t,
             cam_iso_mode_type> ISO_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_ext_dewarp_type_t,
+            cam_dewarp_type_t> DEWARP_TYPE_MAP[];
     static const QCameraPropMap CDS_MAP[];
 
     pendingRequestIterator erasePendingRequest(pendingRequestIterator i);
@@ -625,6 +632,9 @@ private:
     bool mIsDeviceLinked;
     bool mIsMainCamera;
     uint8_t mLinkedCameraId;
+    cam_dual_camera_role_t mDualCamRole;
+    cam_3a_sync_mode_t mDualCam3ASyncMode;
+
     QCamera3HeapMemory *m_pDualCamCmdHeap;
     cam_dual_camera_cmd_info_t *m_pDualCamCmdPtr;
     cam_sync_related_sensors_event_info_t m_relCamSyncInfo;
@@ -632,6 +642,7 @@ private:
     bool m_bSensorHDREnabled;
 
     uint8_t mCurrentSceneMode;
+    bool m_bOfflineIsp;
 };
 
 }; // namespace qcamera
