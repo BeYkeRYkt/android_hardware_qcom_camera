@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -68,37 +68,7 @@ extern pthread_mutex_t gCamLock;
 volatile uint32_t gCamHalLogLevel = 0;
 extern uint8_t gNumCameraSessions;
 
-camera_device_ops_t QCamera2HardwareInterface::mCameraOps = {
-    set_preview_window:         QCamera2HardwareInterface::set_preview_window,
-    set_callbacks:              QCamera2HardwareInterface::set_CallBacks,
-    enable_msg_type:            QCamera2HardwareInterface::enable_msg_type,
-    disable_msg_type:           QCamera2HardwareInterface::disable_msg_type,
-    msg_type_enabled:           QCamera2HardwareInterface::msg_type_enabled,
-
-    start_preview:              QCamera2HardwareInterface::start_preview,
-    stop_preview:               QCamera2HardwareInterface::stop_preview,
-    preview_enabled:            QCamera2HardwareInterface::preview_enabled,
-    store_meta_data_in_buffers: QCamera2HardwareInterface::store_meta_data_in_buffers,
-
-    start_recording:            QCamera2HardwareInterface::start_recording,
-    stop_recording:             QCamera2HardwareInterface::stop_recording,
-    recording_enabled:          QCamera2HardwareInterface::recording_enabled,
-    release_recording_frame:    QCamera2HardwareInterface::release_recording_frame,
-
-    auto_focus:                 QCamera2HardwareInterface::auto_focus,
-    cancel_auto_focus:          QCamera2HardwareInterface::cancel_auto_focus,
-
-    take_picture:               QCamera2HardwareInterface::take_picture,
-    cancel_picture:             QCamera2HardwareInterface::cancel_picture,
-
-    set_parameters:             QCamera2HardwareInterface::set_parameters,
-    get_parameters:             QCamera2HardwareInterface::get_parameters,
-    put_parameters:             QCamera2HardwareInterface::put_parameters,
-    send_command:               QCamera2HardwareInterface::send_command,
-
-    release:                    QCamera2HardwareInterface::release,
-    dump:                       QCamera2HardwareInterface::dump,
-};
+camera_device_ops_ext QCamera2HardwareInterface::mCameraOps;
 
 /*===========================================================================
  * FUNCTION   : set_preview_window
@@ -561,6 +531,38 @@ void QCamera2HardwareInterface::release_recording_frame(
     }
     hw->unlockAPI();
     CDBG("%s: X", __func__);
+}
+
+
+/*===========================================================================
+ * FUNCTION   : release_preview_frame
+ *
+ * DESCRIPTION: return preview frame back
+ *
+ * PARAMETERS :
+ *   @device  : ptr to camera device struct
+ *   @opaque  : ptr to frame to be returned
+ *
+ * RETURN     : none
+ *==========================================================================*/
+void QCamera2HardwareInterface::release_preview_frame(
+            struct camera_device *device, const void *opaque)
+{
+    QCamera2HardwareInterface *hw =
+        reinterpret_cast<QCamera2HardwareInterface *>(device->priv);
+    if (!hw) {
+        ALOGE("NULL camera device");
+        return;
+    }
+    ALOGD("%s: E", __func__);
+    hw->lockAPI();
+    qcamera_api_result_t apiResult;
+    int32_t ret = hw->processAPI(QCAMERA_SM_EVT_RELEASE_PREVIEW_FRAME, (void *)opaque);
+    if (ret == NO_ERROR) {
+        hw->waitAPIResult(QCAMERA_SM_EVT_RELEASE_PREVIEW_FRAME,&apiResult);
+    }
+    hw->unlockAPI();
+    ALOGD("%s: X", __func__);
 }
 
 /*===========================================================================
@@ -1050,7 +1052,35 @@ QCamera2HardwareInterface::QCamera2HardwareInterface(uint32_t cameraId)
     mCameraDevice.common.tag = HARDWARE_DEVICE_TAG;
     mCameraDevice.common.version = HARDWARE_DEVICE_API_VERSION(1, 0);
     mCameraDevice.common.close = close_camera_device;
-    mCameraDevice.ops = &mCameraOps;
+
+    /* Initialize the ops */
+    mCameraOps.set_preview_window =        set_preview_window;
+    mCameraOps.set_callbacks =             set_CallBacks;
+    mCameraOps.enable_msg_type =           enable_msg_type;
+    mCameraOps.disable_msg_type =          disable_msg_type;
+    mCameraOps.msg_type_enabled =          msg_type_enabled;
+    mCameraOps.start_preview =             start_preview;
+    mCameraOps.stop_preview =              stop_preview;
+    mCameraOps.preview_enabled =           preview_enabled;
+    mCameraOps.store_meta_data_in_buffers= store_meta_data_in_buffers;
+    mCameraOps.start_recording =           start_recording;
+    mCameraOps.stop_recording =            stop_recording;
+    mCameraOps.recording_enabled =         recording_enabled;
+    mCameraOps.release_recording_frame =   release_recording_frame;
+    mCameraOps.release_preview_frame =     release_preview_frame;
+    mCameraOps.auto_focus =                auto_focus;
+    mCameraOps.cancel_auto_focus =         cancel_auto_focus;
+    mCameraOps.take_picture =              take_picture;
+    mCameraOps.cancel_picture =            cancel_picture;
+    mCameraOps.set_parameters =            set_parameters;
+    mCameraOps.get_parameters =            get_parameters;
+    mCameraOps.put_parameters =            put_parameters;
+    mCameraOps.send_command =              send_command;
+    mCameraOps.release =                   release;
+    mCameraOps.dump =                      dump;
+
+    mCameraDevice.ops = (camera_device_ops *) &mCameraOps;
+
     mCameraDevice.priv = this;
 
     pthread_mutex_init(&m_lock, NULL);
@@ -1660,6 +1690,8 @@ uint8_t QCamera2HardwareInterface::getBufNumRequired(cam_stream_type_t stream_ty
         }
         break;
     case CAM_STREAM_TYPE_RAW:
+    //port ov7251 raw stream
+#if 0
         if (mParameters.isZSLMode()) {
             bufferCnt = zslQBuffers + minCircularBufNum;
             if (getSensorType() == CAM_SENSOR_YUV &&
@@ -1678,6 +1710,9 @@ uint8_t QCamera2HardwareInterface::getBufNumRequired(cam_stream_type_t stream_ty
                 bufferCnt = maxStreamBuf;
             }
         }
+#else
+        bufferCnt = 10;
+#endif
         break;
     case CAM_STREAM_TYPE_VIDEO:
         {
@@ -1923,7 +1958,6 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
            streamInfo->dim.height, streamInfo->num_bufs);
     switch (stream_type) {
     case CAM_STREAM_TYPE_SNAPSHOT:
-    case CAM_STREAM_TYPE_RAW:
         if ((mParameters.isZSLMode() && mParameters.getRecordingHintValue() != true) ||
                  mLongshotEnabled) {
             streamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
@@ -1935,6 +1969,10 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
                         - mParameters.getNumOfExtraHDROutBufsIfNeeded()
                         + mParameters.getNumOfExtraBuffersForImageProc());
         }
+        break;
+   //port ov7251 raw stream
+   case CAM_STREAM_TYPE_RAW:
+        streamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
         break;
     case CAM_STREAM_TYPE_POSTVIEW:
         if (mLongshotEnabled) {
@@ -2330,6 +2368,18 @@ int QCamera2HardwareInterface::releaseRecordingFrame(const void * opaque)
     QCameraVideoChannel *pChannel =
         (QCameraVideoChannel *)m_channels[QCAMERA_CH_TYPE_VIDEO];
     CDBG("%s: opaque data = %p", __func__,opaque);
+    if(pChannel != NULL) {
+        rc = pChannel->releaseFrame(opaque, mStoreMetaDataInFrame > 0);
+    }
+    return rc;
+}
+
+int QCamera2HardwareInterface::releasePreviewFrame(const void * opaque)
+{
+    int32_t rc = UNKNOWN_ERROR;
+    QCameraChannel *pChannel =
+        (QCameraChannel *)m_channels[QCAMERA_CH_TYPE_PREVIEW];
+    ALOGD("%s: opaque data = %p", __func__,opaque);
     if(pChannel != NULL) {
         rc = pChannel->releaseFrame(opaque, mStoreMetaDataInFrame > 0);
     }
@@ -4694,8 +4744,7 @@ int32_t QCamera2HardwareInterface::addStreamToChannel(QCameraChannel *pChannel,
 
     if ( ( streamType == CAM_STREAM_TYPE_SNAPSHOT ||
             streamType == CAM_STREAM_TYPE_POSTVIEW ||
-            streamType == CAM_STREAM_TYPE_METADATA ||
-            streamType == CAM_STREAM_TYPE_RAW) &&
+            streamType == CAM_STREAM_TYPE_METADATA) &&
             !isZSLMode() &&
             !isLongshotEnabled() &&
             !mParameters.getRecordingHintValue()) {
@@ -4816,8 +4865,16 @@ int32_t QCamera2HardwareInterface::addPreviewChannel()
     }
 
     if (isNoDisplayMode()) {
-        rc = addStreamToChannel(pChannel, CAM_STREAM_TYPE_PREVIEW,
+        cam_format_t format; /* OV7251 RAW inferface bringup*/
+        mParameters.getStreamFormat( CAM_STREAM_TYPE_PREVIEW, format );
+        if( (format >= CAM_FORMAT_BAYER_MIPI_RAW_8BPP_GBRG) &&
+             (format <= CAM_FORMAT_BAYER_MIPI_RAW_12BPP_BGGR)) {
+            rc = addStreamToChannel(pChannel, CAM_STREAM_TYPE_RAW,
+                    nodisplay_preview_stream_raw_cb_routine, this);
+        } else {
+            rc = addStreamToChannel(pChannel, CAM_STREAM_TYPE_PREVIEW,
                                 nodisplay_preview_stream_cb_routine, this);
+        }
     } else {
         rc = addStreamToChannel(pChannel, CAM_STREAM_TYPE_PREVIEW,
                                 preview_stream_cb_routine, this);

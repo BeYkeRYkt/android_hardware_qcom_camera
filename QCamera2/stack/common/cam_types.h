@@ -532,6 +532,11 @@ typedef struct {
     };
 } cam_manual_wb_parm_t;
 
+typedef struct {
+    float gain;
+    int32_t linecnt;
+} cam_manual_exposure_t;
+
 typedef enum {
     CAM_SCENE_MODE_OFF,
     CAM_SCENE_MODE_AUTO,
@@ -1145,6 +1150,7 @@ typedef enum {
     CAM_INTF_PARM_BRIGHTNESS,
     CAM_INTF_PARM_ISO,
     CAM_INTF_PARM_EXPOSURE_TIME,
+    CAM_INTF_PARM_RAW_MANUAL_EXPOSURE,
     CAM_INTF_PARM_ZOOM, /* 20 */
     CAM_INTF_PARM_ROLLOFF,
     CAM_INTF_PARM_MODE,             /* camera mode */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2015, 2017, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -582,6 +582,33 @@ int32_t QCameraChannel::UpdateStreamBasedParameters(QCameraParameters &param)
         }
     }
     return rc;
+}
+
+int32_t QCameraChannel::releaseFrame(const void * opaque, bool isMetaData)
+{
+    QCameraStream *pStream = NULL;
+    QCameraStream *rStream = NULL;
+    for (int i = 0; i < mStreams.size(); i++) {
+        if (mStreams[i] != NULL) {
+            if (mStreams[i]->isTypeOf(CAM_STREAM_TYPE_PREVIEW)) {
+                pStream = mStreams[i];
+                break;
+            } else if (mStreams[i]->isTypeOf(CAM_STREAM_TYPE_RAW)) {
+                rStream = mStreams[i];
+            }
+        }
+    }
+
+    if (NULL == pStream) {
+        if ( NULL == rStream) {
+            ALOGE("%s: No preview & raw stream in the channel", __func__);
+            return BAD_VALUE;
+        }
+        pStream = rStream;
+        CDBG("%s: Release the raw stream instead of preview", __func__);
+    }
+
+    return pStream->bufDone(opaque, false);
 }
 
 /*===========================================================================

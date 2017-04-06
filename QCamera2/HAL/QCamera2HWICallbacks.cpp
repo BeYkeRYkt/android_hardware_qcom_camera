@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -929,6 +929,76 @@ int32_t QCamera2HardwareInterface::sendPreviewCallback(QCameraStream *stream,
 }
 
 /*===========================================================================
+ * FUNCTION   : nodisplay_preview_stream_raw_cb_routine
+ *
+ * DESCRIPTION: helper function to handle post frame from preview_raw_stream
+ *
+ * PARAMETERS :
+ *   @super_frame : received super buffer
+ *   @stream      : stream object
+ *   @userdata    : user data ptr
+ *
+ * RETURN    : None
+ *
+ * NOTE      : caller passes the ownership of super_frame, it's our
+ *             responsibility to free super_frame once it's done.
+ *==========================================================================*/
+
+void QCamera2HardwareInterface::nodisplay_preview_stream_raw_cb_routine(
+                                                          mm_camera_super_buf_t *super_frame,
+                                                          QCameraStream *stream,
+                                                          void * userdata)
+{
+    ATRACE_CALL();
+    QCamera2HardwareInterface *pme = (QCamera2HardwareInterface *)userdata;
+    if (pme == NULL ||
+        pme->mCameraHandle == NULL ||
+        pme->mCameraHandle->camera_handle != super_frame->camera_handle){
+        ALOGE("%s: camera obj not valid", __func__);
+        // simply free super frame
+        free(super_frame);
+        return;
+    }
+    mm_camera_buf_def_t *frame = super_frame->bufs[0];
+    if (NULL == frame) {
+        ALOGE("%s: preview frame is NLUL", __func__);
+        free(super_frame);
+        return;
+    }
+
+    nsecs_t timeStamp;
+    if(pme->mParameters.isAVTimerEnabled() == true) {
+        timeStamp = (nsecs_t)((frame->ts.tv_sec * 1000000LL) + frame->ts.tv_nsec) * 1000;
+    } else {
+        timeStamp = nsecs_t(frame->ts.tv_sec) * 1000000000LL + frame->ts.tv_nsec;
+    }
+    QCameraMemory *previewMemObj = (QCameraMemory *)frame->mem_info;
+    camera_memory_t *preview_mem = NULL;
+    if (previewMemObj != NULL) {
+        preview_mem = previewMemObj->getMemory(frame->buf_idx, false);
+    }
+    if (NULL != previewMemObj && NULL != preview_mem) {
+        pme->dumpFrameToFile(stream, frame, QCAMERA_DUMP_FRM_PREVIEW);
+        if ( pme->mDataCb != NULL ) {
+            qcamera_callback_argm_t cbArg;
+            memset(&cbArg, 0, sizeof(qcamera_callback_argm_t));
+            cbArg.cb_type = QCAMERA_DATA_TIMESTAMP_CALLBACK;
+            cbArg.msg_type = CAMERA_MSG_PREVIEW_FRAME;
+            cbArg.data = preview_mem;
+            cbArg.timestamp = timeStamp;
+            int32_t rc = pme->m_cbNotifier.notifyCallback(cbArg);
+            if (rc != NO_ERROR) {
+                ALOGE("%s: fail sending data notify", __func__);
+                stream->bufDone(frame->buf_idx);
+            }
+        } else {
+           stream->bufDone(frame->buf_idx);
+        }
+    }
+    free(super_frame);
+}
+
+/*===========================================================================
  * FUNCTION   : nodisplay_preview_stream_cb_routine
  *
  * DESCRIPTION: helper function to handle preview frame from preview stream in
@@ -1012,9 +1082,9 @@ void QCamera2HardwareInterface::nodisplay_preview_stream_cb_routine(
             cbArg.cb_type = QCAMERA_DATA_CALLBACK;
             cbArg.msg_type = CAMERA_MSG_PREVIEW_FRAME;
             cbArg.data = preview_mem;
-            cbArg.user_data = (void *) &frame->buf_idx;
-            cbArg.cookie = stream;
-            cbArg.release_cb = returnStreamBuffer;
+            //cbArg.user_data = (void *) &frame->buf_idx;
+            //cbArg.cookie = stream;
+            //cbArg.release_cb = returnStreamBuffer;
             int32_t rc = pme->m_cbNotifier.notifyCallback(cbArg);
             if (rc != NO_ERROR) {
                 ALOGE("%s: fail sending data notify", __func__);
