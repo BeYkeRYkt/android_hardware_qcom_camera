@@ -15002,7 +15002,7 @@ int32_t QCameraParameters::updatePpFeatureMask(cam_stream_type_t stream_type) {
 
         if (satEnabledFlag &&
                 (getHalPPType() != CAM_HAL_PP_TYPE_BOKEH)) {
-        LOGH("SAT flag enabled");
+            LOGH("SAT flag enabled");
             if (stream_type == CAM_STREAM_TYPE_VIDEO &&
                 !is4k2kVideoResolution()) {
                 feature_mask |= CAM_QTI_FEATURE_SAT;
@@ -15020,8 +15020,10 @@ int32_t QCameraParameters::updatePpFeatureMask(cam_stream_type_t stream_type) {
 
         if (sacEnabledFlag  &&
                 (getHalPPType() != CAM_HAL_PP_TYPE_BOKEH)) {
-        LOGH("SAC flag enabled");
-            if (stream_type == CAM_STREAM_TYPE_ANALYSIS) {
+            LOGH("SAC flag enabled");
+            if ((stream_type == CAM_STREAM_TYPE_ANALYSIS) ||
+                (stream_type == CAM_STREAM_TYPE_VIDEO) ||
+                (stream_type == CAM_STREAM_TYPE_PREVIEW)) {
                 feature_mask |= CAM_QTI_FEATURE_SAC;
                 LOGH("SAC feature mask set");
             }
@@ -15033,7 +15035,7 @@ int32_t QCameraParameters::updatePpFeatureMask(cam_stream_type_t stream_type) {
 
         if (rtbdmEnabledFlag  &&
                 (getHalPPType() == CAM_HAL_PP_TYPE_BOKEH)) {
-        LOGH("RTBDM flag enabled");
+            LOGH("RTBDM flag enabled");
             if (stream_type == CAM_STREAM_TYPE_ANALYSIS) {
                 feature_mask |= CAM_QTI_FEATURE_RTBDM;
                 LOGH("RTBDM feature mask set");
@@ -15046,7 +15048,7 @@ int32_t QCameraParameters::updatePpFeatureMask(cam_stream_type_t stream_type) {
 
         if (rtbEnabledFlag ||
                 (getHalPPType() == CAM_HAL_PP_TYPE_BOKEH)) {
-        LOGH("RTB flag enabled");
+            LOGH("RTB flag enabled");
             if ((stream_type == CAM_STREAM_TYPE_PREVIEW)||
                 (stream_type == CAM_STREAM_TYPE_CALLBACK)) {
                 feature_mask |= CAM_QTI_FEATURE_RTB;
