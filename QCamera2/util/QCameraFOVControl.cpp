@@ -367,10 +367,14 @@ void QCameraFOVControl::resetVars()
 {
     // Copy the FOV-control settings for camera/camcorder from QCameraFOVControlSettings.h
     if (mFovControlData.camcorderMode) {
+        // Disable snapshot post-processing if two cameras have no sync mechanism.
         mFovControlConfig.snapshotPPConfig.enablePostProcess =
-                FOVC_CAMCORDER_SNAPSHOT_PP_ENABLE;
+                (DUALCAM_SYNC_MECHANISM == CAM_SYNC_NO_SYNC) ?
+                    0 : FOVC_CAMCORDER_SNAPSHOT_PP_ENABLE;
     } else {
-        mFovControlConfig.snapshotPPConfig.enablePostProcess = FOVC_CAM_SNAPSHOT_PP_ENABLE;
+        // Disable snapshot post-processing if two cameras have no sync mechanism.
+        mFovControlConfig.snapshotPPConfig.enablePostProcess =
+                (DUALCAM_SYNC_MECHANISM == CAM_SYNC_NO_SYNC) ? 0 : FOVC_CAM_SNAPSHOT_PP_ENABLE;
         mFovControlConfig.snapshotPPConfig.zoomMin           = FOVC_CAM_SNAPSHOT_PP_ZOOM_MIN;
         mFovControlConfig.snapshotPPConfig.zoomMax           = FOVC_CAM_SNAPSHOT_PP_ZOOM_MAX;
         mFovControlConfig.snapshotPPConfig.LuxIdxMax         = FOVC_CAM_SNAPSHOT_PP_LUX_IDX_MAX;
@@ -387,8 +391,8 @@ void QCameraFOVControl::resetVars()
     mFovControlConfig.constZoomTimeoutSnapshotPPRange = FOVC_CONSTZOOM_SNAPSHOT_PP_RANGE_TIMEOUT_MS;
 
     // Reset variables
-    mFovControlData.zoomDirection         = ZOOM_STABLE;
-    mFovControlData.fallbackToWide        = false;
+    mFovControlData.zoomDirection  = ZOOM_STABLE;
+    mFovControlData.fallbackToWide = false;
 
     mFovControlData.afStatusMain = CAM_AF_STATE_INACTIVE;
     mFovControlData.afStatusAux  = CAM_AF_STATE_INACTIVE;
@@ -1186,13 +1190,13 @@ void QCameraFOVControl::generateFovControlResult()
                     (currentFocusDist >= thresholdFocusDist))) {
                 /* Switch to transition state if -
                  1. Scene is bright and far focused
-                 2. Bundled snapshot triggered
+                 2. Force cameras to wakeup (Bundled snapshot / autofocus)
                  3. Zoom is above threshold with user zooming in
                  4. No low light / macro scene fallback triggered
                  Lower constraint if zooming in
                  This path is taken for the normal behavior - there was no fallback to wide state
                  due to low light, macro-scene and user zooms in with zoom hitting the threshold */
-                if ((mFovControlData.takeBundledSnapshot) ||
+                if ((mFovControlData.forceCameraWakeup) ||
                     (needDualZone() &&
                     ((mFovControlData.zoomDirection == ZOOM_IN) ||
                     (zoom >= mFovControlData.transitionParams.cutOverTeleToWide)) &&
@@ -1200,8 +1204,8 @@ void QCameraFOVControl::generateFovControlResult()
                     mFovControlData.camState = STATE_TRANSITION;
                     mFovControlResult.activeCameras = (camWide | camTele);
 
-                    if (mFovControlData.takeBundledSnapshot) {
-                        LOGD("state: wide: bundled snapshot triggered."
+                    if (mFovControlData.forceCameraWakeup) {
+                        LOGD("state: wide: Forced camera wakeup (bundled snapshot/autofocus)."
                                 " Switching to Transition state");
                     }
                 }
@@ -1234,7 +1238,8 @@ void QCameraFOVControl::generateFovControlResult()
         case STATE_TRANSITION:
             // Start const-zoom timer if needed
             if (mFovControlData.zoomDirection == ZOOM_STABLE) {
-                if (!mFovControlData.timerConstZoom.active) {
+                if (!mFovControlData.timerConstZoom.active ||
+                        mFovControlData.forceCameraWakeup) {
                     /* Provide the timeout value based on whether zoom is in snapshot
                      postprocess range. */
                     startTimer(&mFovControlData.timerConstZoom,
@@ -1368,14 +1373,14 @@ void QCameraFOVControl::generateFovControlResult()
 
             /* Switch to transition state if -
              1. Start fallback to wide if the low light / macro scene detected
-             2. Bundled snapshot triggered */
+             2. Force cameras to wakeup (Bundled snapshot / autofocus) */
             if ((mFovControlData.fallbackEnabled && mFovControlData.fallbackToWide) ||
-                    (mFovControlData.takeBundledSnapshot)) {
+                    (mFovControlData.forceCameraWakeup)) {
                 mFovControlData.camState = STATE_TRANSITION;
                 mFovControlResult.activeCameras = (camWide | camTele);
 
-                if (mFovControlData.takeBundledSnapshot) {
-                    LOGD("state: tele: bundled snapshot triggered."
+                if (mFovControlData.forceCameraWakeup) {
+                    LOGD("state: tele: Forced camera wakeup (bundled snapshot/autofocus)."
                         " Switching to Transition state");
                 } else if (mFovControlData.fallbackEnabled && mFovControlData.fallbackToWide) {
                     LOGD("state: tele: low light / Macro scene fallback triggered."
@@ -2459,18 +2464,13 @@ void QCameraFOVControl::UpdateFlag(
 {
     if ((flag >= 0) && (flag < FOVCONTROL_FLAG_COUNT)) {
         mMutex.lock();
-        bool snapshotPostProcess = mFovControlResult.snapshotPostProcess;
-        uint32_t activeCameras   = mFovControlResult.activeCameras;
-
         switch (flag) {
-            case FOVCONTROL_FLAG_TAKE_BUNDLED_SNAPSHOT: {
-                bool takeBundledSnapshot = *(bool*)value;
-                if (takeBundledSnapshot) {
-                    if (snapshotPostProcess && (activeCameras != (CAM_TYPE_MAIN | CAM_TYPE_AUX))) {
-                        mFovControlData.takeBundledSnapshot = true;
-                    }
+            case FOVCONTROL_FLAG_FORCE_CAMERA_WAKEUP: {
+                bool forceCameraWakeup = *(bool*)value;
+                if (forceCameraWakeup) {
+                    mFovControlData.forceCameraWakeup = true;
                 } else {
-                    mFovControlData.takeBundledSnapshot = false;
+                    mFovControlData.forceCameraWakeup = false;
                 }
                 break;
             }
