@@ -376,6 +376,10 @@ static void mm_channel_process_stream_buf(mm_camera_cmdcb_t * cmd_cb,
             ch_obj->manualZSLSnapshot = FALSE;
             mm_camera_stop_zsl_snapshot(ch_obj->cam_obj);
     } else if (MM_CAMERA_CMD_TYPE_CONFIG_NOTIFY == cmd_cb->cmd_type) {
+           if (m_obj->frame_sync.is_active) {
+              m_obj->frame_sync.superbuf_queue.attr.notify_mode =
+                      cmd_cb->u.notify_mode;
+           }
            ch_obj->bundle.superbuf_queue.attr.notify_mode = cmd_cb->u.notify_mode;
     } else if (MM_CAMERA_CMD_TYPE_FLUSH_QUEUE  == cmd_cb->cmd_type) {
         ch_obj->bundle.superbuf_queue.expected_frame_id = cmd_cb->u.flush_cmd.frame_idx;
@@ -1734,9 +1738,12 @@ int32_t mm_channel_get_bundle_info(mm_channel_t *my_obj,
                                                           my_obj->streams[i].my_hdl);
             if (NULL != s_obj) {
                 stream_type = s_obj->stream_info->stream_type;
-                if ((CAM_STREAM_TYPE_METADATA != stream_type) &&
-                        (CAM_STREAM_TYPE_ANALYSIS != stream_type) &&
-                        (s_obj->ch_obj == my_obj)) {
+                if (((CAM_STREAM_TYPE_ANALYSIS == stream_type) &&
+                        (s_obj->stream_info->bNoBundling))||
+                        (CAM_STREAM_TYPE_METADATA == stream_type) ||
+                        (s_obj->ch_obj != my_obj)) {
+                    LOGD("Don't bundle stream type %d", stream_type);
+                } else {
                     bundle_info->stream_ids[bundle_info->num_of_streams++] =
                                                         s_obj->server_stream_id;
                 }

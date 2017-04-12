@@ -3377,6 +3377,7 @@ int QCamera2HardwareInterface::initStreamInfoBuf(cam_stream_type_t stream_type,
     streamInfo->buf_cnt = streamInfo->num_bufs;
     streamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
     streamInfo->is_secure = NON_SECURE;
+    streamInfo->bNoBundling = false;
 
     streamInfo->cam_type = (cam_sync_type_t)cam_type;
     if (!isNoDisplayMode(cam_type) && (stream_type == CAM_STREAM_TYPE_PREVIEW)) {
@@ -3490,6 +3491,7 @@ int QCamera2HardwareInterface::initStreamInfoBuf(cam_stream_type_t stream_type,
         break;
     case CAM_STREAM_TYPE_ANALYSIS:
         streamInfo->noFrameExpected = 1;
+        streamInfo->bNoBundling = QCameraCommon::skipAnalysisBundling();
         break;
     case CAM_STREAM_TYPE_METADATA:
         streamInfo->cache_ops = CAM_STREAM_CACHE_OPS_CLEAR_FLAGS;
@@ -4018,7 +4020,9 @@ int QCamera2HardwareInterface::stopPreview()
     mActiveAF = false;
 
     // Wake up both sensors before stopping preview
-    mParameters.setDCLowPowerMode(MM_CAMERA_DUAL_CAM);
+    if (isDualCamera()) {
+        mParameters.setDCLowPowerMode(MM_CAMERA_DUAL_CAM);
+    }
 
     // Disable power Hint for preview
     m_perfLockMgr.releasePerfLock(PERF_LOCK_POWERHINT_PREVIEW);
