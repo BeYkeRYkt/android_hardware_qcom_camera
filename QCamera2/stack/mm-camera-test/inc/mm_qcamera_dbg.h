@@ -68,4 +68,8 @@
   #define CDBG_HIGH(fmt, args...) fprintf(stderr, fmt, ##args)
   #define CDBG_ERROR(fmt, args...) fprintf(stderr, fmt, ##args)
 #endif
+
+#define DUMP_PRV_IN_FILE 0
+#define DUMP_RDI_IN_FILE 0
+
 #endif /* __MM_QCAMERA_DBG_H__ */
