@@ -109,7 +109,6 @@ static int stopUsbCamCapture(           camera_hardware_t *camHal);
 static int initV4L2mmap(                camera_hardware_t *camHal);
 static int unInitV4L2mmap(              camera_hardware_t *camHal);
 static int launch_preview_thread(       camera_hardware_t *camHal);
-static int launchTakePictureThread(     camera_hardware_t *camHal);
 static int initDisplayBuffers(          camera_hardware_t *camHal);
 static int deInitDisplayBuffers(        camera_hardware_t *camHal);
 static int stopPreviewInternal(         camera_hardware_t *camHal);
@@ -122,7 +121,7 @@ static int put_buf_to_display(   camera_hardware_t *camHal, int buffer_id);
 #endif
 static int convert_data_frm_cam_to_disp(camera_hardware_t *camHal, int buffer_id);
 static void * previewloop(void *);
-static void * takePictureThread(void *);
+static void * takePictureThread( camera_hardware_t *camHal);
 static int convert_YUYV_to_420_NV12(char *in_buf, char *out_buf, int wd, int ht);
 static int get_uvc_device(char *devname);
 static int getPreviewCaptureFmt(camera_hardware_t *camHal);
@@ -134,7 +133,6 @@ int freevideobuffer(camera_hardware_t *camHal,int buffenum);
 int getmetadatafreeHandle(camera_hardware_t *camHal,int buffer_id,int count,int timestamp);
 int mStoreMetaDataInBuffers = 0;
 void write_image(void *data, const int size, int width, int height,const char *name);
-
 typedef struct VideoNativeHandleMetadata media_metadata_buffer;
 // camera_memory_t *mMetadata[MM_CAMERA_MAX_NUM_FRAMES];
 // native_handle_t *mNativeHandle[MM_CAMERA_MAX_NUM_FRAMES];
@@ -252,7 +250,8 @@ extern "C" int  usbcam_camera_device_open(int id,
     device->ops             = &usbcam_camera_ops;
     device->priv            = (void *)camHal;
     *hw_device              = &(device->common);
-
+    camHal->prvwStoppedForPicture = 0;
+    camHal->preview_thread_enable = 0;
     ALOGD("%s: camHal: %p", __func__, camHal);
     ALOGI("%s: X %d", __func__, rc);
     return rc;
@@ -412,12 +411,21 @@ int usbcam_start_preview(struct camera_device * device)
         ALOGI("%s: Preview is already running", __func__);
         return 0;
     }
+    if(camHal->prvwStoppedForPicture){
+        rc = stopUsbCamCapture(camHal);
+        ERROR_CHECK_EXIT(rc, "stopUsbCamCapture");
 
+        rc = unInitV4L2mmap(camHal);
+        ERROR_CHECK_EXIT(rc, "unInitV4L2mmap");
+
+        USB_CAM_CLOSE(camHal);
+        camHal->prvwStoppedForPicture = 0;
+        USB_CAM_OPEN(camHal);
+    }
 
 #if CAPTURE
     rc = initUsbCamera(camHal, camHal->prevWidth,
                         camHal->prevHeight, getPreviewCaptureFmt(camHal));
-   //allocatevideobuffer(camHal,1);
     if(rc < 0) {
         ALOGE("%s: Failed to intialize the device", __func__);
     }else{
@@ -425,17 +433,17 @@ int usbcam_start_preview(struct camera_device * device)
         if(rc < 0) {
             ALOGE("%s: Failed to startUsbCamCapture", __func__);
         }else{
-            rc = launch_preview_thread(camHal);
-            if(rc < 0) {
-                ALOGE("%s: Failed to launch_preview_thread", __func__);
+            if(!camHal->preview_thread_enable){
+                rc = launch_preview_thread(camHal);
+                if(rc < 0) {
+                    ALOGE("%s: Failed to launch_preview_thread", __func__);
+                }
+                camHal->preview_thread_enable = 1;
             }
+            camHal->snapshotEnabledFlag = 0;
         }
     }
 #else /* CAPTURE */
-    rc = launch_preview_thread(camHal);
-    if(rc < 0) {
-        ALOGE("%s: Failed to launch_preview_thread", __func__);
-    }
 #endif /* CAPTURE */
     /* if no errors, then set the flag */
     if(!rc)
@@ -463,7 +471,10 @@ void usbcam_stop_preview(struct camera_device * device)
     rc = stopPreviewInternal(camHal);
     if(rc)
         ALOGE("%s: stopPreviewInternal returned error", __func__);
-
+    if(pthread_join(camHal->previewThread, NULL)){
+            ALOGE("%s: Error in pthread_join preview thread", __func__);
+    }
+    camHal->preview_thread_enable = 0;
     ALOGI("%s: X", __func__);
     return;
 }
@@ -660,36 +671,9 @@ int usbcam_take_picture(struct camera_device * device)
         ALOGI("%s: Take picture already in progress", __func__);
         return 0;
     }
-
-    if(camHal->previewEnabledFlag)
-    {
-        rc = stopPreviewInternal(camHal);
-        if(rc){
-            ALOGE("%s: stopPreviewInternal returned error", __func__);
-        }
-        USB_CAM_CLOSE(camHal);
-        camHal->prvwStoppedForPicture = 1;
-    }
-    /* TBD: Need to handle any dependencies on video recording state */
-    rc = launchTakePictureThread(camHal);
-    if(rc)
-        ALOGE("%s: launchTakePictureThread error", __func__);
-
-#if 0
-    /* This implementation requests preview thread to take picture */
-    if(camHal->previewEnabledFlag)
-    {
-        camHal->prvwCmdPending++;
-        camHal->prvwCmd         = USB_CAM_PREVIEW_TAKEPIC;
-        ALOGD("%s: Take picture command set ", __func__);
-    }else{
-        ALOGE("%s: Take picture without preview started!", __func__);
-        rc = -1;
-    }
-#endif
-
-    if(!rc)
-        camHal->takePictInProgress = 1;
+    camHal->snapshotEnabledFlag = 1;
+    camHal->prvwStoppedForPicture = 1;
+    camHal->takePictInProgress = 1;
 
     ALOGI("%s: X", __func__);
     return rc;
@@ -1623,14 +1607,14 @@ static int stopPreviewInternal(camera_hardware_t *camHal)
 
     if(camHal->previewEnabledFlag)
     {
-        camHal->prvwCmdPending++;
-        camHal->prvwCmd         = USB_CAM_PREVIEW_EXIT;
+         camHal->prvwCmdPending++;
+         camHal->prvwCmd         = USB_CAM_PREVIEW_EXIT;
 
         /* yield lock while waiting for the preview thread to exit */
         camHal->lock.unlock();
-        if(pthread_join(camHal->previewThread, NULL)){
-            ALOGE("%s: Error in pthread_join preview thread", __func__);
-        }
+         if(pthread_join(camHal->previewThread, NULL)){
+             ALOGE("%s: Error in pthread_join preview thread", __func__);
+         }
         camHal->lock.lock();
 
         if(stopUsbCamCapture(camHal)){
@@ -2212,6 +2196,19 @@ static void * previewloop(void *hcamHal)
     /* - Enqueue capture buffer back to USB camera                          */
     /************************************************************************/
     while(1) {
+        if(camHal->snapshotEnabledFlag){
+            if(stopUsbCamCapture(camHal)){
+            ALOGE("%s: Error in stopUsbCamCapture", __func__);
+        }
+        if(unInitV4L2mmap(camHal)){
+            ALOGE("%s: Error in stopUsbCamCapture", __func__);
+        }
+        camHal->previewEnabledFlag = 0;
+            USB_CAM_CLOSE(camHal);
+            takePictureThread(camHal);
+            camHal->snapshotEnabledFlag = 0;
+            continue;
+        }else if(camHal->previewEnabledFlag){
         fd_set fds;
         struct timeval tv;
         int r = 0;
@@ -2465,7 +2462,7 @@ static void * previewloop(void *hcamHal)
         if (previewMem)
             previewMem->release(previewMem);
 #endif
-
+}
     }//while(1)
     ALOGD("%s: X", __func__);
     return (void *)0;
@@ -2742,26 +2739,6 @@ static int get_uvc_device(char *devname)
  *
  * Notes: none
  *****************************************************************************/
-static int launchTakePictureThread(camera_hardware_t *camHal)
-{
-    ALOGD("%s: E", __func__);
-    int rc = 0;
-
-    if(!camHal) {
-        ALOGE("%s: camHal is NULL", __func__);
-        return -1;
-    }
-
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    /* create the thread in detatched state, when the thread exits all */
-    /* memory resources are freed up */
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    pthread_create(&camHal->takePictureThread, &attr, takePictureThread, camHal);
-
-    ALOGD("%s: X", __func__);
-    return rc;
-}
 
 /******************************************************************************
  * Function: takePictureThread
@@ -2776,13 +2753,10 @@ static int launchTakePictureThread(camera_hardware_t *camHal)
  *
  * Notes: none
  *****************************************************************************/
-static void * takePictureThread(void *hcamHal)
+static void * takePictureThread(camera_hardware_t *hcamHal)
 {
     int                 rc = 0;
-    //int                 buffer_id   = 0;
-    pid_t               tid         = 0;
     camera_hardware_t   *camHal     = NULL;
-    //int                 msgType     = 0;
     int                 jpegLength  = 0;
     QCameraHalMemInfo_t *mem_info   = NULL;
 
@@ -2794,10 +2768,7 @@ static void * takePictureThread(void *hcamHal)
         return NULL ;
     }
 
-    tid  = gettid();
     /* TBR: Set appropriate thread priority */
-    androidSetThreadPriority(tid, ANDROID_PRIORITY_NORMAL);
-    prctl(PR_SET_NAME, (unsigned long)"Camera HAL preview thread", 0, 0, 0);
 
     /************************************************************************/
     /* - If requested for shutter notfication, notify                       */
@@ -2810,7 +2781,6 @@ static void * takePictureThread(void *hcamHal)
     /* - Free USB camera resources and close camera                         */
     /* - If preview was stopped for taking picture, restart the preview     */
     /************************************************************************/
-
     Mutex::Autolock autoLock(camHal->lock);
     /************************************************************************/
     /* - If requested for shutter notfication, notify                       */
@@ -2944,7 +2914,6 @@ static void * takePictureThread(void *hcamHal)
             (camHal->data_cb)){
         /* Unlock temporarily, callback might call HAL api in turn */
         camHal->lock.unlock();
-
         camHal->data_cb(CAMERA_MSG_COMPRESSED_IMAGE,
                         camHal->pictMem.camera_memory[0],
                         0, NULL, camHal->cb_ctxt);
@@ -2972,30 +2941,6 @@ static void * takePictureThread(void *hcamHal)
     /************************************************************************/
     /* - Free USB camera resources and close camera                         */
     /************************************************************************/
-    rc = stopUsbCamCapture(camHal);
-    ERROR_CHECK_EXIT_THREAD(rc, "stopUsbCamCapture");
-
-    rc = unInitV4L2mmap(camHal);
-    ERROR_CHECK_EXIT_THREAD(rc, "unInitV4L2mmap");
-
-    USB_CAM_CLOSE(camHal);
-    /************************************************************************/
-    /* - If preview was stopped for taking picture, restart the preview     */
-    /************************************************************************/
-    if(camHal->prvwStoppedForPicture)
-    {
-        struct camera_device    device;
-        device.priv = (void *)camHal;
-
-        USB_CAM_OPEN(camHal);
-        /* Unlock temporarily coz usbcam_start_preview has a lock */
-        camHal->lock.unlock();
-        rc = usbcam_start_preview(&device);
-        if(rc)
-            ALOGE("%s: start_preview error after take picture", __func__);
-        camHal->lock.lock();
-        camHal->prvwStoppedForPicture = 0;
-    }
 
     /* take picture activity is done */
     camHal->takePictInProgress = 0;

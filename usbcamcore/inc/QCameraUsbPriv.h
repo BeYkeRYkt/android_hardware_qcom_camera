@@ -171,6 +171,8 @@ typedef struct {
     int                                 videorecordingEnableFlag;
     int                                 prvwStoppedForPicture;
     int                                 msgEnabledFlag;
+    int                                 snapshotEnabledFlag;
+    int                                 preview_thread_enable;
     volatile int                        prvwCmdPending;
     volatile int                        prvwCmd;
     pthread_t                           previewThread;
