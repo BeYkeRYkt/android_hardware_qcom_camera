@@ -107,7 +107,7 @@
 #define EXIF_IMAGE_DESCRIPTION_SIZE 100
 
 #define MAX_INFLIGHT_REQUESTS  6
-#define MAX_INFLIGHT_BLOB      3
+#define MAX_INFLIGHT_BLOB      10
 #define MIN_INFLIGHT_REQUESTS  3
 #define MIN_INFLIGHT_60FPS_REQUESTS (6)
 #define MAX_INFLIGHT_REPROCESS_REQUESTS 1
@@ -144,6 +144,9 @@
 
 /* Defines the number of columns in the color correction matrix (CCM) */
 #define AWB_NUM_CCM_COLS (3)
+
+/* Index to switch H/W to consume to free-run Q*/
+#define CAM_FREERUN_IDX 0xFFFFFFFF
 
 typedef uint64_t cam_feature_mask_t;
 
@@ -557,6 +560,12 @@ typedef struct {
     int32_t min_sensitivity;
     int32_t max_sensitivity;
 } cam_sensitivity_range_t;
+
+typedef enum {
+    CAM_ISO_PRIORITY,
+    CAM_EXP_PRIORITY,
+    CAM_DEFAULT_OFF,
+} cam_priority_mode_t;
 
 typedef enum {
     CAM_HFR_MODE_OFF,
@@ -1692,8 +1701,13 @@ typedef struct {
 } cam_hw_data_overwrite_t;
 
 typedef struct {
+    uint32_t streamID;
+    uint32_t buf_index;
+} cam_stream_request_t;
+
+typedef struct {
     uint32_t num_streams;
-    uint32_t streamID[MAX_NUM_STREAMS];
+    cam_stream_request_t stream_request[MAX_NUM_STREAMS];
 } cam_stream_ID_t;
 
 /*CAC Message posted during pipeline*/
@@ -2218,6 +2232,8 @@ typedef enum {
     CAM_INTF_META_FOCUS_VALUE,
     /*Spot light detection result output from af core*/
     CAM_INTF_META_SPOT_LIGHT_DETECT,
+    /* HAL based HDR*/
+    CAM_INTF_PARM_HAL_BRACKETING_HDR,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
@@ -2441,6 +2457,7 @@ typedef struct {
 #define CAM_QCOM_FEATURE_PAAF           (((cam_feature_mask_t)1UL)<<32)
 #define CAM_QCOM_FEATURE_QUADRA_CFA     (((cam_feature_mask_t)1UL)<<33)
 #define CAM_QTI_FEATURE_PPEISCORE       (((cam_feature_mask_t)1UL)<<34)
+#define CAM_QCOM_FEATURE_METADATA_BYPASS (((cam_feature_mask_t)1UL)<<35)
 #define CAM_QCOM_FEATURE_PP_SUPERSET    (CAM_QCOM_FEATURE_DENOISE2D|CAM_QCOM_FEATURE_CROP|\
                                          CAM_QCOM_FEATURE_ROTATION|CAM_QCOM_FEATURE_SHARPNESS|\
                                          CAM_QCOM_FEATURE_SCALE|CAM_QCOM_FEATURE_CAC|\
@@ -2789,7 +2806,7 @@ typedef struct {
 } cam_event_t;
 
 typedef struct {
-    /* Information for DDM */
+    /* Information for DDM metadata*/
     cam_stream_crop_info_t   sensor_crop_info; /* sensor crop info */
     cam_stream_crop_info_t   camif_crop_info; /* CAMIF crop info */
     cam_stream_crop_info_t   isp_crop_info; /* ISP crop info */
@@ -2797,7 +2814,10 @@ typedef struct {
     cam_focal_length_ratio_t af_focal_length_ratio; /* AF focal length ratio */
     int32_t                  pipeline_flip; /* current pipeline flip and rotational parameters */
     cam_rotation_info_t      rotation_info; /* rotation information */
-} cam_ddm_info_t;
+    cam_area_t               af_roi;        /* AF roi info */
+    /* Information for CPP reprocess */
+    cam_dyn_img_data_t       dyn_mask;      /* Post processing dynamic feature mask */
+} cam_reprocess_info_t;
 
 /***********************************
 * ENUM definition for custom parameter type

@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+** Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
 ** Not a Contribution. Apache license notifications and license are
 ** retained for attribution purposes only.
 **
@@ -719,6 +719,7 @@ public:
     bool isFpsDebugEnabled() {return m_bDebugFps;};
     bool isHistogramEnabled() {return m_bHistogramEnabled;};
     bool isSceneSelectionEnabled() {return m_bSceneSelection;};
+    bool isSmallJpegSizeEnabled() {return m_bSmallJpegSize;};
     int32_t setSelectedScene(cam_scene_mode_type scene);
     cam_scene_mode_type getSelectedScene();
     bool isFaceDetectionEnabled() {return ((m_nFaceProcMask &
@@ -737,6 +738,9 @@ public:
     bool isAVTimerEnabled();
     bool isDISEnabled();
     int32_t setISType();
+    void setSmallJpegSize(cam_dimension_t sensor_dim, cam_dimension_t snap_dim);
+    int32_t updateSnapshotPpMask(cam_stream_size_info_t &stream_config_info);
+    int32_t getSensorOutputSize(cam_dimension_t max_dim, cam_dimension_t &sensor_dim);
     cam_is_type_t getVideoISType();
     cam_is_type_t getPreviewISType();
     uint8_t getMobicatMask();
@@ -898,6 +902,7 @@ public:
     int32_t getMetaRawInfo();
     bool sendStreamConfigForPickRes(cam_stream_size_info_t &stream_config_info);
     int32_t updateDtVc(int32_t *dt, int32_t *vc);
+    bool isLinkPreviewForLiveShot();
 
 private:
     int32_t setPreviewSize(const QCameraParameters& );
@@ -1261,6 +1266,7 @@ private:
     // Number of preview frames, that HAL will hold without displaying, for instant AEC mode.
     uint8_t mAecSkipDisplayFrameBound;
     bool m_bQuadraCfa;
+    bool m_bSmallJpegSize;
 };
 
 }; // namespace qcamera

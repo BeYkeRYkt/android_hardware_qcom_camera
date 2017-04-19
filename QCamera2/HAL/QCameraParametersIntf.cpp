@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -485,6 +485,13 @@ bool QCameraParametersIntf::isSceneSelectionEnabled()
     return mImpl->isSceneSelectionEnabled();
 }
 
+bool QCameraParametersIntf::isSmallJpegSizeEnabled()
+{
+    Mutex::Autolock lock(mLock);
+    CHECK_PARAM_INTF(mImpl);
+    return mImpl->isSmallJpegSizeEnabled();
+}
+
 int32_t QCameraParametersIntf::setSelectedScene(cam_scene_mode_type scene)
 {
     Mutex::Autolock lock(mLock);
@@ -604,7 +611,6 @@ int32_t QCameraParametersIntf::setISType()
     CHECK_PARAM_INTF(mImpl);
     return mImpl->setISType();
 }
-
 
 cam_is_type_t QCameraParametersIntf::getVideoISType()
 {
@@ -1447,6 +1453,13 @@ int32_t QCameraParametersIntf::updateDtVc(int32_t *dt, int32_t *vc)
     Mutex::Autolock lock(mLock);
     CHECK_PARAM_INTF(mImpl);
     return mImpl->updateDtVc(dt, vc);
+}
+
+bool QCameraParametersIntf::isLinkPreviewForLiveShot()
+{
+    Mutex::Autolock lock(mLock);
+    CHECK_PARAM_INTF(mImpl);
+    return mImpl->isLinkPreviewForLiveShot();
 }
 
 }; // namespace qcamera
