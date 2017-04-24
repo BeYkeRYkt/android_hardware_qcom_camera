@@ -68,8 +68,15 @@ static void mm_app_rdi_notify_cb(mm_camera_super_buf_t *bufs,
 
     CDBG("%s: BEGIN - length=%zu, frame idx = %d stream_id=%d\n",
          __func__, frame->frame_len, frame->frame_idx, frame->stream_id);
+#if DUMP_RDI_IN_FILE
     snprintf(file_name, sizeof(file_name), "RDI_dump_%d", pme->cam->camera_handle);
     mm_app_rdi_dump_frame(frame, file_name, "raw", frame->frame_idx);
+#endif
+
+    if (pme->user_rdi_cb) {
+        CDBG("[DBG] %s, user defined own rdi cb. calling it...", __func__);
+        pme->user_rdi_cb(frame);
+    }
 
     if (MM_CAMERA_OK != pme->cam->ops->qbuf(bufs->camera_handle,
                                             bufs->ch_id,

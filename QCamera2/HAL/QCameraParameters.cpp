@@ -5209,8 +5209,11 @@ int32_t QCameraParameters::initDefaultParameters()
     setLowPowerMode(VALUE_DISABLE);
 
     //set default exposure gain and linecnt
-    set(KEY_QC_EXPOSURE_MANUAL, DEFAULT_INIT_MANUAL_EXPOSURE_LINECNT);
-    set(KEY_QC_GAIN_MANUAL, DEFAULT_INIT_MANUAL_EXPOSURE_GAIN);
+    char exp_linecnt[20];
+    char exp_gain[20];
+    snprintf(exp_linecnt, sizeof(exp_linecnt), "%d", DEFAULT_INIT_MANUAL_EXPOSURE_LINECNT);
+    snprintf(exp_gain, sizeof(exp_gain), "%d", DEFAULT_INIT_MANUAL_EXPOSURE_GAIN);
+    setManualExposure(exp_linecnt, exp_gain);
 
     int32_t rc = commitParameters();
     if (rc == NO_ERROR) {

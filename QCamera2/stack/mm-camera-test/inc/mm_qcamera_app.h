@@ -235,6 +235,7 @@ typedef struct {
     int zsl_enabled;
     int8_t focus_supported;
     cam_stream_user_cb user_preview_cb;
+    cam_stream_user_cb user_rdi_cb;
     cam_stream_user_cb user_metadata_cb;
     parm_buffer_new_t *params_buffer;
     USER_INPUT_DISPLAY_T preview_resolution;
