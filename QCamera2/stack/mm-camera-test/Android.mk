@@ -31,6 +31,7 @@ LOCAL_SRC_FILES:= \
         src/mm_qcamera_commands.c
 #        src/mm_qcamera_dual_test.c \
 
+LOCAL_LDLIBS += -llog
 LOCAL_C_INCLUDES:=$(LOCAL_PATH)/inc
 LOCAL_C_INCLUDES+= \
         frameworks/native/include/media/openmax \
@@ -122,6 +123,7 @@ LOCAL_SRC_FILES:= \
         src/mm_qcamera_commands.c
 #        src/mm_qcamera_dual_test.c \
 
+LOCAL_LDLIBS += -llog
 LOCAL_C_INCLUDES:=$(LOCAL_PATH)/inc
 LOCAL_C_INCLUDES+= \
         frameworks/native/include/media/openmax \

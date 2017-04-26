@@ -19,6 +19,7 @@ LOCAL_C_INCLUDES := $(OMX_HEADER_DIR)
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../qexif
 
 LOCAL_SRC_FILES := qomx_core.c
+LOCAL_LDLIBS += -llog
 
 LOCAL_MODULE           := libqomx_core
 LOCAL_PRELINK_MODULE   := false
