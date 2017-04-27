@@ -114,6 +114,13 @@ namespace qcamera {
 
 #define TIMEOUT_NEVER -1
 
+/* Face rect indices */
+#define FACE_LEFT              0
+#define FACE_TOP               1
+#define FACE_RIGHT             2
+#define FACE_BOTTOM            3
+#define FACE_WEIGHT            4
+
 /* Face landmarks indices */
 #define LEFT_EYE_X             0
 #define LEFT_EYE_Y             1
@@ -125,6 +132,10 @@ namespace qcamera {
 
 // Max preferred zoom
 #define MAX_PREFERRED_ZOOM_RATIO 5.0
+
+
+// TODO: Enabl HDR+ for front camera after it's supported. b/37723569.
+#define ENABLE_HDRPLUS_FOR_FRONT_CAMERA 0
 
 cam_capability_t *gCamCapability[MM_CAMERA_MAX_NUM_SENSORS];
 const camera_metadata_t *gStaticMetadata[MM_CAMERA_MAX_NUM_SENSORS];
@@ -554,7 +565,7 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
     m_bSwTnrPreview = (uint8_t)atoi(prop);
 
     memset(prop, 0, sizeof(prop));
-    property_get("persist.camera.tnr.video", prop, "0");
+    property_get("persist.camera.tnr.video", prop, "1");
     m_bTnrVideo = (uint8_t)atoi(prop);
 
     memset(prop, 0, sizeof(prop));
@@ -1980,8 +1991,6 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
 
     /* Logic to enable/disable TNR based on specific config size/etc.*/
     if ((m_bTnrPreview || m_bTnrVideo) && m_bIsVideo &&
-            ((videoWidth == 1920 && videoHeight == 1080) ||
-            (videoWidth == 1280 && videoHeight == 720)) &&
             (mOpMode != CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE))
         m_bTnrEnabled = true;
     else if (forceEnableTnr)
@@ -2229,6 +2238,11 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     cam_feature_mask_t zsl_ppmask = CAM_QCOM_FEATURE_NONE;
     bool isRawStreamRequested = false;
     bool onlyRaw = true;
+    // Keep track of preview/video streams indices.
+    // There could be more than one preview streams, but only one video stream.
+    int32_t video_stream_idx = -1;
+    int32_t preview_stream_idx[streamList->num_streams];
+    size_t preview_stream_cnt = 0;
     memset(&mStreamConfigInfo, 0, sizeof(cam_stream_size_info_t));
     /* Allocate channel objects for the requested streams */
     for (size_t i = 0; i < streamList->num_streams; i++) {
@@ -2286,6 +2300,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                         mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] |=
                             CAM_QTI_FEATURE_PPEISCORE;
                     }
+                    video_stream_idx = mStreamConfigInfo.num_streams;
                 } else {
                         mStreamConfigInfo.type[mStreamConfigInfo.num_streams] =
                             CAM_STREAM_TYPE_PREVIEW;
@@ -2300,6 +2315,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                         mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] &=
                                 ~CAM_QTI_FEATURE_SW_TNR;
                     }
+                    preview_stream_idx[preview_stream_cnt++] = mStreamConfigInfo.num_streams;
                     padding_info.width_padding = mSurfaceStridePadding;
                     padding_info.height_padding = CAM_PAD_TO_2;
                     previewSize.width = (int32_t)newStream->width;
@@ -2635,6 +2651,27 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                         (newStream->format == HAL_PIXEL_FORMAT_BLOB))) {
             mStreamConfigInfo.num_streams++;
         }
+    }
+
+    // By default, preview stream TNR is disabled.
+    // Enable TNR to the preview stream if all conditions below are satisfied:
+    //  1. resolution <= 1080p.
+    //  2. preview resolution == video resolution.
+    //  3. video stream TNR is enabled.
+    //  4. EIS2.0
+    for (size_t i = 0; i < preview_stream_cnt && video_stream_idx != -1; i++) {
+        camera3_stream_t *video_stream = streamList->streams[video_stream_idx];
+        camera3_stream_t *preview_stream = streamList->streams[preview_stream_idx[i]];
+        if (m_bTnrEnabled && m_bTnrVideo && (atoi(is_type_value) == IS_TYPE_EIS_2_0) &&
+                video_stream->width <= 1920 && video_stream->height <= 1080 &&
+                video_stream->width == preview_stream->width &&
+                video_stream->height == preview_stream->height) {
+                mStreamConfigInfo.postprocess_mask[preview_stream_idx[i]] |=
+                    CAM_QCOM_FEATURE_CPP_TNR;
+                //TNR and CDS are mutually exclusive. So reset CDS from feature mask
+                mStreamConfigInfo.postprocess_mask[preview_stream_idx[i]] &=
+                    ~CAM_QCOM_FEATURE_CDS;
+            }
     }
 
     if (mOpMode != QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE) {
@@ -5225,7 +5262,7 @@ no_error:
     }
 
     // Enable HDR+ mode for the first PREVIEW_INTENT request.
-    {
+    if (ENABLE_HDRPLUS_FOR_FRONT_CAMERA || mCameraId == 0) {
         Mutex::Autolock l(gHdrPlusClientLock);
         if (gEaselManagerClient.isEaselPresentOnDevice() &&
                 !gEaselBypassOnly && !mFirstPreviewIntentSeen &&
@@ -7054,6 +7091,12 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                         convertToRegions(faceDetectionInfo->faces[i].face_boundary,
                                 faceRectangles+j, -1);
 
+                        LOGL("FD_DEBUG : Frame[%d] Face[%d] : top-left (%d, %d), "
+                                "bottom-right (%d, %d)",
+                                faceDetectionInfo->frame_id, i,
+                                faceRectangles[j + FACE_LEFT], faceRectangles[j + FACE_TOP],
+                                faceRectangles[j + FACE_RIGHT], faceRectangles[j + FACE_BOTTOM]);
+
                         j+= 4;
                     }
                     if (numFaces <= 0) {
@@ -7086,6 +7129,17 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                                         landmarks->face_landmarks[i].mouth_center.y);
 
                                 convertLandmarks(landmarks->face_landmarks[i], faceLandmarks+k);
+
+                                LOGL("FD_DEBUG LANDMARK : Frame[%d] Face[%d] : "
+                                        "left-eye (%d, %d), right-eye (%d, %d), mouth (%d, %d)",
+                                        faceDetectionInfo->frame_id, i,
+                                        faceLandmarks[k + LEFT_EYE_X],
+                                        faceLandmarks[k + LEFT_EYE_Y],
+                                        faceLandmarks[k + RIGHT_EYE_X],
+                                        faceLandmarks[k + RIGHT_EYE_Y],
+                                        faceLandmarks[k + MOUTH_X],
+                                        faceLandmarks[k + MOUTH_Y]);
+
                                 k+= TOTAL_LANDMARK_INDICES;
                             }
                         } else {
@@ -7095,10 +7149,17 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                             }
                         }
 
+                        for (size_t i = 0; i < numFaces; i++) {
+                            faceIds[i] = faceDetectionInfo->faces[i].face_id;
+
+                            LOGL("FD_DEBUG LANDMARK : Frame[%d] : Face[%d] : faceIds=%d",
+                                    faceDetectionInfo->frame_id, i, faceIds[i]);
+                        }
+
                         camMetadata.update(ANDROID_STATISTICS_FACE_IDS, faceIds, numFaces);
                         camMetadata.update(ANDROID_STATISTICS_FACE_LANDMARKS,
                                 faceLandmarks, numFaces * 6U);
-                   }
+                    }
                     IF_META_AVAILABLE(cam_face_blink_data_t, blinks,
                             CAM_INTF_META_FACE_BLINK, metadata) {
                         uint8_t detected[MAX_ROI];
@@ -7107,6 +7168,11 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                             detected[i] = blinks->blink[i].blink_detected;
                             degree[2 * i] = blinks->blink[i].left_blink;
                             degree[2 * i + 1] = blinks->blink[i].right_blink;
+
+                            LOGL("FD_DEBUG LANDMARK : Frame[%d] : Face[%d] : "
+                                    "blink_detected=%d, leye_blink=%d, reye_blink=%d",
+                                    faceDetectionInfo->frame_id, i, detected[i], degree[2 * i],
+                                    degree[2 * i + 1]);
                         }
                         camMetadata.update(QCAMERA3_STATS_BLINK_DETECTED,
                                 detected, numFaces);
@@ -7120,6 +7186,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                         for (size_t i = 0; i < numFaces; i++) {
                             degree[i] = smiles->smile[i].smile_degree;
                             confidence[i] = smiles->smile[i].smile_confidence;
+
+                            LOGL("FD_DEBUG LANDMARK : Frame[%d] : Face[%d] : "
+                                    "smile_degree=%d, smile_score=%d",
+                                    faceDetectionInfo->frame_id, i, degree[i], confidence[i]);
                         }
                         camMetadata.update(QCAMERA3_STATS_SMILE_DEGREE,
                                 degree, numFaces);
@@ -7138,6 +7208,14 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                             direction[3 * i + 2] = gazes->gaze[i].roll_dir;
                             degree[2 * i] = gazes->gaze[i].left_right_gaze;
                             degree[2 * i + 1] = gazes->gaze[i].top_bottom_gaze;
+
+                            LOGL("FD_DEBUG LANDMARK : Frame[%d] : Face[%d] : gaze_angle=%d, "
+                                    "updown_dir=%d, leftright_dir=%d,, roll_dir=%d, "
+                                    "left_right_gaze=%d, top_bottom_gaze=%d",
+                                    faceDetectionInfo->frame_id, i, angle[i],
+                                    direction[3 * i], direction[3 * i + 1],
+                                    direction[3 * i + 2],
+                                    degree[2 * i], degree[2 * i + 1]);
                         }
                         camMetadata.update(QCAMERA3_STATS_GAZE_ANGLE,
                                 (uint8_t *)angle, numFaces);
@@ -8340,12 +8418,12 @@ void QCamera3HardwareInterface::extractJpegMetadata(
 void QCamera3HardwareInterface::convertToRegions(cam_rect_t rect,
         int32_t *region, int weight)
 {
-    region[0] = rect.left;
-    region[1] = rect.top;
-    region[2] = rect.left + rect.width;
-    region[3] = rect.top + rect.height;
+    region[FACE_LEFT] = rect.left;
+    region[FACE_TOP] = rect.top;
+    region[FACE_RIGHT] = rect.left + rect.width;
+    region[FACE_BOTTOM] = rect.top + rect.height;
     if (weight > -1) {
-        region[4] = weight;
+        region[FACE_WEIGHT] = weight;
     }
 }
 
@@ -9893,7 +9971,9 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     }
 
     if (gExposeEnableZslKey) {
-        available_request_keys.add(ANDROID_CONTROL_ENABLE_ZSL);
+        if (ENABLE_HDRPLUS_FOR_FRONT_CAMERA || cameraId == 0) {
+            available_request_keys.add(ANDROID_CONTROL_ENABLE_ZSL);
+        }
     }
 
     staticInfo.update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
@@ -10599,7 +10679,7 @@ int QCamera3HardwareInterface::initHdrPlusClientLocked() {
             ALOGE("%s: Suspending Easel failed: %s (%d)", __FUNCTION__, strerror(-res), res);
         }
 
-        gEaselBypassOnly = !property_get_bool("persist.camera.hdrplus.enable", false);
+        gEaselBypassOnly = !property_get_bool("persist.camera.hdrplus.enable", true);
         gEaselProfilingEnabled = property_get_bool("persist.camera.hdrplus.profiling", false);
 
         // Expose enableZsl key only when HDR+ mode is enabled.
@@ -14399,6 +14479,10 @@ void QCamera3HardwareInterface::disableHdrPlusModeLocked()
         if (res != OK) {
             ALOGE("%s: Failed to disable HDR+ mode: %s (%d)", __FUNCTION__, strerror(-res), res);
         }
+
+        // Close HDR+ client so Easel can enter low power mode.
+        gEaselManagerClient.closeHdrPlusClient(std::move(gHdrPlusClient));
+        gHdrPlusClient = nullptr;
     }
 
     mHdrPlusModeEnabled = false;
