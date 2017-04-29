@@ -31,11 +31,15 @@
 #define __QCAMERA3HARDWAREINTERFACE_H__
 
 // System dependencies
-#include <camera/CameraMetadata.h>
 #include <pthread.h>
 #include <utils/KeyedVector.h>
 #include <utils/List.h>
 #include <map>
+#ifdef ANDROID_O
+#include "CameraMetadata.h"
+#else
+#include <camera/CameraMetadata.h>
+#endif //ANDROID_O
 // Camera dependencies
 #include "hardware/camera3.h"
 #include "QCamera3Channel.h"
@@ -55,6 +59,10 @@ extern "C" {
 using namespace android;
 
 namespace qcamera {
+
+#ifdef ANDROID_O
+using ::android::hardware::camera::common::V1_0::helper::CameraMetadata;
+#endif
 
 #ifndef TRUE
 #define TRUE 1

@@ -39,7 +39,9 @@
 #include "QCameraAllocator.h"
 #include "QCameraChannel.h"
 #include "QCameraCmdThread.h"
+#ifndef ANDROID_O
 #include "QCameraDisplay.h"
+#endif //ANDROID_O
 #include "QCameraMem.h"
 #include "QCameraParameters.h"
 #include "QCameraParametersIntf.h"
@@ -825,7 +827,9 @@ private:
     uint32_t mSurfaceStridePadding;
 
     //QCamera Display Object
+#ifndef ANDROID_O
     QCameraDisplay mCameraDisplay;
+#endif //ANDROID_O
 
     bool m_bNeedRestart;
     Mutex mMapLock;

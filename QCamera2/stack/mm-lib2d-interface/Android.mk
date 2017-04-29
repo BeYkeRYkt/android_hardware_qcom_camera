@@ -32,6 +32,9 @@ LOCAL_MODULE           := libmmlib2d_interface
 LOCAL_PRELINK_MODULE   := false
 LOCAL_SHARED_LIBRARIES := libdl libcutils liblog libmmcamera_interface
 LOCAL_MODULE_TAGS := optional
+ifeq ($(call is-platform-sdk-version-at-least,26),true)
+LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib
+endif
 
 LOCAL_32_BIT_ONLY := $(BOARD_QTI_CAMERA_32BIT_ONLY)
 include $(BUILD_SHARED_LIBRARY)
