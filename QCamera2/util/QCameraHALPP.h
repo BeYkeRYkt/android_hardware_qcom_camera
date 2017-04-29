@@ -37,6 +37,9 @@
 // STL dependencies
 #include <unordered_map>
 #include <vector>
+#ifdef ANDROID_O
+#include <sys/stat.h>
+#endif
 
 extern "C" {
 #include "mm_camera_interface.h"

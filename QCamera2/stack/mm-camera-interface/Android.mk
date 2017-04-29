@@ -58,7 +58,11 @@ LOCAL_CFLAGS += -Wall -Wextra -Werror
 LOCAL_SRC_FILES := $(MM_CAM_FILES)
 
 LOCAL_MODULE           := libmmcamera_interface
+ifeq ($(call is-platform-sdk-version-at-least,26),true)
+LOCAL_VENDOR_MODULE := true
+else
 LOCAL_PRELINK_MODULE   := false
+endif
 LOCAL_SHARED_LIBRARIES := libdl libcutils liblog
 LOCAL_MODULE_TAGS := optional
 

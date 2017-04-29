@@ -19,8 +19,10 @@ LOCAL_INC_FILES := qomx_core.h \
 LOCAL_SRC_FILES := qomx_core.c
 
 LOCAL_MODULE           := libqomx_core
-LOCAL_PRELINK_MODULE   := false
-LOCAL_SHARED_LIBRARIES := libcutils libdl
+LOCAL_SHARED_LIBRARIES := libcutils libdl liblog
+ifeq ($(call is-platform-sdk-version-at-least,26),true)
+LOCAL_VENDOR_MODULE := true
+endif
 
 LOCAL_32_BIT_ONLY := true
 include $(BUILD_SHARED_LIBRARY)
