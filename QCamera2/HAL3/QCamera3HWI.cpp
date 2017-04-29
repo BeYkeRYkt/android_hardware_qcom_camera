@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundataion. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -371,9 +371,17 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
     //TBD - To see if this hardcoding is needed. Check by printing if this is filled by mctl to 3
     gCamCapability[cameraId]->min_num_pp_bufs = 3;
 
-    pthread_cond_init(&mBuffersCond, NULL);
+    pthread_condattr_t cond_attr;
+    if (pthread_condattr_init(&cond_attr)) {
+        ALOGE("%s: pthread_condattr_init failed", __func__);
+    }
+    if (pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC)) {
+        ALOGE("%s: pthread_condattr_setclock failed!!!", __func__);
+    }
 
-    pthread_cond_init(&mRequestCond, NULL);
+    pthread_cond_init(&mBuffersCond, &cond_attr);
+
+    pthread_cond_init(&mRequestCond, &cond_attr);
     mPendingRequest = 0;
     mCurrentRequestId = -1;
     pthread_mutex_init(&mMutex, NULL);
@@ -2957,7 +2965,7 @@ int QCamera3HardwareInterface::processCaptureRequest(
     // Added a timed condition wait
     struct timespec ts;
     uint8_t isValidTimeout = 1;
-    rc = clock_gettime(CLOCK_REALTIME, &ts);
+    rc = clock_gettime(CLOCK_MONOTONIC, &ts);
     if (rc < 0) {
       isValidTimeout = 0;
       ALOGE("%s: Error reading the real time clock!!", __func__);
@@ -3347,7 +3355,7 @@ int QCamera3HardwareInterface::flushPerf()
     }
 
     /* wait on a signal that buffers were received */
-    rc = clock_gettime(CLOCK_REALTIME, &timeout);
+    rc = clock_gettime(CLOCK_MONOTONIC, &timeout);
     if (rc < 0) {
         ALOGE("%s: Error reading the real time clock, cannot use timed wait",
                 __func__);

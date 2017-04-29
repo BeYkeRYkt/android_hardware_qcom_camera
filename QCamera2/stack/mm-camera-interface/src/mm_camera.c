@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, 2017 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -343,7 +343,15 @@ int32_t mm_camera_open(mm_camera_obj_t *my_obj)
 
     pthread_mutex_init(&my_obj->cb_lock, NULL);
     pthread_mutex_init(&my_obj->evt_lock, NULL);
-    pthread_cond_init(&my_obj->evt_cond, NULL);
+
+    pthread_condattr_t cond_attr;
+    if (pthread_condattr_init(&cond_attr)) {
+        ALOGE("%s: pthread_condattr_init failed", __func__);
+    }
+    if (pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC)) {
+        ALOGE("%s: pthread_condattr_setclock failed!!!", __func__);
+    }
+    pthread_cond_init(&my_obj->evt_cond, &cond_attr);
 
     CDBG("%s : Launch evt Thread in Cam Open",__func__);
     snprintf(my_obj->evt_thread.threadName, THREAD_NAME_SIZE, "CAM_Dispatch");
@@ -1734,7 +1742,7 @@ void mm_camera_util_wait_for_event(mm_camera_obj_t *my_obj,
 
     pthread_mutex_lock(&my_obj->evt_lock);
     while (!(my_obj->evt_rcvd.server_event_type & evt_mask)) {
-        clock_gettime(CLOCK_REALTIME, &ts);
+        clock_gettime(CLOCK_MONOTONIC, &ts);
         ts.tv_sec += WAIT_TIMEOUT;
         rc = pthread_cond_timedwait(&my_obj->evt_cond, &my_obj->evt_lock, &ts);
         if (rc == ETIMEDOUT) {
