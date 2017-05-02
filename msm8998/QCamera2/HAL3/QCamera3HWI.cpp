@@ -133,10 +133,6 @@ namespace qcamera {
 // Max preferred zoom
 #define MAX_PREFERRED_ZOOM_RATIO 5.0
 
-
-// TODO: Enabl HDR+ for front camera after it's supported. b/37723569.
-#define ENABLE_HDRPLUS_FOR_FRONT_CAMERA 0
-
 cam_capability_t *gCamCapability[MM_CAMERA_MAX_NUM_SENSORS];
 const camera_metadata_t *gStaticMetadata[MM_CAMERA_MAX_NUM_SENSORS];
 extern pthread_mutex_t gCamLock;
@@ -4473,13 +4469,15 @@ void QCamera3HardwareInterface::orchestrateResult(
             LOGD("Internal Request drop the result");
         } else {
             if (result->result != NULL) {
-                CameraMetadata metadata;
-                metadata.acquire((camera_metadata_t *)result->result);
-                if (metadata.exists(ANDROID_SYNC_FRAME_NUMBER)) {
+                camera_metadata_t *metadata = const_cast<camera_metadata_t*>(result->result);
+                camera_metadata_entry_t entry;
+                int ret = find_camera_metadata_entry(metadata, ANDROID_SYNC_FRAME_NUMBER, &entry);
+                if (ret == OK) {
                     int64_t sync_frame_number = frameworkFrameNumber;
-                    metadata.update(ANDROID_SYNC_FRAME_NUMBER, &sync_frame_number, 1);
+                    ret = update_camera_metadata_entry(metadata, entry.index, &sync_frame_number, 1, &entry);
+                    if (ret != OK)
+                        LOGE("Update ANDROID_SYNC_FRAME_NUMBER Error!");
                 }
-                result->result = metadata.release();
             }
             result->frame_number = frameworkFrameNumber;
             mCallbackOps->process_capture_result(mCallbackOps, result);
@@ -4942,9 +4940,9 @@ int QCamera3HardwareInterface::processCaptureRequest(
             }
         }
 
-        if (meta.exists(NEXUS_EXPERIMENTAL_2017_SENSOR_MODE_FULLFOV)) {
+        if (meta.exists(TANGO_MODE_DATA_SENSOR_FULLFOV)) {
             uint8_t sensorModeFullFov =
-                    meta.find(NEXUS_EXPERIMENTAL_2017_SENSOR_MODE_FULLFOV).data.u8[0];
+                    meta.find(TANGO_MODE_DATA_SENSOR_FULLFOV).data.u8[0];
             LOGD("SENSOR_MODE_FULLFOV %d" , sensorModeFullFov);
             if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_META_SENSOR_MODE_FULLFOV,
                     sensorModeFullFov)) {
@@ -5262,7 +5260,7 @@ no_error:
     }
 
     // Enable HDR+ mode for the first PREVIEW_INTENT request.
-    if (ENABLE_HDRPLUS_FOR_FRONT_CAMERA || mCameraId == 0) {
+    {
         Mutex::Autolock l(gHdrPlusClientLock);
         if (gEaselManagerClient.isEaselPresentOnDevice() &&
                 !gEaselBypassOnly && !mFirstPreviewIntentSeen &&
@@ -9959,7 +9957,8 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
        /* DevCamDebug metadata end */
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM_ENABLE,
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM_BINS,
-       NEXUS_EXPERIMENTAL_2017_SENSOR_MODE_FULLFOV
+       TANGO_MODE_DATA_SENSOR_FULLFOV,
+       NEXUS_EXPERIMENTAL_2017_TRACKING_AF_TRIGGER,
        };
 
     size_t request_keys_cnt =
@@ -9971,9 +9970,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     }
 
     if (gExposeEnableZslKey) {
-        if (ENABLE_HDRPLUS_FOR_FRONT_CAMERA || cameraId == 0) {
-            available_request_keys.add(ANDROID_CONTROL_ENABLE_ZSL);
-        }
+        available_request_keys.add(ANDROID_CONTROL_ENABLE_ZSL);
     }
 
     staticInfo.update(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS,
@@ -10069,6 +10066,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM_ENABLE,
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM_BINS,
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM,
+       NEXUS_EXPERIMENTAL_2017_AF_REGIONS_CONFIDENCE,
        };
 
     size_t result_keys_cnt =
@@ -10679,7 +10677,7 @@ int QCamera3HardwareInterface::initHdrPlusClientLocked() {
             ALOGE("%s: Suspending Easel failed: %s (%d)", __FUNCTION__, strerror(-res), res);
         }
 
-        gEaselBypassOnly = !property_get_bool("persist.camera.hdrplus.enable", true);
+        gEaselBypassOnly = !property_get_bool("persist.camera.hdrplus.enable", false);
         gEaselProfilingEnabled = property_get_bool("persist.camera.hdrplus.profiling", false);
 
         // Expose enableZsl key only when HDR+ mode is enabled.
