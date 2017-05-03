@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -169,8 +169,10 @@ vendor_tag_info qcamera3_av_timer[QCAMERA3_AV_TIMER_END -
 
 vendor_tag_info qcamera3_sensor_meta_data[QCAMERA3_SENSOR_META_DATA_END -
                                   QCAMERA3_SENSOR_META_DATA_START] = {
-   {"dynamic_black_level_pattern", TYPE_FLOAT },
-   {"is_mono_only",                TYPE_BYTE }
+   {"dynamic_black_level_pattern",  TYPE_FLOAT },
+   {"is_mono_only",                 TYPE_BYTE },
+   {"start_frame_readout",          TYPE_INT64 },
+   {"frame_readout_duration",       TYPE_INT64 }
 };
 
 vendor_tag_info_t
@@ -382,6 +384,8 @@ uint32_t qcamera3_all_tags[] = {
     //QCAMERA3_SENSOR_META_DATA
     (uint32_t)QCAMERA3_SENSOR_DYNAMIC_BLACK_LEVEL_PATTERN,
     (uint32_t)QCAMERA3_SENSOR_IS_MONO_ONLY,
+    (uint64_t)QCAMERA3_SENSOR_START_FRAME_READOUT,
+    (uint64_t)QCAMERA3_SENSOR_FRAME_READOUT_DURATION,
 
     // QCAMERA3_DUALCAM_LINK_META_DATA
     (uint32_t)QCAMERA3_DUALCAM_LINK_ENABLE,
