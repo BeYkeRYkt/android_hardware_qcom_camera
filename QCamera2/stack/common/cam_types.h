@@ -54,7 +54,7 @@
 #define CEILING2(X)  (((X) + 0x0001) & 0xFFFE)
 
 #define MAX_ZOOMS_CNT 91
-#define MAX_SIZES_CNT 40
+#define MAX_SIZES_CNT 50
 #define MAX_EXP_BRACKETING_LENGTH 32
 #define MAX_ROI 10
 #define MAX_STREAM_NUM_IN_BUNDLE 8
@@ -2246,8 +2246,8 @@ typedef enum {
     CAM_INTF_META_SENSOR_SENSITIVITY,
     /* Time at start of exposure of first row */
     CAM_INTF_META_SENSOR_TIMESTAMP,
-    /* Duration b/w start of first row exposure and the start of last
-       row exposure in nanoseconds */
+    /* cam_sensor_timestamp_t  - croped frame timings in nanoseconds plus
+     * first sensor output line exposure_start */
     CAM_INTF_META_SENSOR_ROLLING_SHUTTER_SKEW,
     /* SHADING */
     /* Quality of lens shading correction applied to the image data */
@@ -3024,6 +3024,15 @@ typedef struct {
     uint32_t exp_gr_num[STATS_MAX_EXPOSURE_NUM];
     uint32_t exp_gb_num[STATS_MAX_EXPOSURE_NUM];
 } cam_exposure_data_t;
+
+typedef struct {
+    /* first sensor output line exposure_start timestamp */
+    int64_t exposure_start;
+    /* sensor output image crop start readout timestamp */
+    int64_t start_frame_readout;
+    /* sensor output image croped frame readout */
+    int64_t frame_readout_duration;
+} cam_sensor_timestamp_t;
 
 typedef struct {
     /* Whether the information here is valid or not */
