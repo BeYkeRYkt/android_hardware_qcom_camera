@@ -39,7 +39,7 @@ LOCAL_SRC_FILES += \
         HAL/QCameraParameters.cpp \
         HAL/QCameraThermalAdapter.cpp
 
-LOCAL_CFLAGS := -Wall -Wextra -Werror
+LOCAL_CFLAGS := -Wall -Wextra -Wno-error -Wno-tautological-pointer-compare
 
 LOCAL_CFLAGS += -DHAS_MULTIMEDIA_HINTS
 
@@ -96,7 +96,7 @@ endif
 
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_MODULE := camera.$(TARGET_BOARD_PLATFORM)
-LOCAL_CLANG := false
+LOCAL_CLANG := true
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_32_BIT_ONLY := $(BOARD_QTI_CAMERA_32BIT_ONLY)
