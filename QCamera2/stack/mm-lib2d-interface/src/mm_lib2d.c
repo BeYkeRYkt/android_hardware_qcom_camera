@@ -292,6 +292,7 @@ lib2d_error mm_lib2d_init(lib2d_mode mode, cam_format_t src_format,
     return MM_LIB2D_ERR_BAD_PARAM;
   }
 
+
   // validate src_format, dst_format to check whether we support these.
   // Currently support NV21 to ARGB conversions only. Others not tested.
   if ((src_format != CAM_FORMAT_YUV_420_NV21) ||
@@ -544,11 +545,13 @@ lib2d_error mm_lib2d_start_job(void *lib2d_obj_handle,
   lib2d_fill_img_frame(p_in_frame, src_buffer, jobid);
   lib2d_fill_img_frame(p_out_frame, dst_buffer, jobid);
 
+
   p_meta->frame_id = jobid;
   p_meta->rotation.device_rotation = (int32_t)rotation;
   p_meta->rotation.frame_rotation = (int32_t)rotation;
 
   // call set_param to set the source, destination formats
+
 
   rc = IMG_COMP_Q_BUF(p_comp, p_in_frame, IMG_IN);
   if (rc != IMG_SUCCESS) {
@@ -561,6 +564,7 @@ lib2d_error mm_lib2d_start_job(void *lib2d_obj_handle,
     LOGE("rc %d", rc);
     goto ERROR;
   }
+
 
   rc = IMG_COMP_Q_META_BUF(p_comp, p_meta);
   if (rc != IMG_SUCCESS) {
@@ -577,6 +581,7 @@ lib2d_error mm_lib2d_start_job(void *lib2d_obj_handle,
   if (lib2d_obj->lib2d_mode == MM_LIB2D_SYNC_MODE) {
     if (lib2d_obj->comp_mode == IMG_ASYNC_MODE) {
       LOGD("before wait rc %d", rc);
+
       rc = lib2d_obj->img_lib.img_wait_for_completion(&lib2d_obj->cond,
         &lib2d_obj->mutex, 10000);
       if (rc != IMG_SUCCESS) {
