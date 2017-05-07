@@ -10398,7 +10398,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     }
 
     int64_t available_exp_time_range[EXPOSURE_TIME_RANGE_CNT];
-    for (size_t i = 0; i < count; i++)
+    for (size_t i = 0; i < EXPOSURE_TIME_RANGE_CNT; i++)
         available_exp_time_range[i] = gCamCapability[cameraId]->exposure_time_range[i];
     staticInfo.update(QCAMERA3_EXP_TIME_RANGE,
             available_exp_time_range, EXPOSURE_TIME_RANGE_CNT);
@@ -11190,7 +11190,7 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
     uint8_t sync_type = CAM_TYPE_STANDALONE;
     settings.update(QCAMERA3_DUALCAM_LINK_ENABLE, &sync_type, 1);
 
-    uint8_t is_main = 0; //this doesn't matter as app should overwrite
+    uint8_t is_main = 1;
     settings.update(QCAMERA3_DUALCAM_LINK_IS_MAIN, &is_main, 1);
 
     uint8_t related_camera_id = mCameraId;
