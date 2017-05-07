@@ -11390,6 +11390,11 @@ bool QCameraParameters::useJpegExifRotation() {
         return true;
     }
 
+    property_get("persist.camera.lib2d.rotation", exifRotation, "off");
+    if (!strcmp(exifRotation, "on")) {
+        return false;
+    }
+
     if (!(m_pCapability->qcom_supported_feature_mask & CAM_QCOM_FEATURE_ROTATION)) {
         return true;
     }
