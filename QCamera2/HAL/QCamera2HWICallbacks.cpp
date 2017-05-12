@@ -966,6 +966,16 @@ void QCamera2HardwareInterface::nodisplay_preview_stream_raw_cb_routine(
         return;
     }
 
+    if (pme->needDebugFps()) {
+        pme->debugShowPreviewFPS();
+    }
+
+    if(pme->m_bPreviewStarted) {
+        CDBG_HIGH("[KPI Perf] %s : PROFILE_FIRST_PREVIEW_RAW_FRAME", __func__);
+        pme->m_bPreviewStarted = false;
+    }
+    ATRACE_INT("Preview:FrameIdx", frame->frame_idx);
+
     nsecs_t timeStamp;
     if(pme->mParameters.isAVTimerEnabled() == true) {
         timeStamp = (nsecs_t)((frame->ts.tv_sec * 1000000LL) + frame->ts.tv_nsec) * 1000;
@@ -1065,6 +1075,12 @@ void QCamera2HardwareInterface::nodisplay_preview_stream_cb_routine(
             return;
         }
     }
+
+    if(pme->m_bPreviewStarted) {
+        CDBG_HIGH("[KPI Perf] %s : PROFILE_FIRST_PREVIEW_FRAME", __func__);
+        pme->m_bPreviewStarted = false;
+    }
+    ATRACE_INT("Preview:FrameIdx", frame->frame_idx);
 
     QCameraMemory *previewMemObj = (QCameraMemory *)frame->mem_info;
     camera_memory_t *preview_mem = NULL;
@@ -2168,19 +2184,47 @@ void QCamera2HardwareInterface::debugShowVideoFPS()
  *==========================================================================*/
 void QCamera2HardwareInterface::debugShowPreviewFPS()
 {
+    ATRACE_CALL();
     static int n_pFrameCount = 0;
     static int n_pLastFrameCount = 0;
+    static nsecs_t n_pTotalFpsTime = 0;
     static nsecs_t n_pLastFpsTime = 0;
+    static nsecs_t n_pLastFrameTime = 0;
+    static nsecs_t n_pMaxFrameInterval = 0;
+    static double n_pFpsAll = 0;
     static double n_pFps = 0;
     n_pFrameCount++;
     nsecs_t now = systemTime();
     nsecs_t diff = now - n_pLastFpsTime;
-    if (diff > ms2ns(250)) {
-        n_pFps = (((double)(n_pFrameCount - n_pLastFrameCount)) *
-                (double)(s2ns(1))) / (double)diff;
-        CDBG_HIGH("[KPI Perf] %s: PROFILE_PREVIEW_FRAMES_PER_SECOND : %.4f", __func__, n_pFps);
+    nsecs_t intv = now - n_pLastFrameTime;
+    char str[64];
+
+    if (n_pFrameCount == 1) {
         n_pLastFpsTime = now;
-        n_pLastFrameCount = n_pFrameCount;
+        n_pLastFrameTime = now;
+    } else {
+        n_pLastFrameTime = now;
+        if (intv > n_pMaxFrameInterval) {
+            n_pMaxFrameInterval = intv;
+            sprintf(str, "Preview:MaxInterval:%ld", n_pMaxFrameInterval);
+            ATRACE_INT(str, n_pFrameCount);
+        }
+
+        if (diff > ms2ns(250)) {
+            n_pFps = (((double)(n_pFrameCount - n_pLastFrameCount)) *
+                    (double)(s2ns(1))) / (double)diff;
+            CDBG_HIGH("[KPI Perf] %s: PROFILE_PREVIEW_FRAMES_PER_SECOND : %.4f",
+                     __func__, n_pFps);
+
+            n_pTotalFpsTime += diff;
+            n_pFpsAll = (((double)(n_pFrameCount - 1)) *
+                    (double)(s2ns(1))) / (double)n_pTotalFpsTime;
+            sprintf(str, "Preview:FPS:%.4f\\%.4f", n_pFps, n_pFpsAll);
+            ATRACE_INT(str, n_pFrameCount);
+
+            n_pLastFpsTime = now;
+            n_pLastFrameCount = n_pFrameCount;
+        }
     }
 }
 

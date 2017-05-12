@@ -265,7 +265,7 @@ int32_t mm_camera_open(mm_camera_obj_t *my_obj)
     strlcpy(t_devname, temp_dev_name, sizeof(t_devname));
     snprintf(dev_name, sizeof(dev_name), "/dev/%s",t_devname );
     sscanf(dev_name, "/dev/video%d", &cam_idx);
-    CDBG_ERROR("%s: dev name = %s, cam_idx = %d", __func__, dev_name, cam_idx);
+    CDBG_HIGH("%s: dev name = %s, cam_idx = %d", __func__, dev_name, cam_idx);
 
     do{
         n_try--;
