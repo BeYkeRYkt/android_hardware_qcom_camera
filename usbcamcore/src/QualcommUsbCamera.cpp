@@ -185,7 +185,7 @@ extern "C" int usbcam_get_camera_info(int camera_id, struct camera_info *info)
         struct CameraInfo camInfo;
         memset((char*)&camInfo, -1, sizeof (struct CameraInfo));
 
-        info->facing = CAMERA_FACING_FRONT;///CAMERA_FACING_FRONT;//CAMERA_FACING_BACK;
+        info->facing = CAMERA_FACING_EXTERNAL;///CAMERA_FACING_FRONT;//CAMERA_FACING_BACK;
         info->orientation = 0;
         info->device_version = CAMERA_DEVICE_API_VERSION_1_0;
         rc = 0;

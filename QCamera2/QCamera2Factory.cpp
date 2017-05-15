@@ -81,7 +81,6 @@ QCamera2Factory::QCamera2Factory()
     mCallbacks = NULL;
     mNumOfCSICamera = get_num_of_cameras();
     if(mNumOfCSICamera > 1) {
-        mNumOfCSICamera = 1;
     }
     mNumOfUSBCamera = usbcam_get_number_of_cameras();
     mNumOfCameras = mNumOfCSICamera + mNumOfUSBCamera;
