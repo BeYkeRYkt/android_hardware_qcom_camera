@@ -1447,6 +1447,7 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
 
         // Fill in exif debug data
         if (exif_debug_params) {
+        #ifdef CAMERA_DEBUG_DATA
             // AE
             IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
                     CAM_INTF_META_EXIF_DEBUG_AE, metadata) {
@@ -1527,6 +1528,7 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
                 exif_debug_params->q3a_tuning_debug_params_valid = TRUE;
                 jpg_job.encode_job.p_metadata->is_statsdebug_3a_tuning_params_valid = TRUE;
             }
+        #endif
         }
     } else {
        LOGW("Metadata is null");
@@ -1877,7 +1879,7 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
     if (metadata != NULL) {
        //Fill in the metadata passed as parameter
        jpg_job.encode_job.p_metadata = metadata;
-
+       #ifdef CAMERA_DEBUG_DATA
        jpg_job.encode_job.p_metadata->is_mobicat_aec_params_valid =
                 jpg_job.encode_job.cam_exif_params.cam_3a_params_valid;
 
@@ -1885,8 +1887,9 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
             jpg_job.encode_job.p_metadata->mobicat_aec_params =
                 jpg_job.encode_job.cam_exif_params.cam_3a_params;
        }
-
+       #endif
        if (exif_debug_params) {
+          #ifdef CAMERA_DEBUG_DATA
             // Copy debug parameters locally.
            memcpy(jpg_job.encode_job.cam_exif_params.debug_params,
                    exif_debug_params, (sizeof(mm_jpeg_debug_exif_params_t)));
@@ -1940,6 +1943,7 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
                 jpg_job.encode_job.p_metadata->statsdebug_3a_tuning_data =
                         jpg_job.encode_job.cam_exif_params.debug_params->q3a_tuning_debug_params;
             }
+        #endif
         }
     } else {
        LOGW("Metadata is null");
