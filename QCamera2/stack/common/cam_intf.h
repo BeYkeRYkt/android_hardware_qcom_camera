@@ -995,6 +995,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_LENS_SHADING_MAP,             cam_lens_shading_map_t,      1);
     INCLUDE(CAM_INTF_META_AEC_INFO,                     cam_3a_params_t,             1);
     INCLUDE(CAM_INTF_META_SENSOR_INFO,                  cam_sensor_params_t,         1);
+    #ifdef CAMERA_DEBUG_DATA
     INCLUDE(CAM_INTF_META_EXIF_DEBUG_AE,                cam_ae_exif_debug_t,         1);
     INCLUDE(CAM_INTF_META_EXIF_DEBUG_AWB,               cam_awb_exif_debug_t,        1);
     INCLUDE(CAM_INTF_META_EXIF_DEBUG_AF,                cam_af_exif_debug_t,         1);
@@ -1003,6 +1004,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_EXIF_DEBUG_BESTATS,           cam_bestats_buffer_exif_debug_t, 1);
     INCLUDE(CAM_INTF_META_EXIF_DEBUG_BHIST,             cam_bhist_buffer_exif_debug_t,   1);
     INCLUDE(CAM_INTF_META_EXIF_DEBUG_3A_TUNING,         cam_q3a_tuning_info_t,       1);
+    #endif
     INCLUDE(CAM_INTF_META_ASD_SCENE_CAPTURE_TYPE,       cam_auto_scene_t,            1);
     INCLUDE(CAM_INTF_PARM_EFFECT,                       uint32_t,                    1);
     /* Defining as int32_t so that this array is 4 byte aligned */
@@ -1179,6 +1181,7 @@ typedef struct {
     };
     metadata_data_t data;
     /*Tuning Data */
+    #ifdef CAMERA_DEBUG_DATA
     uint8_t is_tuning_params_valid;
     tuning_params_t tuning_params;
 
@@ -1210,6 +1213,7 @@ typedef struct {
 
     uint8_t is_statsdebug_3a_tuning_params_valid;
     cam_q3a_tuning_info_t statsdebug_3a_tuning_data;
+    #endif
 } metadata_buffer_t;
 
 typedef metadata_buffer_t parm_buffer_t;
@@ -1224,6 +1228,7 @@ static inline void clear_metadata_buffer(metadata_buffer_t *meta)
 {
     if (meta) {
       memset(meta->is_valid, 0, CAM_INTF_PARM_MAX);
+      #ifdef CAMERA_DEBUG_DATA
       meta->is_tuning_params_valid = 0;
       meta->is_mobicat_aec_params_valid = 0;
       meta->is_statsdebug_ae_params_valid = 0;
@@ -1241,6 +1246,7 @@ static inline void clear_metadata_buffer(metadata_buffer_t *meta)
       meta->tuning_params.tuning_sensor_data_size = 0;
       meta->tuning_params.tuning_vfe_data_size = 0;
       meta->tuning_params.tuning_mod1_stats_data_size = 0;
+      #endif
     }
 }
 
