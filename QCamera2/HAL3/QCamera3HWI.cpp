@@ -2383,7 +2383,13 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     }
 
     // Create analysis stream all the time, even when h/w support is not available
-    if (!onlyRaw) {
+    char analysis_prop[PROPERTY_VALUE_MAX];
+    memset(analysis_prop, 0, sizeof(analysis_prop));
+    /* Disable analysis stram by default for connected camera */
+    property_get("persist.camera.analysis.enable", analysis_prop, "0");
+    int32_t analysis_enable = atoi(analysis_prop);
+
+    if ((!onlyRaw) && (analysis_enable) ) {
         cam_feature_mask_t analysisFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
         setPAAFSupport(analysisFeatureMask, CAM_STREAM_TYPE_ANALYSIS,
                 gCamCapability[mCameraId]->color_arrangement);
