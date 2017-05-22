@@ -972,19 +972,22 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
             frameIndex = super_frame->bufs[0]->buf_idx;
             resultFrameNumber = mMemory.getFrameNumber(frameIndex);
             lowestFrameNumber = mMemory.getOldestFrameNumber(oldestBufIndex);
-            LOGE("Attempting to recover next frame: result Frame#: %d, resultIdx: %d, "
+            LOGE("camera id %d, Attempting to recover next frame: result Frame#: %d, resultIdx: %d, "
                     "Lowest Frame#: %d, oldestBufIndex: %d",
+                    hal_obj->getCameraID(),
                     resultFrameNumber, frameIndex, lowestFrameNumber, oldestBufIndex);
             if ((lowestFrameNumber != -1) && (lowestFrameNumber < resultFrameNumber)) {
-                LOGE("Multiple frame dropped requesting cancel for frame %d, idx:%d",
-                        lowestFrameNumber, oldestBufIndex);
+                LOGE("camera id %d, Multiple frame dropped requesting cancel for frame %d, idx:%d",
+                        hal_obj->getCameraID(),lowestFrameNumber, oldestBufIndex);
                 stream->cancelBuffer(oldestBufIndex);
                 return;
              } else if (lowestFrameNumber == resultFrameNumber) {
-                LOGE("Time to flush out head of list continue loop with this new super frame");
+                LOGE("camera id %d, Time to flush out head of list continue loop with this new super frame",
+                        hal_obj->getCameraID());
                 itr = mOutOfSequenceBuffers.erase(itr);
              } else {
-                LOGE("Unexpected condition head of list is not the lowest frame number");
+                LOGE("camera id %d, Unexpected condition head of list is not the lowest frame number",
+                        hal_obj->getCameraID());
                 itr = mOutOfSequenceBuffers.erase(itr);
              }
           }
