@@ -2715,7 +2715,7 @@ QCamera3YUVChannel::QCamera3YUVChannel(uint32_t cam_handle,
         QCamera3Channel *metadataChannel) :
             QCamera3ProcessingChannel(cam_handle, channel_handle, cam_ops,
                     cb_routine, cb_buf_err, paddingInfo, userData, stream, stream_type,
-                    postprocess_mask, metadataChannel)
+                    postprocess_mask, metadataChannel, MAX_INFLIGHT_REQUESTS + 4)
 {
 
     mBypass = (postprocess_mask == CAM_QCOM_FEATURE_NONE);
