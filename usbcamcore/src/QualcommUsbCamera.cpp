@@ -167,8 +167,6 @@ void jpegEncodeCb   (jpeg_job_status_t status,
 extern "C" int usbcam_get_number_of_cameras()
 {
     /* TBR: This is hardcoded currently to 1 USB camera */
-    char devName[1024];
-    get_uvc_device(devName);
     int numCameras = 1;
     ALOGI("%s: E", __func__);
     ALOGI("%s: X", __func__);
@@ -226,12 +224,13 @@ extern "C" int  usbcam_camera_device_open(int id,
     dev_name = camHal->dev_name;
 
     rc = get_uvc_device(dev_name);
-    if(rc || *dev_name == '\0'){
+    if(rc < 0 || *dev_name == '\0'){
         ALOGE("%s: No UVC node found \n", __func__);
+		free(camHal);
         return -1;
     }
 
-    camHal->fd = open(dev_name, O_RDWR /* required */ | O_NONBLOCK, 0);
+    camHal->fd = rc;
 
     if (camHal->fd <  0) {
         ALOGE("%s: Cannot open '%s'", __func__, dev_name);
@@ -2608,15 +2607,22 @@ static int get_uvc_device(char *devname)
     static char    temp_devname[FILENAME_LENGTH] = {0};
     //FILE    *fp = NULL;
     int     i = 0, fd;
+	int count = 0;
 
     ALOGD("%s: E", __func__);
 
     if(temp_devname[0] == 0){
-        for(i = 0; i < 5; i++){
+        for(i = 1; i < 4; i++){
             sprintf(temp_devname, "/dev/video%d", i);
              ALOGD("%s:  i= %d temp_devname=%s", __func__,i,temp_devname);
-            fd = open(temp_devname, O_RDWR);
-            if(fd < 0){
+			 count = 0;
+            fd = open(temp_devname, O_RDWR | O_NONBLOCK, 0);
+			while(fd < 0 && count < 5){
+				fd = open(temp_devname, O_RDWR | O_NONBLOCK, 0);
+				count++;
+				usleep(1000*500);
+			}
+            if(fd < 0 || count > 5){
                 ALOGD("%s: open temp_devname=%s  failed",__func__, temp_devname);
                 memset(temp_devname, 0, sizeof(temp_devname));
                 continue;
@@ -2633,97 +2639,13 @@ static int get_uvc_device(char *devname)
              }
              else{
                 ALOGE("%s: success ,devname=%s",__func__,temp_devname);
-                close(fd);
-                break;
+				strncpy(devname, temp_devname, FILENAME_LENGTH);
+				return fd;
              }
          }
     }
-#if 1
-    strncpy(devname, temp_devname, FILENAME_LENGTH);
-
-/*
-    struct          stat st;
-
-    strncpy(dev_name, "/dev/video1", FILENAME_LENGTH);
-    if (-1 == stat(dev_name, &st)) {
-        ALOGE("%s: Cannot identify '%s': %d, %s\n",
-             __func__, dev_name, errno, strerror(errno));
-    }
-
-    if (!S_ISCHR(st.st_mode)) {
-        ALOGE("%s: %s is no device\n", __func__, dev_name);
-        rc = -1;
-    }
-*/
-
-#else
-
-    *devname = '\0';
-    /************************************************************************/
-    /* - List all /dev/video* entries to a file                             */
-    /* - Open the video list file and loop through the list                 */
-    /* - Send UVC specific control query and check the response             */
-    /* - If device responds to the query as success, device is UVC webcam   */
-    /************************************************************************/
-
-    /************************************************************************/
-    /* - List all /dev/video* entries to a file                             */
-    /************************************************************************/
-    /* Temporarily commented out. This logic doesnt seem to be working */
-    //system("ls > /data/video_dev_list");
-
-    /************************************************************************/
-    /* - Open the video list file and loop through the list                 */
-    /************************************************************************/
-
-    /* Temporarily commented out. This logic doesnt seem to be working */
-    /*
-    fp = fopen("/data/video_dev_list", "rb");
-    if(!fp) {
-        ALOGE("%s: Error in opening /data/video_dev_list ", __func__);
-        return -1;
-    }
-    */
-
-    /* Temporarily commented out. Looping logic changed due to issue in */
-    /* executing system("ls > /data/video_dev_list") */
-    //while(EOF != fscanf(fp, "%s", devname)){
-    while(1){
-        uvc_xu_control_query    xqry;
-
-        sprintf(temp_devname, "/dev/video%d", i);
-        ALOGD("%s: Probing %s \n", __func__, temp_devname);
-
-        fd = open(temp_devname, O_RDWR /* required */ | O_NONBLOCK, 0);
-        if(-1 != fd){
-            memset(&xqry, 0, sizeof(uvc_xu_control_query));
-            ret = ioctl(fd, UVCIOC_CTRL_QUERY, &xqry);
-            ALOGD("%s: UVCIOC ret: %d, errno: %d", __func__, ret, errno);
-            /****************************************************************/
-            /* if UVCIOC is executed successfully, ret = 0                  */
-            /* if UVCIOC is executed but Control Unit = 0 does not exist,   */
-            /*      ret = -1 and errno = ENOENT                             */
-            /* if UVCIOC doesnot execute, ret = -1 and errno = EINVAL       */
-            /****************************************************************/
-            if((0 == ret) || (ret && (ENOENT == errno))){
-                ALOGD("%s: Found UVC node: %s\n", __func__, temp_devname);
-                strncpy(devname, temp_devname, FILENAME_LENGTH);
-                /* Exit the loop at the first UVC node detection */
-                break;
-            }
-            close(fd);
-        }
-        /* Temporarily logic to probe video0 to video10 nodes */
-        if(i++ > 10)
-        {
-            if(fp)
-                fclose(fp);
-            break;
-        }
-    }
-#endif /* #if 0 */
     ALOGD("%s: X", __func__);
-    return 0;
+    return -1;
 } /* get_uvc_device */
 
 /******************************************************************************
