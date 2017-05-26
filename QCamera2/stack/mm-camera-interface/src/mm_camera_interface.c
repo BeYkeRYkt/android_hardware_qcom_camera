@@ -1391,7 +1391,7 @@ void get_sensor_info()
                 facing = (temp & 0xFF00) >> 8;
                 is_yuv = ((entity.flags & CAM_SENSOR_FORMAT_MASK) ?
                         CAM_SENSOR_YUV:CAM_SENSOR_RAW);
-                ALOGD("index = %u flag = %x mount_angle = %u "
+                CDBG_HIGH("index = %u flag = %x mount_angle = %u "
                         "facing = %u is_yuv = %u\n",
                         (unsigned int)num_cameras, (unsigned int)temp,
                         (unsigned int)mount_angle, (unsigned int)facing,
@@ -1550,14 +1550,14 @@ uint8_t get_num_of_cameras()
             struct media_entity_desc entity;
             memset(&entity, 0, sizeof(entity));
             entity.id = num_entities++;
-            CDBG_ERROR("entity id %d", entity.id);
+            CDBG_HIGH("entity id %d", entity.id);
             rc = ioctl(dev_fd, MEDIA_IOC_ENUM_ENTITIES, &entity);
             if (rc < 0) {
-                CDBG_ERROR("Done enumerating media entities");
+                CDBG_HIGH("Done enumerating media entities");
                 rc = 0;
                 break;
             }
-            CDBG_ERROR("entity name %s type %d group id %d",
+            CDBG_HIGH("entity name %s type %d group id %d",
                 entity.name, entity.type, entity.group_id);
             if (entity.type == MEDIA_ENT_T_V4L2_SUBDEV &&
                 entity.group_id == MSM_CAMERA_SUBDEV_SENSOR_INIT) {

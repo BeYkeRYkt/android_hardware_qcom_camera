@@ -2510,7 +2510,7 @@ int32_t QCameraParameters::setSensorDebugMask()
 
     property_get("persist.camera.sensor.debug", value, "0");
     mask = (uint32_t)atoi(value);
-    ALOGV("%s: ctrl mask :%d", __func__, mask);
+    CDBG_HIGH("%s: ctrl mask :%d", __func__, mask);
 
     return AddSetParmEntryToBatch(m_pParamBuf,
                                   CAM_INTF_PARM_SENSOR_DEBUG_MASK,

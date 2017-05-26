@@ -554,7 +554,7 @@ void QCamera2HardwareInterface::release_preview_frame(
         ALOGE("NULL camera device");
         return;
     }
-    ALOGD("%s: E", __func__);
+    CDBG("%s: E", __func__);
     hw->lockAPI();
     qcamera_api_result_t apiResult;
     int32_t ret = hw->processAPI(QCAMERA_SM_EVT_RELEASE_PREVIEW_FRAME, (void *)opaque);
@@ -562,7 +562,7 @@ void QCamera2HardwareInterface::release_preview_frame(
         hw->waitAPIResult(QCAMERA_SM_EVT_RELEASE_PREVIEW_FRAME,&apiResult);
     }
     hw->unlockAPI();
-    ALOGD("%s: X", __func__);
+    CDBG("%s: X", __func__);
 }
 
 /*===========================================================================
@@ -1254,7 +1254,7 @@ int QCamera2HardwareInterface::openCamera()
     //check if video size 4k x 2k support is enabled
     property_get("persist.camera.4k2k.enable", value, "0");
     enable_4k2k = atoi(value) > 0 ? 1 : 0;
-    ALOGD("%s: enable_4k2k is %d", __func__, enable_4k2k);
+    CDBG_HIGH("%s: enable_4k2k is %d", __func__, enable_4k2k);
     if (!enable_4k2k) {
        //if the 4kx2k size exists in the supported preview size or
        //supported video size remove it
@@ -1764,7 +1764,7 @@ uint8_t QCamera2HardwareInterface::getBufNumRequired(cam_stream_type_t stream_ty
         break;
     }
 
-    ALOGD("%s: Allocating %d buffers for streamtype %d",__func__,bufferCnt,stream_type);
+    CDBG_HIGH("%s: Allocating %d buffers for streamtype %d",__func__,bufferCnt,stream_type);
     return (uint8_t)bufferCnt;
 }
 
@@ -1953,7 +1953,7 @@ QCameraHeapMemory *QCamera2HardwareInterface::allocateStreamInfoBuf(
     rc = mParameters.getStreamRotation(stream_type, streamInfo->pp_config, streamInfo->dim);
     streamInfo->num_bufs = getBufNumRequired(stream_type);
     streamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
-    ALOGD("%s: stream_type %d, stream format %d,stream dimension %dx%d, num_bufs %d\n",
+    CDBG_HIGH("%s: stream_type %d, stream format %d,stream dimension %dx%d, num_bufs %d\n",
            __func__, stream_type, streamInfo->fmt, streamInfo->dim.width,
            streamInfo->dim.height, streamInfo->num_bufs);
     switch (stream_type) {
@@ -2379,7 +2379,7 @@ int QCamera2HardwareInterface::releasePreviewFrame(const void * opaque)
     int32_t rc = UNKNOWN_ERROR;
     QCameraChannel *pChannel =
         (QCameraChannel *)m_channels[QCAMERA_CH_TYPE_PREVIEW];
-    ALOGD("%s: opaque data = %p", __func__,opaque);
+    CDBG("%s: opaque data = %p", __func__,opaque);
     if(pChannel != NULL) {
         rc = pChannel->releaseFrame(opaque, mStoreMetaDataInFrame > 0);
     }
@@ -7461,7 +7461,7 @@ void QCamera2HardwareInterface::getLogLevel()
     else
         gCamHalLogLevel = 0; // Debug logs are not required if debug_mask is zero
 
-    ALOGI("%s gCamHalLogLevel=%d",__func__, gCamHalLogLevel);
+    CDBG_HIGH("%s gCamHalLogLevel=%d",__func__, gCamHalLogLevel);
     return;
 }
 

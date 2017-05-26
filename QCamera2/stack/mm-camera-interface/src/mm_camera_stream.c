@@ -44,6 +44,9 @@
 #include "mm_camera_interface.h"
 #include "mm_camera.h"
 
+#include "cutils/trace.h"
+#define ATRACE_TAG ATRACE_TAG_CAMERA
+
 /* internal function decalre */
 int32_t mm_stream_qbuf(mm_stream_t *my_obj,
                        mm_camera_buf_def_t *buf);
@@ -1038,6 +1041,7 @@ int32_t mm_stream_read_msm_frame(mm_stream_t * my_obj,
     int32_t rc = 0;
     struct v4l2_buffer vb;
     struct v4l2_plane planes[VIDEO_MAX_PLANES];
+    char str[64];
     CDBG("%s: E, my_handle = 0x%x, fd = %d, state = %d",
          __func__, my_obj->my_hdl, my_obj->fd, my_obj->state);
 
@@ -1090,6 +1094,8 @@ int32_t mm_stream_read_msm_frame(mm_stream_t * my_obj,
         CDBG_HIGH("%s: VIDIOC_DQBUF buf_index %d, frame_idx %d, stream type %d, queued cnt %d\n",
                    __func__, vb.index, buf_info->buf->frame_idx,
                    my_obj->stream_info->stream_type,my_obj->queued_buffer_count);
+        sprintf(str, "Stream:%d|FrameIdx", my_obj->stream_info->stream_type);
+        ATRACE_INT(str, buf_info->buf->frame_idx);
         pthread_mutex_unlock(&my_obj->buf_lock);
         if ( NULL != my_obj->mem_vtbl.clean_invalidate_buf ) {
             rc = my_obj->mem_vtbl.clean_invalidate_buf(idx,
@@ -1341,7 +1347,7 @@ int32_t mm_stream_request_buf(mm_stream_t * my_obj)
     CDBG("%s: E, my_handle = 0x%x, fd = %d, state = %d",
          __func__, my_obj->my_hdl, my_obj->fd, my_obj->state);
 
-    CDBG_ERROR("%s: buf_num = %d, stream type = %d",
+    CDBG_HIGH("%s: buf_num = %d, stream type = %d",
          __func__, buf_num, my_obj->stream_info->stream_type);
 
     if(buf_num > MM_CAMERA_MAX_NUM_FRAMES) {
