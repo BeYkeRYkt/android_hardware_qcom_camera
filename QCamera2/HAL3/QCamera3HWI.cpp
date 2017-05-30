@@ -94,6 +94,8 @@ namespace qcamera {
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #ifdef _DRONE_
 #define MIN_FPS_FOR_BATCH_MODE (90)
+#elif _LE_CAMERA_
+#define MIN_FPS_FOR_BATCH_MODE (60)
 #else
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #endif
