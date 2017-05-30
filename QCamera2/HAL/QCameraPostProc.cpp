@@ -3408,6 +3408,10 @@ int32_t QCameraPostProcessor::doReprocess()
         ppInputFrame = src_frame;
     }
 
+    if ((mCurChannelIdx == 0) && m_parent->mParameters.getQuadraCfa()){
+      m_parent->mParameters.setStreamConfigure(false,false,true);
+      LOGD("reset meta stream");
+    }
     if (mPPChannelCount >= CAM_PP_CHANNEL_MAX) {
         LOGE("invalid channel count");
         return UNKNOWN_ERROR;
