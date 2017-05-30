@@ -11389,6 +11389,43 @@ int QCamera3HardwareInterface::translateToHalMetadata
         }
     }
 
+    if (frame_settings.exists(ANDROID_CONTROL_AWB_REGIONS)) {
+        cam_area_t roi;
+        bool reset = true;
+        cam_awb_roi_color_target awb_color_roi;
+        convertFromRegions(roi, request->settings, ANDROID_CONTROL_AWB_REGIONS);
+        LOGD("ROI_DBG frame setting existed left: %d  top:%d   width:%d   height:%d",
+                roi.rect.left,roi.rect.top,roi.rect.width,roi.rect.height);
+        // Map coordinate system based on FOV
+        mCropRegionMapper.toSensor(roi.rect.left, roi.rect.top, roi.rect.width,
+                roi.rect.height);
+
+        if (scalerCropSet) {
+            reset = resetIfNeededROI(&roi, &scalerCropRegion);
+        }
+        awb_color_roi.roi = roi;
+        if (frame_settings.exists(QCAMERA3_AWB_ROI_COLOR)) {
+            int rgb_color[3];
+            rgb_color[0] = frame_settings.find(QCAMERA3_AWB_ROI_COLOR).data.i32[0];
+            rgb_color[1] = frame_settings.find(QCAMERA3_AWB_ROI_COLOR).data.i32[1];
+            rgb_color[2] = frame_settings.find(QCAMERA3_AWB_ROI_COLOR).data.i32[2];
+            if((rgb_color[0] <= 0) || (rgb_color[0] <= 0) || (rgb_color[0] <= 0))
+                LOGE(" Invalid RGB color");
+            awb_color_roi.rgb[0] = rgb_color[0];
+            awb_color_roi.rgb[1] = rgb_color[1];
+            awb_color_roi.rgb[2] = rgb_color[2];
+            LOGD("ROI_DBG Setting RGB Color  %d  and %d  and %d",
+                    awb_color_roi.rgb[0], awb_color_roi.rgb[1], awb_color_roi.rgb[2]);
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata,
+                    CAM_INTF_META_AWB_COLOR_ROI, awb_color_roi)) {
+                rc = BAD_VALUE;
+            }
+        }
+        else {
+            LOGE("Currently not supporting Auto AWB Region ");
+        }
+    }
+
     // CDS for non-HFR non-video mode
     if ((mOpMode != CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE) &&
             !(m_bIsVideo) && frame_settings.exists(QCAMERA3_CDS_MODE)) {
