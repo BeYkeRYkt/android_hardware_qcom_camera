@@ -532,7 +532,7 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
     m_bTnrPreview = (uint8_t)atoi(prop);
 
     memset(prop, 0, sizeof(prop));
-    property_get("persist.camera.swtnr.preview", prop, "1");
+    property_get("persist.camera.swtnr.preview", prop, "0");
     m_bSwTnrPreview = (uint8_t)atoi(prop);
 
     memset(prop, 0, sizeof(prop));
@@ -1482,6 +1482,7 @@ int QCamera3HardwareInterface::configureStreams(
     mPerfLockMgr.acquirePerfLock(PERF_LOCK_START_PREVIEW);
     rc = configureStreamsPerfLocked(streamList);
     mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
+    mPerfLockMgr.releasePerfLock(PERF_LOCK_POWERHINT_ENCODE);
 
     return rc;
 }
@@ -3775,7 +3776,8 @@ void QCamera3HardwareInterface::handleBufferWithLock(
 
     if (mPreviewStarted == false) {
         QCamera3Channel *channel = (QCamera3Channel *)buffer->stream->priv;
-        if ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) {
+        if (((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) ||
+                ((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask())) {
             mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
             mPerfLockMgr.releasePerfLock(PERF_LOCK_OPEN_CAMERA);
             mPreviewStarted = true;
