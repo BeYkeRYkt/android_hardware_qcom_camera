@@ -46,6 +46,7 @@ LOCAL_C_INCLUDES := \
         hardware/qcom/display/libqdutils \
         hardware/qcom/media/libstagefrighthw \
         system/media/camera/include \
+        system/core/include/cutils \
         $(LOCAL_PATH)/../../mm-image-codec/qexif \
         $(LOCAL_PATH)/../../mm-image-codec/qomx_core \
         $(LOCAL_PATH)/../util \
