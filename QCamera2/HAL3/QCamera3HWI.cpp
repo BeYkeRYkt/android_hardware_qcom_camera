@@ -94,6 +94,8 @@ namespace qcamera {
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #ifdef _DRONE_
 #define MIN_FPS_FOR_BATCH_MODE (90)
+#elif _LE_CAMERA_
+#define MIN_FPS_FOR_BATCH_MODE (60)
 #else
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #endif
@@ -530,7 +532,7 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
     m_bTnrPreview = (uint8_t)atoi(prop);
 
     memset(prop, 0, sizeof(prop));
-    property_get("persist.camera.swtnr.preview", prop, "1");
+    property_get("persist.camera.swtnr.preview", prop, "0");
     m_bSwTnrPreview = (uint8_t)atoi(prop);
 
     memset(prop, 0, sizeof(prop));
@@ -1480,6 +1482,7 @@ int QCamera3HardwareInterface::configureStreams(
     mPerfLockMgr.acquirePerfLock(PERF_LOCK_START_PREVIEW);
     rc = configureStreamsPerfLocked(streamList);
     mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
+    mPerfLockMgr.releasePerfLock(PERF_LOCK_POWERHINT_ENCODE);
 
     return rc;
 }
@@ -2383,7 +2386,13 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     }
 
     // Create analysis stream all the time, even when h/w support is not available
-    if (!onlyRaw) {
+    char analysis_prop[PROPERTY_VALUE_MAX];
+    memset(analysis_prop, 0, sizeof(analysis_prop));
+    /* Disable analysis stram by default for connected camera */
+    property_get("persist.camera.analysis.enable", analysis_prop, "0");
+    int32_t analysis_enable = atoi(analysis_prop);
+
+    if ((!onlyRaw) && (analysis_enable) ) {
         cam_feature_mask_t analysisFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
         setPAAFSupport(analysisFeatureMask, CAM_STREAM_TYPE_ANALYSIS,
                 gCamCapability[mCameraId]->color_arrangement);
@@ -3767,7 +3776,8 @@ void QCamera3HardwareInterface::handleBufferWithLock(
 
     if (mPreviewStarted == false) {
         QCamera3Channel *channel = (QCamera3Channel *)buffer->stream->priv;
-        if ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) {
+        if (((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) ||
+                ((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask())) {
             mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
             mPerfLockMgr.releasePerfLock(PERF_LOCK_OPEN_CAMERA);
             mPreviewStarted = true;
@@ -4185,6 +4195,32 @@ int32_t FrameNumberRegistry::getFrameworkFrameNumber(uint32_t internalFrameNumbe
     frameworkFrameNumber = itr->second;
     purgeOldEntriesLocked();
     return NO_ERROR;
+}
+
+/*===========================================================================
+ * FUNCTION   : cleanLastPendingRequest
+ *
+ * DESCRIPTION: removes latest pending request from queues. This routine should
+ *              be used to clean up in case of error before pending request is
+ *              propagated to the back end.
+ *
+ * PARAMETERS :
+ *
+ * RETURN     :
+ *
+ *==========================================================================*/
+void QCamera3HardwareInterface::cleanLastPendingRequest()
+{
+    pendingRequestIterator it = mPendingRequestsList.end();
+    it--;
+    it->buffers.clear();
+    erasePendingRequest(it);
+
+    List<PendingBuffersInRequest>::iterator it2 =
+        mPendingBuffersMap.mPendingBuffersInRequest.end();
+    it2--;
+    it2->mPendingBufferList.clear();
+    mPendingBuffersMap.mPendingBuffersInRequest.erase(it2);
 }
 
 /*===========================================================================
@@ -5057,6 +5093,7 @@ no_error:
         rc = setReprocParameters(request, &mReprocMeta, snapshotStreamId);
         if (NO_ERROR != rc) {
             LOGE("fail to set reproc parameters");
+            cleanLastPendingRequest();
             pthread_mutex_unlock(&mMutex);
             return rc;
         }
@@ -5082,6 +5119,7 @@ no_error:
                         pInputBuffer, &mReprocMeta, indexUsed, false, false);
                 if (rc < 0) {
                     LOGE("Fail to request on picture channel");
+                    cleanLastPendingRequest();
                     pthread_mutex_unlock(&mMutex);
                     return rc;
                 }
@@ -5097,6 +5135,7 @@ no_error:
                 }
                 if (rc < 0) {
                     LOGE("Fail to request on picture channel");
+                    cleanLastPendingRequest();
                     pthread_mutex_unlock(&mMutex);
                     return rc;
                 }
@@ -5128,6 +5167,8 @@ no_error:
                     needMetadata, indexUsed, false, false);
             if (rc < 0) {
                 LOGE("Fail to request on YUV channel");
+
+                cleanLastPendingRequest();
                 pthread_mutex_unlock(&mMutex);
                 return rc;
             }
@@ -5184,6 +5225,7 @@ no_error:
             }
             if (rc < 0) {
                 LOGE("request failed");
+                cleanLastPendingRequest();
                 pthread_mutex_unlock(&mMutex);
                 return rc;
             }
@@ -5213,6 +5255,7 @@ no_error:
                         pInputBuffer, &mReprocMeta, indexUsed, true, requestedStream.meteringOnly);
                 if (rc < 0) {
                     LOGE("Fail to request on picture channel");
+                    cleanLastPendingRequest();
                     pthread_mutex_unlock(&mMutex);
                     return rc;
                 }
@@ -5227,6 +5270,7 @@ no_error:
                 }
                 if (rc < 0) {
                     LOGE("Fail to request on picture channel");
+                    cleanLastPendingRequest();
                     pthread_mutex_unlock(&mMutex);
                     return rc;
                 }
@@ -5255,6 +5299,7 @@ no_error:
 
         } else {
             LOGE("Internal requests not supported on this stream type");
+            cleanLastPendingRequest();
             assert(0);
             return INVALID_OPERATION;
         }
@@ -5266,6 +5311,7 @@ no_error:
     if (streams_need_metadata > 1) {
         LOGE("not supporting request in which two streams requires"
                 " 2 HAL metadata for reprocessing");
+        cleanLastPendingRequest();
         pthread_mutex_unlock(&mMutex);
         return -EINVAL;
     }
@@ -5306,6 +5352,8 @@ no_error:
             /* Update stream id of all the requested buffers */
             if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_META_STREAM_ID, streamsArray)) {
                 LOGE("Failed to set stream type mask in the parameters");
+                cleanLastPendingRequest();
+                pthread_mutex_unlock(&mMutex);
                 return BAD_VALUE;
             }
 

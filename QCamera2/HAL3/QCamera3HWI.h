@@ -404,6 +404,7 @@ private:
             cam_color_filter_arrangement_t filter_arrangement);
     int32_t setSensorHDR(metadata_buffer_t *hal_metadata, bool enable,
             bool isVideoHdrEnable = false);
+    void cleanLastPendingRequest();
 
     camera3_device_t   mCameraDevice;
     uint32_t           mCameraId;
