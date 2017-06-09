@@ -7063,6 +7063,11 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                 sizeof(mm_jpeg_debug_exif_params_t));
     }
 
+    // Strict Antibanding
+    IF_META_AVAILABLE(uint8_t, strict_banding, CAM_INTF_PARM_STRICT_ANTIBANDING, metadata) {
+        uint8_t fwk_strict_banding = (uint8_t) *strict_banding;
+        camMetadata.update(QCAMERA3_STRICT_ANTIBANDING_MODE, &fwk_strict_banding, 1);
+    }
 
     // DeWarp Modes
     IF_META_AVAILABLE(cam_dewarp_type_t, dwarp, CAM_INTF_META_DEWARP_MODE, metadata) {
@@ -11739,6 +11744,18 @@ int QCamera3HardwareInterface::translateToHalMetadata
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_SATURATION, *use_saturation)) {
             rc = BAD_VALUE;
         }
+    }
+
+    //Strict Antibanding
+    if (frame_settings.exists(QCAMERA3_STRICT_ANTIBANDING_MODE)) {
+
+      uint8_t strict_atb_mode =
+                frame_settings.find(QCAMERA3_STRICT_ANTIBANDING_MODE).data.u8[0];
+                LOGE(" Camera AntiBanding Mode is :%d",strict_atb_mode);
+      if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_STRICT_ANTIBANDING,
+              strict_atb_mode)) {
+          rc = BAD_VALUE;
+      }
     }
 
     // Dewarp

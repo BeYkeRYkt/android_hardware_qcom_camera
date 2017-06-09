@@ -2453,6 +2453,8 @@ typedef enum {
 
     /* De warp type info */
     CAM_INTF_META_DEWARP_MODE,
+    /*Strict Antibanding Enable/Disable flag*/
+    CAM_INTF_PARM_STRICT_ANTIBANDING,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 
