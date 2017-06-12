@@ -3414,10 +3414,14 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
             if (i->blob_request) {
                 {
                     //Dump tuning metadata if enabled and available
+#if (defined(_ANDROID_) && !defined(_DRONE_))
                     char prop[PROPERTY_VALUE_MAX];
                     memset(prop, 0, sizeof(prop));
                     property_get("persist.camera.dumpmetadata", prop, "0");
                     int32_t enabled = atoi(prop);
+#else
+                    int32_t enabled = 0;
+#endif
                     #ifdef CAMERA_DEBUG_DATA
                     if (enabled && metadata->is_tuning_params_valid) {
                         dumpMetadataToFile(metadata->tuning_params,
