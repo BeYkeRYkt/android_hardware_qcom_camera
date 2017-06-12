@@ -94,11 +94,10 @@ namespace qcamera {
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #ifdef _DRONE_
 #define MIN_FPS_FOR_BATCH_MODE (90)
-#elif _LE_CAMERA_
-#define MIN_FPS_FOR_BATCH_MODE (60)
 #else
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #endif
+#define MIN_FPS_FOR_HFR_MODE (60)
 #define PREVIEW_FPS_FOR_HFR    (30)
 #define DEFAULT_VIDEO_FPS      (30.0)
 #define TEMPLATE_MAX_PREVIEW_FPS (30.0)
@@ -8582,7 +8581,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
 
         /* Advertise only MIN_FPS_FOR_BATCH_MODE or above as HIGH_SPEED_CONFIGS */
-        if (fps >= MIN_FPS_FOR_BATCH_MODE) {
+        if (fps >= MIN_FPS_FOR_HFR_MODE) {
             /* For each HFR frame rate, need to advertise one variable fps range
              * and one fixed fps range per dimension. Eg: for 120 FPS, advertise [30, 120]
              * and [120, 120]. While camcorder preview alone is running [30, 120] is
