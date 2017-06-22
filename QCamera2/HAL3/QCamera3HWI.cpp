@@ -10926,6 +10926,13 @@ int QCamera3HardwareInterface::translateToHalMetadata
         }
     }
 
+    if (frame_settings.exists(QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST)) {
+        uint32_t syncRequest = frame_settings.find(QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST).data.u8[0];
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_SYNC_DC_PARAMETERS, syncRequest)) {
+            rc = BAD_VALUE;
+        }
+    }
+
     if (frame_settings.exists(ANDROID_CONTROL_EFFECT_MODE)) {
         uint8_t fwk_effectMode = frame_settings.find(ANDROID_CONTROL_EFFECT_MODE).data.u8[0];
         int val = lookupHalName(EFFECT_MODES_MAP, METADATA_MAP_SIZE(EFFECT_MODES_MAP),
