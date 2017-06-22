@@ -180,7 +180,8 @@ vendor_tag_info_t
     { "is_main",           TYPE_BYTE },
     { "related_camera_id", TYPE_INT32 },
     { "camera_role",       TYPE_BYTE },
-    { "3a_sync_mode",      TYPE_BYTE }
+    { "3a_sync_mode",      TYPE_BYTE },
+    { "sync_request",      TYPE_BYTE }
 };
 
 vendor_tag_info_t
@@ -389,7 +390,7 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_DUALCAM_LINK_RELATED_CAMERA_ID,
     (uint32_t)QCAMERA3_DUALCAM_LINK_CAMERA_ROLE,
     (uint32_t)QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE,
-
+    (uint32_t)QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST,
     // QCAMERA3_DUALCAM_CALIB_META_DATA
     (uint32_t)QCAMERA3_DUALCAM_CALIB_META_DATA_BLOB,
 
