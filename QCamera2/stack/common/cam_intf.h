@@ -1162,7 +1162,8 @@ typedef struct {
     INCLUDE(CAM_INTF_META_EXPOSURE_INFO,                cam_exposure_data_t,         1);
     INCLUDE(CAM_INTF_META_TNR_INTENSITY,                float,                       1);
     INCLUDE(CAM_INTF_META_TNR_MOTION_SENSITIVITY,       float,                       1);
-    INCLUDE(CAM_INTF_META_DEWARP_MODE,                  cam_dewarp_type_t,  1);
+    INCLUDE(CAM_INTF_META_DEWARP_MODE,                  cam_dewarp_type_t,           1);
+    INCLUDE(CAM_INTF_PARM_STRICT_ANTIBANDING,           uint8_t,                     1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to
