@@ -3144,6 +3144,11 @@ int QCamera3HardwareInterface::validateCaptureRequest(
 void QCamera3HardwareInterface::deriveMinFrameDuration()
 {
     int32_t maxJpegDim, maxProcessedDim, maxRawDim;
+    bool hasRaw = false;
+
+    mMinRawFrameDuration = 0;
+    mMinJpegFrameDuration = 0;
+    mMinProcessedFrameDuration = 0;
 
     maxJpegDim = 0;
     maxProcessedDim = 0;
@@ -3164,6 +3169,7 @@ void QCamera3HardwareInterface::deriveMinFrameDuration()
         } else if ((*it)->stream->format == HAL_PIXEL_FORMAT_RAW_OPAQUE ||
                 (*it)->stream->format == HAL_PIXEL_FORMAT_RAW10 ||
                 (*it)->stream->format == HAL_PIXEL_FORMAT_RAW16) {
+            hasRaw = true;
             if (dimension > maxRawDim)
                 maxRawDim = dimension;
         } else {
@@ -3179,7 +3185,7 @@ void QCamera3HardwareInterface::deriveMinFrameDuration()
     if (maxJpegDim > maxProcessedDim)
         maxProcessedDim = maxJpegDim;
     //Find the smallest raw dimension that is greater or equal to jpeg dimension
-    if (maxProcessedDim > maxRawDim) {
+    if (hasRaw && maxProcessedDim > maxRawDim) {
         maxRawDim = INT32_MAX;
 
         for (size_t i = 0; i < count; i++) {
@@ -4057,6 +4063,9 @@ void QCamera3HardwareInterface::handleInputBufferWithLock(uint32_t frame_number)
         LOGD("Input request metadata and input buffer frame_number = %u",
                         i->frame_number);
         i = erasePendingRequest(i);
+
+        // Dispatch result metadata that may be just unblocked by this reprocess result.
+        dispatchResultMetadataWithLock(frame_number, /*isLiveRequest*/false);
     } else {
         LOGE("Could not find input request for frame number %d", frame_number);
     }
@@ -4184,6 +4193,11 @@ void QCamera3HardwareInterface::handlePendingResultMetadataWithLock(uint32_t fra
         }
     }
 
+    dispatchResultMetadataWithLock(frameNumber, liveRequest);
+}
+
+void QCamera3HardwareInterface::dispatchResultMetadataWithLock(uint32_t frameNumber,
+        bool isLiveRequest) {
     // The pending requests are ordered by increasing frame numbers. The result metadata are ready
     // to be sent if all previous pending requests are ready to be sent.
     bool readyToSend = true;
@@ -4216,7 +4230,7 @@ void QCamera3HardwareInterface::handlePendingResultMetadataWithLock(uint32_t fra
                 iter++;
                 continue;
             }
-        } else if (iter->frame_number < frameNumber && liveRequest && thisLiveRequest) {
+        } else if (iter->frame_number < frameNumber && isLiveRequest && thisLiveRequest) {
             // If the result metadata belongs to a live request, notify errors for previous pending
             // live requests.
             mPendingLiveRequest--;
@@ -4249,7 +4263,7 @@ void QCamera3HardwareInterface::handlePendingResultMetadataWithLock(uint32_t fra
         iter = erasePendingRequest(iter);
     }
 
-    if (liveRequest) {
+    if (isLiveRequest) {
         for (auto &iter : mPendingRequestsList) {
             // Increment pipeline depth for the following pending requests.
             if (iter.frame_number > frameNumber) {
