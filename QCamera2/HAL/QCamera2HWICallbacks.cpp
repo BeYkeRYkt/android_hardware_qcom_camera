@@ -2029,7 +2029,7 @@ int32_t QCamera2HardwareInterface::updateMetadata(metadata_buffer_t *pMetaData)
     cam_denoise_param_t denoise_config;
     memset(&denoise_config, 0, sizeof(denoise_config));
     denoise_config.denoise_enable = (uint8_t)mParameters.isWNREnabled();
-    denoise_config.strength = gCamCapability[mCameraId]->wnr_range.default_val;
+    denoise_config.strength = getCamHalCapabilities()->wnr_range.default_val;
     ADD_SET_PARAM_ENTRY_TO_BATCH(pMetaData,
             CAM_INTF_META_NOISE_REDUCTION_MODE, denoise_config);
 

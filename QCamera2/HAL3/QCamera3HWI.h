@@ -203,6 +203,7 @@ public:
                                    uint32_t tag);
     static bool resetIfNeededROI(cam_area_t* roi, const cam_crop_region_t* scalerCropRegion);
     static int32_t getSensorSensitivity(int32_t iso_mode);
+    static uint8_t getIsoMode(int32_t sensitivity);
 
     double computeNoiseModelEntryS(int32_t sensitivity);
     double computeNoiseModelEntryO(int32_t sensitivity);
@@ -317,6 +318,7 @@ private:
         CONFIGURED,
         STARTED,
         ERROR,
+        RESTART,
         DEINIT
     } State;
 
@@ -616,6 +618,8 @@ private:
             cam_auto_exposure_mode_type> AEC_MODES_MAP[];
     static const QCameraMap<qcamera3_ext_iso_mode_t,
             cam_iso_mode_type> ISO_MODES_MAP[];
+    static const QCameraMap<camera_metadata_enum_ext_dewarp_type_t,
+            cam_dewarp_type_t> DEWARP_TYPE_MAP[];
     static const QCameraPropMap CDS_MAP[];
 
     pendingRequestIterator erasePendingRequest(pendingRequestIterator i);
@@ -629,6 +633,9 @@ private:
     bool mIsDeviceLinked;
     bool mIsMainCamera;
     uint8_t mLinkedCameraId;
+    cam_dual_camera_role_t mDualCamRole;
+    cam_3a_sync_mode_t mDualCam3ASyncMode;
+
     QCamera3HeapMemory *m_pDualCamCmdHeap;
     cam_dual_camera_cmd_info_t *m_pDualCamCmdPtr;
     cam_sync_related_sensors_event_info_t m_relCamSyncInfo;

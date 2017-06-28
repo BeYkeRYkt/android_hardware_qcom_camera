@@ -130,6 +130,9 @@ public:
             cam_frame_len_offset_t offset, uint8_t name);
     bool isUBWCEnabled();
     void setUBWCEnabled(bool val);
+    cam_dewarp_type_t getDewarpType();
+    void setDewarpType(cam_dewarp_type_t val);
+
     cam_format_t getStreamDefaultFormat(cam_stream_type_t type,
             uint32_t width, uint32_t height);
     virtual int32_t timeoutFrame(__unused uint32_t frameNumber) = 0;
@@ -155,6 +158,7 @@ protected:
     mm_camera_ops_t *m_camOps;
     bool m_bIsActive;
     bool m_bUBWCenable;
+    cam_dewarp_type_t mDewarpType;
 
     uint32_t m_handle;
 
