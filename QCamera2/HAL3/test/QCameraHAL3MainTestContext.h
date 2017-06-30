@@ -45,7 +45,8 @@ typedef enum
     MENU_TOGGLE_IR_MODE,
     MENU_TOGGLE_SVHDR_MODE,
     MENU_TOGGLE_BINNING_CORRECTION,
-    MENU_EXIT
+    MENU_EXIT,
+    MENU_INVALID
 } menu_id;
 
 typedef struct {
