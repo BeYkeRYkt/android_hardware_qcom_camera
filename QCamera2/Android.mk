@@ -1,5 +1,6 @@
 # Enable SDLLVM compiler option for build flavour >= N flavour
 PLATFORM_SDK_NPDK = 24
+TARGET_SUPPORT_HAL1 := true
 ENABLE_CAM_SDLLVM  := $(shell if [ $(PLATFORM_SDK_VERSION) -ge $(PLATFORM_SDK_NPDK) ] ; then echo true ; else echo false ; fi)
 ifeq ($(ENABLE_CAM_SDLLVM),true)
 SDCLANGSAVE := $(SDCLANG)
