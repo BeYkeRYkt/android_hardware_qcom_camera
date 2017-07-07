@@ -610,6 +610,17 @@ typedef struct {
 } cam_fps_range_t;
 
 typedef struct {
+  float min_luma;
+  float max_luma;
+}cam_luma_range_t;
+
+typedef struct {
+  float target_luma;
+  float curr_luma;
+  cam_luma_range_t luma_range;
+} cam_luma_info_t;
+
+typedef struct {
     int32_t min_sensitivity;
     int32_t max_sensitivity;
 } cam_sensitivity_range_t;
@@ -1643,6 +1654,7 @@ typedef struct {
     int32_t est_snap_iso_value;
     uint32_t est_snap_luma;
     uint32_t est_snap_target;
+    cam_luma_info_t luma_info;
 } cam_3a_params_t;
 
 typedef struct {
