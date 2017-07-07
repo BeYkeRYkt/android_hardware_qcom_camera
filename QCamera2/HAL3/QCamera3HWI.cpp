@@ -2429,6 +2429,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
             LOGW("Analysis channel cannot be created");
         }
     }
+    if (onlyRaw) {
+        mStreamConfigInfo.sync_type = CAM_TYPE_STANDALONE;
+    }
 
     //RAW DUMP channel
     if (mEnableRawDump && isRawStreamRequested == false){
