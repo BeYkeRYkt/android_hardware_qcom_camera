@@ -37,6 +37,7 @@ namespace qcamera {
 class QCameraHAL3Test
 {
     int mCamId;
+    int mIonFd;
 public:
     QCameraHAL3Test(int cameraIndex);
     camera3_stream_t *requested_stream;
@@ -54,6 +55,7 @@ public:
 
     native_handle_t *allocateBuffers(int width, int height,
             hal3_camtest_meminfo_t *req_meminfo);
+    void freeBuffers(native_handle_t *handle, hal3_camtest_meminfo_t *req_meminfo);
     bool processThreadCreate(void *obj, int testcase);
     virtual ~QCameraHAL3Test();
 };

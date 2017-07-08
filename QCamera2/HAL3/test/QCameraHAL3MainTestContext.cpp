@@ -29,10 +29,13 @@
 
 #include "QCameraHAL3MainTestContext.h"
 #include "QCameraHAL3Base.h"
+#include "QCameraHAL3PreviewTest.h"
+#include <vector>
 
 namespace qcamera {
 
 #define MAX_CAMERA_SUPPORTED 20
+#define TEST_CMD_CONFIG_OPTION "-c"
 
 const CAMERA_BASE_MENU_TBL_T camera_main_menu_tbl[] = {
     {MENU_START_PREVIEW,             "To Start Preview"},
@@ -72,8 +75,8 @@ int MainTestContext::hal3appGetUserEvent()
     }
     mCamHal3Base = new CameraHAL3Base(0);
     num_of_cameras = mCamHal3Base->hal3appCameraTestLoad();
-    if ((num_of_cameras <= 0) && (num_of_cameras >= MAX_CAMERA_SUPPORTED)) {
-        LOGE("\n Supported Camera Value is wrong : %d", num_of_cameras);
+    if ((num_of_cameras <= 0) || (num_of_cameras >= MAX_CAMERA_SUPPORTED)) {
+        printf("\n Supported Camera Value is wrong : %d", num_of_cameras);
         printf("\n Invalid Number Of Cameras");
         goto exit;
     }
@@ -85,7 +88,7 @@ int MainTestContext::hal3appGetUserEvent()
         }
         else {
             mCamHal3Base->mCameraIndex = choice;
-            rc = mCamHal3Base->hal3appCameraLibOpen(choice);
+            rc = mCamHal3Base->hal3appCameraLibOpen(choice, NULL);
         }
     }
     do {
@@ -289,27 +292,358 @@ int MainTestContext::hal3appPrintMenu()
     choice = ch -'0';
     return choice;
 }
+
+enum HAL3TestModes {
+  HAL3_TEST_MODE_MENU,
+  HAL3_TEST_MODE_CONFIG,
+  HAL3_TEST_MODE_MAX,
+};
+
+HAL3TestModes validateTestCmdParams(int argc, char *argv[])
+{
+  HAL3TestModes testMode = HAL3_TEST_MODE_MAX;
+  if (argc == 1) {
+    testMode = HAL3_TEST_MODE_MENU;
+  } else if ((argc == 3) &&
+              (strlen(argv[1]) == strlen(TEST_CMD_CONFIG_OPTION)) &&
+              (!strncmp(argv[1], TEST_CMD_CONFIG_OPTION, strlen(argv[1])))) {
+    testMode = HAL3_TEST_MODE_CONFIG;
+  }
+  return testMode;
 }
 
-int main()
+class HAL3TestInitParamsFromConfig {
+public:
+    int32_t                camera_id[MAX_NUM_CAMERAS];
+    uint8_t                camera_fps[MAX_NUM_CAMERAS];
+    int32_t                num_cameras;
+    HAL3TestSnapshotInfo   snapshot_info;
+    uint32_t               recordTime;
+    uint32_t               numStream[MAX_NUM_CAMERAS];
+    bool                   tnr;
+    bool                   vhdr;
+    bool                   binning_correct;
+
+    HAL3TestInitParamsFromConfig() :
+            camera_id { -1, -1, -1},
+            camera_fps { 0, 0, 0},
+            num_cameras(0),
+            snapshot_info {
+              HAL3TestStreamType::HAL3_TEST_STREAM_TYPE_MAX,
+              -1,
+              0,
+              0,
+              0
+            },
+            recordTime(0),
+            numStream {0, 0, 0},
+            tnr(0),
+            vhdr(0),
+            binning_correct(false) {};
+};
+
+int32_t ParseConfig(char *fileName, HAL3TestInitParamsFromConfig& initParams,
+                                  std::vector<HAL3TestStreamInfo>& infos) {
+  FILE *fp;
+  HAL3TestStreamInfo track_info;
+  memset(&track_info, 0x0, sizeof(track_info));
+  bool isStreamReadCompleted = false;
+  const int MAX_LINE = 128;
+  char line[MAX_LINE];
+  char value[50];
+  char key[25];
+  uint32_t id = 0;
+  int32_t camera_index = -1;
+
+  if(!(fp = fopen(fileName,"r"))) {
+    ALOGE("failed to open config file: %s", fileName);
+    return -1;
+  }
+
+  while(fgets(line,MAX_LINE-1,fp)) {
+    if((line[0] == '\n') || (line[0] == '/') || line[0] == ' ')
+      continue;
+    strtok(line, "\n");
+    memset(value, 0x0, sizeof(value));
+    memset(key, 0x0, sizeof(key));
+    if(isStreamReadCompleted) {
+      memset(&track_info, 0x0, sizeof(track_info));
+      isStreamReadCompleted = false;
+    }
+    int len = strlen(line);
+    int i,j = 0;
+
+    //This assumes new stream params always start with #
+    if(!strcspn(line,"#")) {
+      id++;
+      continue;
+     }
+
+
+    if((id > 0) && (id > initParams.numStream[camera_index])) {
+      break;
+    }
+
+    int pos = strcspn(line,":");
+    for(i = 0; i< pos; i++){
+      if(line[i] != ' ') {
+        key[j] = line[i];
+        j++;
+      }
+    }
+
+    key[j] = '\0';
+    j = 0;
+    for(i = pos+1; i< len; i++) {
+      if(line[i] != ' ') {
+        value[j] = line[i];
+        j++;
+      }
+    }
+    value[j] = '\0';
+
+    if (!strncmp("NumCameras", key, strlen("NumCameras"))) {
+      initParams.num_cameras = atoi(value);
+      printf("%s: Num cameras read %d\n", __func__, initParams.num_cameras);
+      if (initParams.num_cameras  > MAX_NUM_CAMERAS) {
+         ALOGE("%s: Unsupported number of Cameras %d",
+             __func__, initParams.num_cameras);
+         goto READ_FAILED;
+      }
+    } else if(!strncmp("CameraID", key, strlen("CameraID"))) {
+      if (++camera_index < initParams.num_cameras) {
+         initParams.camera_id[camera_index] = atoi(value);
+         id = 0;
+         printf("%s: Camera ID %d\n", __func__, initParams.camera_id[camera_index]);
+      } else {
+         printf("%s: Number requested cameras %d are more than declared  %d",
+             __func__, camera_index + 1, initParams.num_cameras);
+          goto READ_FAILED;
+      }
+    } else if(!strncmp("CameraFPS", key, strlen("CameraFPS"))) {
+      initParams.camera_fps[camera_index] = atof(value);
+    } else if(!strncmp("SnapshotType", key, strlen("SnapshotType"))) {
+      if(!strncmp("None", value, strlen("None"))) {
+        initParams.snapshot_info.type = HAL3_TEST_STREAM_TYPE_MAX;
+      } else if(!strncmp("JPEG", value, strlen("JPEG"))) {
+        initParams.snapshot_info.type = HAL3_TEST_STREAM_TYPE_JPEG;
+      } else if(!strncmp("RAWYUV", value, strlen("RAWYUV"))) {
+        initParams.snapshot_info.type = HAL3_TEST_STREAM_TYPE_YUV;
+      } else if(!strncmp("RAWRDI", value, strlen("RAWRDI"))) {
+        initParams.snapshot_info.type = HAL3_TEST_STREAM_TYPE_RAW;
+      } else {
+        ALOGE("%s: Unknown SnapshotType(%s)", __func__, value);
+        goto READ_FAILED;
+      }
+      printf("Snapshot type %s\n", value);
+    } else if(!strncmp("SnapshotCameraID", key, strlen("SnapshotCameraID"))) {
+       initParams.snapshot_info.camera_id = atoi(value);
+      printf("Snapshot cameraid %d\n", initParams.snapshot_info.camera_id);
+    } else if(!strncmp("SnapshotWidth", key, strlen("SnapshotWidth"))) {
+      initParams.snapshot_info.width = atoi(value);
+    } else if(!strncmp("SnapshotHeight", key, strlen("SnapshotHeight"))) {
+      initParams.snapshot_info.height = atoi(value);
+    } else if(!strncmp("SnapshotCount", key, strlen("SnapshotCount"))) {
+      initParams.snapshot_info.count = atoi(value);
+    } else if(!strncmp("AFMode", key, strlen("AFMode"))) {
+      // Not supported
+      /*if(!strncmp("None", value, strlen("None"))) {
+        initParams.af_mode = AfMode::kNone;
+      } else if(!strncmp("Off", value, strlen("Off"))) {
+        initParams.af_mode = AfMode::kOff;
+      } else if(!strncmp("AUTO", value, strlen("AUTO"))) {
+        initParams.af_mode = AfMode::kAuto;
+      } else if(!strncmp("MACRO", value, strlen("MACRO"))) {
+        initParams.af_mode = AfMode::kMacro;
+      } else if(!strncmp("CVAF", value, strlen("CVAF"))) {
+        initParams.af_mode = AfMode::kContinousVideo;
+      } else if(!strncmp("CPAF", value, strlen("CPAF"))) {
+        initParams.af_mode = AfMode::kContinuousPicture;
+      } else {
+        ALOGE("%s: Unknown AFMode(%s)", __func__, value);
+        goto READ_FAILED;
+      } */
+    } else if(!strncmp("RecordingTime", key, strlen("RecordingTime"))) {
+      initParams.recordTime = atoi(value);
+    } else if(!strncmp("NumStream", key, strlen("NumStream"))) {
+      if(atoi(value) <= 0) {
+        ALOGE ("%s Number of stream can not be %d", __func__,
+                atoi (value));
+        goto READ_FAILED;
+      }
+      initParams.numStream[camera_index] = atoi(value);
+    } else if(!strncmp("VHDR", key, strlen("VHDR"))) {
+      initParams.vhdr = atoi(value)?true:false;
+    } else if(!strncmp("TNR", key, strlen("TNR"))) {
+      initParams.tnr = atoi(value)?true:false;
+    } else if(!strncmp("BinningCorrect", key, strlen("BinningCorrect"))) {
+      initParams.binning_correct = atoi(value)?true:false;
+    } else if(!strncmp("Width", key, strlen("Width"))) {
+      track_info.width = atoi(value);
+    } else if(!strncmp("Height", key, strlen("Height"))) {
+      track_info.height = atoi(value);
+    } else if(!strncmp("FPS", key, strlen("FPS"))) {
+      track_info.fps = atof(value);
+    } else if(!strncmp("Bitrate", key, strlen("Bitrate"))) {
+      // Not supported
+      //track_info.bitrate = atoi(value);
+    } else if(!strncmp("TrackType", key, strlen("TrackType"))) {
+      track_info.type = HAL3_TEST_STREAM_TYPE_YUV;
+      if(!strncmp("RAW", value, strlen("RAW"))) {
+        track_info.type = HAL3_TEST_STREAM_TYPE_RAW;
+      }
+    } else if(!strncmp("CamLowPowerMode", key, strlen("CamLowPowerMode"))) {
+      // Not supported
+      track_info.isvideo = atoi(value) ? false : true;
+      isStreamReadCompleted = true;
+    } else {
+      ALOGE("Unknown Key %s found in %s", key, fileName);
+      goto READ_FAILED;
+    }
+    if (isStreamReadCompleted) {
+      track_info.camera_id = initParams.camera_id[camera_index];
+      infos.push_back(track_info);
+      /*printInitParameterAndTtrackInfo(*initParams,track_info, camera_index);*/
+    }
+  }
+
+  if (initParams.numStream[camera_index] > infos.size()) {
+    ALOGE("%s: Insufficient stream parameter for total stream count(%d/%d)",
+           __func__, infos.size(), initParams.numStream);
+    goto READ_FAILED;
+  }
+
+  fclose(fp);
+  return 0;
+READ_FAILED:
+  fclose(fp);
+  return -1;
+}
+
+class HAL3TestCaseFromConfig
+{
+private:
+    CameraHAL3Base *mHAL3Base;
+    QCameraHAL3ConfigTest *testcase;
+    int req_sent;
+    int preview_buffer_allocated;
+    int video_buffer_allocated;
+    int testCaseEnd;
+public:
+    HAL3TestCaseFromConfig(int cameraId, const std::vector<HAL3TestStreamInfo>& infos,
+        const HAL3TestSnapshotInfo *snapshotInfo)
+    {
+        int num_of_cameras;
+        int rc;
+        mHAL3Base = new CameraHAL3Base(cameraId);
+        num_of_cameras = mHAL3Base->hal3appCameraTestLoad();
+        testcase = new QCameraHAL3ConfigTest(cameraId, mHAL3Base);
+        rc = mHAL3Base->hal3appCameraLibOpen(cameraId, testcase);
+        if (rc != HAL3_CAM_OK) {
+          printf("\nError during Camera lib open\n");
+        }
+        testcase->Initialize(cameraId, infos, snapshotInfo);
+    }
+
+    void Start()
+    {
+        testcase->testStart();
+    }
+
+
+    void MakeSnapshot()
+    {
+        testcase->testMakeSnapshot();
+    }
+
+    void Stop()
+    {
+        testcase->testEnd();
+    }
+
+    ~HAL3TestCaseFromConfig()
+    {
+        int rc;
+        testcase->Deinitialize();
+        delete testcase;
+        rc = mHAL3Base->hal3appCameraLibClose();
+        rc = mHAL3Base->hal3appCameraTestUnload();
+    }
+
+};
+
+}
+
+int main(int argc, char *argv[])
 {
     char tc_buf[3];
     int mode = 0;
     int rc = 0;
-    qcamera::MainTestContext main_ctx;
-    printf("Please Select Execution Mode:\n");
-    printf("0: Menu Based 1: Regression\n");
-    printf("\n Enter your choice:");
-    fgets(tc_buf, 3, stdin);
-    mode = tc_buf[0] - '0';
-    if (mode == 0) {
-        printf("\nStarting Menu based!!\n");
-    } else {
-        printf("\nPlease Enter 0 or 1\n");
-        printf("\nExisting the App!!\n");
-        exit(1);
+
+    void *binderHandle;
+    binderHandle = dlopen("/usr/lib/libbinder.so", RTLD_NOW);
+
+    qcamera::HAL3TestModes testmode;
+    testmode = qcamera::validateTestCmdParams(argc, argv);
+    if (testmode == qcamera::HAL3_TEST_MODE_MENU) {
+        qcamera::MainTestContext main_ctx;
+        printf("Please Select Execution Mode:\n");
+        printf("0: Menu Based 1: Regression\n");
+        printf("\n Enter your choice:");
+        fgets(tc_buf, 3, stdin);
+        mode = tc_buf[0] - '0';
+        if (mode == 0) {
+            printf("\nStarting Menu based!!\n");
+        } else {
+            printf("\nPlease Enter 0 or 1\n");
+            printf("\nExisting the App!!\n");
+            exit(1);
+        }
+        rc = main_ctx.hal3appGetUserEvent();
+    } else if (testmode == qcamera::HAL3_TEST_MODE_CONFIG) {
+        qcamera::HAL3TestInitParamsFromConfig initParams;
+        std::vector<qcamera::HAL3TestStreamInfo> infos;
+        qcamera::ParseConfig(argv[2], initParams, infos);
+        qcamera::HAL3TestCaseFromConfig **camInstances;
+
+        if (initParams.num_cameras) {
+            camInstances =
+                new qcamera::HAL3TestCaseFromConfig* [initParams.num_cameras];
+
+            // Start cameras consecutively
+            for (int i = 0; i < initParams.num_cameras; i++) {
+                if (i) sleep(2); // Start cameras 2s after each other to be
+                                 // consistent with recorder test
+                camInstances[i] =
+                    new qcamera::HAL3TestCaseFromConfig(initParams.camera_id[i],
+                            infos, &initParams.snapshot_info);
+                printf("Starting camera %d\n", initParams.camera_id[i]);
+                camInstances[i]->Start();
+            }
+
+            sleep(2);
+
+            for (int i = 0; i < initParams.num_cameras; i++) {
+                camInstances[i]->MakeSnapshot();
+            }
+            printf("Waiting for %ds...\n", initParams.recordTime);
+            sleep(initParams.recordTime);
+
+            // Stop cameras
+            for (int i = 0; i < initParams.num_cameras; i++) {
+                if (i) sleep(2);
+                printf("Stopping camera %d\n", initParams.camera_id[i]);
+                camInstances[i]->Stop();
+                sleep(1);
+                printf("Deinitialize and close");
+                delete(camInstances[i]);
+                printf("Stopped\n");
+            }
+
+            delete[] camInstances;
+        }
     }
-    rc = main_ctx.hal3appGetUserEvent();
+    dlclose(binderHandle);
     printf("Exiting application\n");
     return rc;
 }

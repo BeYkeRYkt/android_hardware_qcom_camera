@@ -32,24 +32,9 @@
 #include "QCameraHAL3RawSnapshotTest.h"
 #include "QCameraHAL3PreviewTest.h"
 
-#ifdef QCAMERA_HAL3_SUPPORT
-#define LIB_PATH /usr/lib/hw/camera.msm8953.so
-#else
-#define LIB_PATH /system/lib/hw/camera.msm8953.so
-#endif
-
 extern "C" {
 extern int set_camera_metadata_vendor_ops(const vendor_tag_ops_t *query_ops);
 }
-
-/*#ifdef CAMERA_CHIPSET_8953
-#define CHIPSET_LIB lib/hw/camera.msm8953.so
-#else
-#define CHIPSET_LIB lib/hw/camera.msm8937.so
-#endif*/
-
-#define CAM_LIB(s) STR_LIB_PATH(s)
-#define STR_LIB_PATH(s) #s
 
 namespace qcamera {
 
@@ -176,7 +161,7 @@ CameraHAL3Base::CameraHAL3Base(int cameraIndex) :
 int CameraHAL3Base::hal3appCameraTestLoad()
 {
     int rc = HAL3_CAM_OK;
-    int numCam;
+    int numCam = 0;
     int32_t res = 0;
     hal3_camera_test_obj_t *my_test_obj;
     mLibHandle = new hal3_camera_lib_test;
@@ -205,14 +190,8 @@ int CameraHAL3Base::hal3appCameraTestLoad()
     my_test_obj = &(mLibHandle->test_obj);
     my_test_obj->module_cb.torch_mode_status_change = &torch_mode_status_change;
     my_test_obj->module_cb.camera_device_status_change = &camera_device_status_change;
-    my_if_handle->set_callbacks(&(my_test_obj->module_cb));
-    my_if_handle->get_camera_info(0, &(mLibHandle->test_obj.cam_info));
-    camcap_info = mLibHandle->test_obj.cam_info;
-    hal3app_cam_settings = (camcap_info.static_camera_characteristics);
-    display_capability();
-    return numCam;
     EXIT:
-    return rc;
+    return numCam;
 
 }
 
@@ -233,7 +212,7 @@ void CameraHAL3Base::display_capability()
     }
 }
 
-int CameraHAL3Base::hal3appCameraLibOpen(int camid)
+int CameraHAL3Base::hal3appCameraLibOpen(int camid, camera3_callback_ops *cb)
 {
     int rc;
     rc = hal3appCamOpen(&mLibHandle->app_obj, (int)camid, &(mLibHandle->test_obj));
@@ -242,30 +221,30 @@ int CameraHAL3Base::hal3appCameraLibOpen(int camid)
                 camid, rc);
         goto EXIT;
     }
-    rc = hal3appCamInitialize((int)camid, &mLibHandle->test_obj);
+    rc = hal3appCamInitialize((int)camid, &mLibHandle->test_obj, cb);
     EXIT:
+    return rc;
+}
+
+int CameraHAL3Base::hal3appCameraLibClose()
+{
+    int rc;
+    rc = hal3appCamClose(&(mLibHandle->test_obj));
     return rc;
 }
 
 int CameraHAL3Base::hal3appTestLoad(hal3_camera_app_t *my_hal3_app)
 {
-    memset(&my_hal3_app->hal3_lib, 0, sizeof(hal3_interface_lib_t));
-    printf("\nLibrary path is :%s", CAM_LIB(LIB_PATH));
-    my_hal3_app->hal3_lib.ptr = dlopen(CAM_LIB(LIB_PATH), RTLD_NOW);
-
-    if (!my_hal3_app->hal3_lib.ptr) {
-        LOGE("Error opening HAL libraries %s\n",
-                dlerror());
-        return -HAL3_CAM_E_GENERAL;
-    }
-    my_hal3_app->hal3_lib.halModule_t =
-        (camera_module_t*)dlsym(my_hal3_app->hal3_lib.ptr, HAL_MODULE_INFO_SYM_AS_STR);
-    if (my_hal3_app->hal3_lib.halModule_t == NULL) {
-        LOGE("Error opening HAL library %s\n",
-                dlerror());
-        return -HAL3_CAM_E_GENERAL;
-    }
+    hw_get_module(CAMERA_HARDWARE_MODULE_ID,
+            (const hw_module_t **)&my_hal3_app->hal3_lib.halModule_t);
     return HAL3_CAM_OK;
+}
+
+
+int CameraHAL3Base::hal3appCameraTestUnload()
+{
+  int rc;
+  return HAL3_CAM_OK;
 }
 
 int CameraHAL3Base::hal3appCamOpen(
@@ -273,20 +252,44 @@ int CameraHAL3Base::hal3appCamOpen(
         int camid,
         hal3_camera_test_obj_t *my_test_obj)
 {
+    const char *camIds[] = {"0", "1", "2"};
+    if (camid < 0 || camid >= sizeof(camIds)/sizeof(camIds[0])) {
+      printf("\nInvalid Camera ID %d\n", camid);
+      return HAL3_CAM_E_GENERAL;
+    }
+
     camera_module_t *my_if_handle = my_hal3_app->hal3_lib.halModule_t;
-    my_if_handle->common.methods->open(&(my_if_handle->common), "0",
+    my_if_handle->set_callbacks(&(my_test_obj->module_cb));
+    my_if_handle->get_camera_info(camid, &(my_test_obj->cam_info));
+    camcap_info = my_test_obj->cam_info;
+    hal3app_cam_settings = (camcap_info.static_camera_characteristics);
+    display_capability();
+    my_if_handle->common.methods->open(&(my_if_handle->common), camIds[camid],
             reinterpret_cast<hw_device_t**>(&(my_test_obj->device)));
-    printf("\n Camera ID %d Opened \n", camid);
+    printf("\n Camera ID %s Opened \n", camIds[camid]);
     return HAL3_CAM_OK;
 }
 
-int CameraHAL3Base::hal3appCamInitialize(int camid, hal3_camera_test_obj_t *my_test_obj)
+int CameraHAL3Base::hal3appCamClose(
+        hal3_camera_test_obj_t *my_test_obj)
+{
+    my_test_obj->device->common.close(&my_test_obj->device->common);
+    printf("\n Camera ID %d Closed \n", mCameraIndex);
+    return HAL3_CAM_OK;
+}
+
+int CameraHAL3Base::hal3appCamInitialize(int camid, hal3_camera_test_obj_t *my_test_obj,
+    camera3_callback_ops *cb)
 {
     int rc = 0;
     camera3_device_t *device_handle = my_test_obj->device;
-    my_test_obj->callback_ops.notify = &Notify;
-    my_test_obj->callback_ops.process_capture_result = &ProcessCaptureResult;
-    rc = device_handle->ops->initialize(my_test_obj->device, &(my_test_obj->callback_ops));
+    camera3_callback_ops *cbOps = cb;
+    if(!cbOps) {
+        my_test_obj->callback_ops.notify = &Notify;
+        my_test_obj->callback_ops.process_capture_result = &ProcessCaptureResult;
+        cbOps = &(my_test_obj->callback_ops);
+    }
+    rc = device_handle->ops->initialize(my_test_obj->device, cbOps);
     if (rc != HAL3_CAM_OK) {
         LOGE("hal3appCamInitialize() camidx=%d, err=%d\n",
                 camid, rc);
@@ -329,6 +332,12 @@ void CameraHAL3Base::hal3appCheckStream(int testcase, int camid)
     }
 }
 
+
+int CameraHAL3Base::hal3appCameraConfigCaseInit(int testcase, int camid, int w, int h)
+{
+
+  return HAL3_CAM_OK;
+}
 
 int CameraHAL3Base::hal3appCameraPreviewInit(int testcase, int camid, int w, int h)
 {

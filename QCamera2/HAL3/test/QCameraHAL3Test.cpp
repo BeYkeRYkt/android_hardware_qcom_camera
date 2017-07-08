@@ -30,6 +30,8 @@
 
 #include "QCameraHAL3Test.h"
 #include "QCameraHAL3Base.h"
+#include "gralloc_priv.h"
+#include <sys/mman.h>
 
 namespace qcamera {
 hal3_camera_lib_test *CamObj_handle;
@@ -56,9 +58,8 @@ camera3_stream_t *QCameraHAL3Test::initStream(int streamtype,
     return requested_stream;
 }
 
-QCameraHAL3Test::QCameraHAL3Test(int id)
+QCameraHAL3Test::QCameraHAL3Test(int id) :mCamId(0),mIonFd(-1)
 {
-    mCamId = id;
 }
 
 camera3_stream_configuration QCameraHAL3Test::configureStream(
@@ -97,44 +98,60 @@ native_handle_t *QCameraHAL3Test::allocateBuffers(int width, int height,
 {
     struct ion_allocation_data alloc;
     struct ion_fd_data ion_info_fd;
-    int main_ion_fd = -1, rc;
+    int rc;
     size_t buf_size;
-    native_handle_t *nh_test;
-    main_ion_fd = open("/dev/ion", O_RDONLY);
-    if (main_ion_fd <= 0) {
+    private_handle_t *nh_test;
+    if (mIonFd <= 0) {
+        mIonFd = open("/dev/ion", O_RDONLY);
+    }
+    if (mIonFd <= 0) {
         LOGE("Ion dev open failed %s\n", strerror(errno));
         return NULL;
     }
     memset(&alloc, 0, sizeof(alloc));
-    buf_size = (size_t)(width * height *2);
+    if (height == 1) {
+        // Blob
+        buf_size = (size_t)width;
+    } else {
+        buf_size = (size_t)(width * height * 2);
+    }
     alloc.len = (size_t)(buf_size);
     alloc.len = (alloc.len + 4095U) & (~4095U);
     alloc.align = 4096;
     alloc.flags = ION_FLAG_CACHED;
     alloc.heap_id_mask = ION_HEAP(ION_SYSTEM_HEAP_ID);
-    rc = ioctl(main_ion_fd, ION_IOC_ALLOC, &alloc);
+    rc = ioctl(mIonFd, ION_IOC_ALLOC, &alloc);
     if (rc < 0) {
         LOGE("ION allocation failed %s with rc = %d \n", strerror(errno), rc);
         return NULL;
     }
     memset(&ion_info_fd, 0, sizeof(ion_info_fd));
     ion_info_fd.handle = alloc.handle;
-    rc = ioctl(main_ion_fd, ION_IOC_SHARE, &ion_info_fd);
+    rc = ioctl(mIonFd, ION_IOC_SHARE, &ion_info_fd);
     if (rc < 0) {
         LOGE("ION map failed %s\n", strerror(errno));
         return NULL;
     }
-    req_meminfo->ion_fd = main_ion_fd;
+    req_meminfo->ion_fd = mIonFd;
     req_meminfo->ion_handle = ion_info_fd.handle;
     LOGD("%s ION FD %d len %d\n", __func__, ion_info_fd.fd, alloc.len);
-    nh_test = native_handle_create(2, 4);
-    nh_test->data[0] = ion_info_fd.fd;
-    nh_test->data[1] = 0;
-    nh_test->data[2] = 0;
-    nh_test->data[3] = 0;
-    nh_test->data[4] = alloc.len;
-    nh_test->data[5] = 0;
+    req_meminfo->size = alloc.len;
+    nh_test = new private_handle_t (ion_info_fd.fd, alloc.len, 0, 0, 0, width, height);
+    req_meminfo->vaddr = mmap(NULL,
+    alloc.len,
+    PROT_READ  | PROT_WRITE,
+    MAP_SHARED,
+    ion_info_fd.fd,
+    0);
     return nh_test;
+}
+
+void  QCameraHAL3Test::freeBuffers(native_handle_t *handle,
+    hal3_camtest_meminfo_t *req_meminfo)
+{
+    munmap(req_meminfo->vaddr, req_meminfo->size);
+    delete handle;
+    ioctl(req_meminfo->ion_fd, ION_IOC_FREE, &req_meminfo->ion_handle);
 }
 
 void QCameraHAL3Test::captureRequestRepeat(
@@ -186,29 +203,30 @@ void * processBuffers(void *data) {
     testcase = thread->testcase;
     QCameraHAL3Test *obj;
     obj = (QCameraHAL3Test *)thread->data_obj;
-    while(!thread_exit) {
+    hal3_test_handle = static_cast<hal3_camera_lib_test *>(thread->camera_obj);
+    while(1) {
+        obj->captureRequestRepeat(hal3_test_handle, 0, testcase);
         pthread_mutex_lock(&thread->mutex);
-        clock_gettime(CLOCK_REALTIME, &ts1);
-        ts1.tv_nsec += 10000000L;
-        pthread_cond_timedwait(&mRequestAppCond, &thread->mutex, &ts1);
-        pthread_mutex_unlock(&thread->mutex);
-        hal3_test_handle = CamObj_handle;
-        if (test_case_end == 0) {
-            obj->captureRequestRepeat(hal3_test_handle, 0, testcase);
+        if (*thread->stop_flag == true) {
+            pthread_mutex_unlock(&thread->mutex);
+            break;
         }
+        if (*thread->queued > 8*2) {
+            clock_gettime(CLOCK_REALTIME, &ts1);
+            ts1.tv_sec += 10L;
+            pthread_cond_timedwait(&thread->cond, &thread->mutex, &ts1);
+        }
+        pthread_mutex_unlock(&thread->mutex);
     }
     LOGD("Sensor thread is exiting");
     close(readfd);
     close(writefd);
-    pthread_cond_destroy(&mRequestAppCond);
-    pthread_mutex_unlock(&TestAppLock);
-    pthread_exit(0);
     return NULL;
 }
 
 QCameraHAL3Test::~QCameraHAL3Test()
 {
-
+    close(mIonFd);
 }
 
 }

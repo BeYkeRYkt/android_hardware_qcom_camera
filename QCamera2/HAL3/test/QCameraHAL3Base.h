@@ -69,6 +69,35 @@ extern "C" {
 
 namespace qcamera {
 
+#define MAX_NUM_CAMERAS 3
+enum HAL3TestStreamType {
+  HAL3_TEST_STREAM_TYPE_YUV,
+  HAL3_TEST_STREAM_TYPE_RAW,
+  HAL3_TEST_STREAM_TYPE_JPEG,
+  HAL3_TEST_STREAM_TYPE_MAX,
+};
+
+class HAL3TestSnapshotInfo {
+public:
+  HAL3TestStreamType  type;
+  int32_t             camera_id;
+  int                 width;
+  int                 height;
+  int                 count;
+
+};
+
+class HAL3TestStreamInfo {
+public:
+  int32_t camera_id;
+  int width;
+  int height;
+  float fps;
+  HAL3TestStreamType type;
+  bool isvideo;
+
+};
+
 typedef enum {
     HAL3_CAM_OK,
     HAL3_CAM_E_GENERAL,
@@ -99,6 +128,7 @@ typedef struct {
     int ion_fd;
     ion_user_handle_t ion_handle;
     size_t size;
+    void *vaddr;
 } hal3_camtest_meminfo_t;
 
 typedef struct {
@@ -131,10 +161,16 @@ typedef struct {
     void *data_obj;
     bool is_thread_started;
     int testcase;
+    void* camera_obj;
+    bool *stop_flag;
+    int *queued;
 } buffer_thread_t;
 
 extern int32_t pfd[2];
 typedef hal3_camera_lib_test hal3_camera_lib_handle;
+static void ProcessCaptureResult(
+        const camera3_callback_ops *cb,
+        const camera3_capture_result *result);
 
 class CameraHAL3Base
 {
@@ -158,20 +194,27 @@ public:
     camera_info camcap_info;
     camera_metadata_entry entry_hal3app;
     android::CameraMetadata hal3app_cam_settings;
-    int hal3appCamInitialize(int camid, hal3_camera_test_obj_t *my_test_obj);
+    int hal3appCamInitialize(int camid, hal3_camera_test_obj_t *,
+            camera3_callback_ops *);
     void hal3appCamCapabilityGet(hal3_camera_lib_test *handle,int camid);
-    int hal3appCameraLibOpen(int );
+    int hal3appCameraLibOpen(int, camera3_callback_ops *);
+    int hal3appCameraLibClose();
     int hal3appTestLoad(hal3_camera_app_t *);
     int hal3appCamOpen(hal3_camera_app_t *,
              int,
              hal3_camera_test_obj_t *);
+    int hal3appCamClose(hal3_camera_test_obj_t *);
+
+    int hal3appCameraConfigCaseInit(int, int, int, int);
     int hal3appCameraPreviewInit(int, int, int, int);
     int hal3appCameraVideoInit(int, int camid, int w, int h);
     void display_capability();
     int hal3appCameraCaptureInit(hal3_camera_lib_test *, int, int);
     int hal3appRawCaptureInit(hal3_camera_lib_test *handle, int camid, int );
     int hal3appCameraTestLoad();
+    int hal3appCameraTestUnload();
     void hal3appCheckStream(int testcase, int camid);
+
 };
 
 }

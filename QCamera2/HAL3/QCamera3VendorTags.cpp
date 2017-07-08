@@ -70,7 +70,8 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_WNR_END,
         QCAMERA3_EXPOSURE_DATA_END,
         QCAMERA3_TNR_TUNING_END,
-        QCAMERA3_DEWARP_END
+        QCAMERA3_DEWARP_END,
+        QCAMERA3_STRICT_ANTIBANDING_END
 };
 
 typedef struct vendor_tag_info {
@@ -107,7 +108,8 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.wnr",
     "org.codeaurora.qcamera3.exposure",
     "org.codeaurora.qcamera3.tnr_tuning",
-    "org.codeaurora.qcamera3.dewarp"
+    "org.codeaurora.qcamera3.dewarp",
+    "org.codeaurora.qcamera3.strict_antibanding"
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -182,7 +184,8 @@ vendor_tag_info_t
     { "is_main",           TYPE_BYTE },
     { "related_camera_id", TYPE_INT32 },
     { "camera_role",       TYPE_BYTE },
-    { "3a_sync_mode",      TYPE_BYTE }
+    { "3a_sync_mode",      TYPE_BYTE },
+    { "sync_request",      TYPE_BYTE }
 };
 
 vendor_tag_info_t
@@ -308,6 +311,12 @@ vendor_tag_info_t qcamera3_dewarp[QCAMERA3_DEWARP_END -
     { "dewarp_supported_modes", TYPE_INT32}
 };
 
+vendor_tag_info_t qcamera3_strict_antibanding[QCAMERA3_STRICT_ANTIBANDING_END-
+        QCAMERA3_STRICT_ANTIBANDING_START] = {
+    { "strict_antibanding_enable", TYPE_BYTE }
+};
+
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -337,7 +346,8 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_wnr,
     qcamera3_exposure,
     qcamera3_tnr_tuning,
-    qcamera3_dewarp
+    qcamera3_dewarp,
+    qcamera3_strict_antibanding
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -393,7 +403,7 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_DUALCAM_LINK_RELATED_CAMERA_ID,
     (uint32_t)QCAMERA3_DUALCAM_LINK_CAMERA_ROLE,
     (uint32_t)QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE,
-
+    (uint32_t)QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST,
     // QCAMERA3_DUALCAM_CALIB_META_DATA
     (uint32_t)QCAMERA3_DUALCAM_CALIB_META_DATA_BLOB,
 
@@ -477,7 +487,10 @@ uint32_t qcamera3_all_tags[] = {
 
     // QCAMERA3_DEWARP
     (uint32_t)QCAMERA3_DEWARP_MODE,
-    (uint32_t)QCAMERA3_DEWARP_AVAILABLE_MODES
+    (uint32_t)QCAMERA3_DEWARP_AVAILABLE_MODES,
+
+    //QCAMERA3_STRICT_ANTIBANDING
+    (uint32_t)QCAMERA3_STRICT_ANTIBANDING_MODE
 
 
 };

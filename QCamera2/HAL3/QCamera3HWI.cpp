@@ -94,11 +94,10 @@ namespace qcamera {
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #ifdef _DRONE_
 #define MIN_FPS_FOR_BATCH_MODE (90)
-#elif _LE_CAMERA_
-#define MIN_FPS_FOR_BATCH_MODE (60)
 #else
 #define MIN_FPS_FOR_BATCH_MODE (120)
 #endif
+#define MIN_FPS_FOR_HFR_MODE (60)
 #define PREVIEW_FPS_FOR_HFR    (30)
 #define DEFAULT_VIDEO_FPS      (30.0)
 #define TEMPLATE_MAX_PREVIEW_FPS (30.0)
@@ -2241,6 +2240,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                         if (!m_bIsVideo && (streamList->operation_mode ==
                                 CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE)) {
                             mDummyBatchStream = *newStream;
+                            mDummyBatchStream.usage |= GRALLOC_USAGE_HW_VIDEO_ENCODER;
                         }
                         int bufferCount = MAX_INFLIGHT_REQUESTS;
                         if (mStreamConfigInfo.type[mStreamConfigInfo.num_streams] ==
@@ -7064,6 +7064,11 @@ QCamera3HardwareInterface::translateFromHalMetadata(
                 sizeof(mm_jpeg_debug_exif_params_t));
     }
 
+    // Strict Antibanding
+    IF_META_AVAILABLE(uint8_t, strict_banding, CAM_INTF_PARM_STRICT_ANTIBANDING, metadata) {
+        uint8_t fwk_strict_banding = (uint8_t) *strict_banding;
+        camMetadata.update(QCAMERA3_STRICT_ANTIBANDING_MODE, &fwk_strict_banding, 1);
+    }
 
     // DeWarp Modes
     IF_META_AVAILABLE(cam_dewarp_type_t, dwarp, CAM_INTF_META_DEWARP_MODE, metadata) {
@@ -8582,7 +8587,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
 
         /* Advertise only MIN_FPS_FOR_BATCH_MODE or above as HIGH_SPEED_CONFIGS */
-        if (fps >= MIN_FPS_FOR_BATCH_MODE) {
+        if (fps >= MIN_FPS_FOR_HFR_MODE) {
             /* For each HFR frame rate, need to advertise one variable fps range
              * and one fixed fps range per dimension. Eg: for 120 FPS, advertise [30, 120]
              * and [120, 120]. While camcorder preview alone is running [30, 120] is
@@ -10922,6 +10927,13 @@ int QCamera3HardwareInterface::translateToHalMetadata
         }
     }
 
+    if (frame_settings.exists(QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST)) {
+        uint32_t syncRequest = frame_settings.find(QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST).data.u8[0];
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_SYNC_DC_PARAMETERS, syncRequest)) {
+            rc = BAD_VALUE;
+        }
+    }
+
     if (frame_settings.exists(ANDROID_CONTROL_EFFECT_MODE)) {
         uint8_t fwk_effectMode = frame_settings.find(ANDROID_CONTROL_EFFECT_MODE).data.u8[0];
         int val = lookupHalName(EFFECT_MODES_MAP, METADATA_MAP_SIZE(EFFECT_MODES_MAP),
@@ -11740,6 +11752,18 @@ int QCamera3HardwareInterface::translateToHalMetadata
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_SATURATION, *use_saturation)) {
             rc = BAD_VALUE;
         }
+    }
+
+    //Strict Antibanding
+    if (frame_settings.exists(QCAMERA3_STRICT_ANTIBANDING_MODE)) {
+
+      uint8_t strict_atb_mode =
+                frame_settings.find(QCAMERA3_STRICT_ANTIBANDING_MODE).data.u8[0];
+                LOGE(" Camera AntiBanding Mode is :%d",strict_atb_mode);
+      if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_STRICT_ANTIBANDING,
+              strict_atb_mode)) {
+          rc = BAD_VALUE;
+      }
     }
 
     // Dewarp
