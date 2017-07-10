@@ -4919,6 +4919,7 @@ no_error:
                 inputbuf = request->input_buffer;
                 if((inputbuf->stream->format == HAL_PIXEL_FORMAT_RAW_OPAQUE) ||
                         (inputbuf->stream->format == HAL_PIXEL_FORMAT_RAW16) ||
+                        (inputbuf->stream->format == HAL_PIXEL_FORMAT_RAW12) ||
                         (inputbuf->stream->format == HAL_PIXEL_FORMAT_RAW10)) {
                     m_bOfflineIsp = true;
                 } else {
