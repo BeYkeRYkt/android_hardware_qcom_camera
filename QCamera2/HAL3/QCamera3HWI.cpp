@@ -1480,6 +1480,7 @@ int QCamera3HardwareInterface::configureStreams(
     mPerfLockMgr.acquirePerfLock(PERF_LOCK_START_PREVIEW);
     rc = configureStreamsPerfLocked(streamList);
     mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
+    mPerfLockMgr.releasePerfLock(PERF_LOCK_POWERHINT_ENCODE);
 
     return rc;
 }
@@ -2419,6 +2420,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
         if (!mAnalysisChannel) {
             LOGW("Analysis channel cannot be created");
         }
+    }
+    if (onlyRaw) {
+        mStreamConfigInfo.sync_type = CAM_TYPE_STANDALONE;
     }
 
     //RAW DUMP channel
@@ -3767,7 +3771,8 @@ void QCamera3HardwareInterface::handleBufferWithLock(
 
     if (mPreviewStarted == false) {
         QCamera3Channel *channel = (QCamera3Channel *)buffer->stream->priv;
-        if ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) {
+        if (((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) ||
+                ((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask())) {
             mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
             mPerfLockMgr.releasePerfLock(PERF_LOCK_OPEN_CAMERA);
             mPreviewStarted = true;
@@ -10870,6 +10875,13 @@ int QCamera3HardwareInterface::translateToHalMetadata
     if (frame_settings.exists(ANDROID_CONTROL_AWB_LOCK)) {
         uint8_t awbLock = frame_settings.find(ANDROID_CONTROL_AWB_LOCK).data.u8[0];
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_AWB_LOCK, awbLock)) {
+            rc = BAD_VALUE;
+        }
+    }
+
+    if (frame_settings.exists(QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST)) {
+        uint32_t syncRequest = frame_settings.find(QCAMERA3_DUALCAM_SYNCHRONIZED_REQUEST).data.u8[0];
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_SYNC_DC_PARAMETERS, syncRequest)) {
             rc = BAD_VALUE;
         }
     }
