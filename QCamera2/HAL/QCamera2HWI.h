@@ -114,6 +114,8 @@ typedef struct {
 //Min buffer requirement for B+M Clearsight fusion
 #define MIN_CLEARSIGHT_BUFS 3
 
+#define NUM_BOKEH_OUTPUT 3    //Bokeh image, main image and depth map
+
 typedef enum {
     QCAMERA_NOTIFY_CALLBACK,
     QCAMERA_DATA_CALLBACK,
@@ -665,6 +667,7 @@ private:
     bool m_bPreviewStarted;             //flag indicates first preview frame callback is received
     bool m_bFirstPreviewFrameReceived;
     bool m_bRecordStarted;             //flag indicates Recording is started for first time
+    bool m_bPreparingHardware;         //flag indicates take picture initiated
 
     // Signifies if ZSL Retro Snapshots are enabled
     bool bRetroPicture;
