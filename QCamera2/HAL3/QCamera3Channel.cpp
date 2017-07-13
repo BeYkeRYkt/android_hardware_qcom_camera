@@ -856,6 +856,8 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
 {
     if (mStreamType == CAM_STREAM_TYPE_PREVIEW) {
         KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_PREVIEW_STRM_CB);
+    } else if (mStreamType == CAM_STREAM_TYPE_VIDEO) {
+        KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_VIDEO_STRM_CB);
     } else {
         ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_PROC_CH_STRM_CB);
     }
