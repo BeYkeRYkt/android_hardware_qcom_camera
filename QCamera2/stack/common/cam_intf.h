@@ -954,6 +954,7 @@ typedef struct {
     INCLUDE(CAM_INTF_META_AF_STATE,                     uint32_t,                    1);
     INCLUDE(CAM_INTF_PARM_WHITE_BALANCE,                int32_t,                     1);
     INCLUDE(CAM_INTF_META_AWB_REGIONS,                  cam_area_t,                  1);
+    INCLUDE(CAM_INTF_META_AWB_COLOR_ROI,                cam_awb_roi_color_target,    1);
     INCLUDE(CAM_INTF_META_AWB_STATE,                    uint32_t,                    1);
     INCLUDE(CAM_INTF_META_AWB_CONVERGENCE_SPEED,        float,                       1);
     INCLUDE(CAM_INTF_META_BLACK_LEVEL_LOCK,             uint32_t,                    1);
