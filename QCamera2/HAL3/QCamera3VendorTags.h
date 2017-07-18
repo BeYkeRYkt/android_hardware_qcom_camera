@@ -553,6 +553,16 @@ typedef enum {
      *   on image/sensor statistics and YUV streams will be disabled.
      */
     QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE = 0x8000,
+
+    /* Controlling Postprocessing of YUV stream from App. This is required to
+     * reduce the performance overhead while multiple callback streams are running
+     * by disabling postprocessing which improves power, performance.
+     * When App notifies this mode to HAL, HAL doesnt link CPP with any stream
+     * This mode has following limitations:
+     *    - All YUV stream under this mode wont be connecting CPP
+     *    - Postprocessing cant be done.
+     */
+    QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE = 0x8001
 } QCamera3VendorStreamConfiguration;
 
 // QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE
@@ -579,6 +589,8 @@ typedef enum camera_metadata_enum_ext_dewarp_type {
     QCAMERA3_DEWARP_CUSTOM,
     QCAMERA3_DEWARP_LDC_CUSTOM
 } camera_metadata_enum_ext_dewarp_type_t;
+
+
 
 class QCamera3VendorTags {
 

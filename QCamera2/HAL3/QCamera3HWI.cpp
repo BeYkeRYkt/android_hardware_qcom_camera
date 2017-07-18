@@ -2092,16 +2092,21 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
             case HAL_PIXEL_FORMAT_YCbCr_420_888:
                 onlyRaw = false; // There is non-raw stream - bypass flag if set
                 mStreamConfigInfo.type[mStreamConfigInfo.num_streams] = CAM_STREAM_TYPE_CALLBACK;
-                if (isOnEncoder(maxViewfinderSize, newStream->width, newStream->height)) {
-                    if (bUseCommonFeatureMask)
-                        mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
-                                commonFeatureMask;
-                    else
-                        mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                if(mOpMode == QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE) {
+                    mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
                                 CAM_QCOM_FEATURE_NONE;
                 } else {
-                    mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
-                            CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
+                    if (isOnEncoder(maxViewfinderSize, newStream->width, newStream->height)) {
+                        if (bUseCommonFeatureMask)
+                            mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                                    commonFeatureMask;
+                        else
+                            mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                                    CAM_QCOM_FEATURE_NONE;
+                    } else {
+                        mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                                CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
+                    }
                 }
             break;
             case HAL_PIXEL_FORMAT_BLOB:
