@@ -77,8 +77,8 @@ namespace qcamera {
 #define VIDEO_4K_WIDTH  3840
 #define VIDEO_4K_HEIGHT 2160
 
-#define MAX_EIS_WIDTH 1920
-#define MAX_EIS_HEIGHT 1080
+#define MAX_EIS_WIDTH 3840
+#define MAX_EIS_HEIGHT 2160
 
 #define MAX_RAW_STREAMS        1
 #define MAX_STALLING_STREAMS   1
@@ -1657,8 +1657,10 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     property_get("persist.camera.eis.enable", eis_prop, "1");
     eis_prop_set = (uint8_t)atoi(eis_prop);
 
-    m_bEisEnable = eis_prop_set && (!oisSupported && m_bEisSupported) &&
-            (mOpMode != CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE);
+    //m_bEisEnable = eis_prop_set && (!oisSupported && m_bEisSupported) &&
+    //        (mOpMode != CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE);
+
+    m_bEisEnable = eis_prop_set && (!oisSupported && m_bEisSupported);
 
     LOGD("m_bEisEnable: %d, eis_prop_set: %d, m_bEisSupported: %d, oisSupported:%d ",
             m_bEisEnable, eis_prop_set, m_bEisSupported, oisSupported);
@@ -2428,6 +2430,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
         if (!mAnalysisChannel) {
             LOGW("Analysis channel cannot be created");
         }
+    }
+    if (onlyRaw) {
+        mStreamConfigInfo.sync_type = CAM_TYPE_STANDALONE;
     }
 
     //RAW DUMP channel
@@ -4339,6 +4344,14 @@ int QCamera3HardwareInterface::processCaptureRequest(
             fwkVideoStabMode |= meta.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE).data.u8[0];
         }
 
+        if (meta.exists(ANDROID_CONTROL_AE_TARGET_FPS_RANGE)) {
+            int32_t fps_max =
+                    (int32_t) meta.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE).data.i32[1];
+            if (CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == mOpMode) {
+                if(fps_max > 60)
+                    m_bEisEnable = false;
+            }
+        }
 
         // If EIS setprop is enabled & if first capture setting has EIS enabled then only
         // turn it on for video/preview
@@ -11393,6 +11406,43 @@ int QCamera3HardwareInterface::translateToHalMetadata
         }
         if (reset && ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_AF_ROI, roi)) {
             rc = BAD_VALUE;
+        }
+    }
+
+    if (frame_settings.exists(ANDROID_CONTROL_AWB_REGIONS)) {
+        cam_area_t roi;
+        bool reset = true;
+        cam_awb_roi_color_target awb_color_roi;
+        convertFromRegions(roi, request->settings, ANDROID_CONTROL_AWB_REGIONS);
+        LOGD("ROI_DBG frame setting existed left: %d  top:%d   width:%d   height:%d",
+                roi.rect.left,roi.rect.top,roi.rect.width,roi.rect.height);
+        // Map coordinate system based on FOV
+        mCropRegionMapper.toSensor(roi.rect.left, roi.rect.top, roi.rect.width,
+                roi.rect.height);
+
+        if (scalerCropSet) {
+            reset = resetIfNeededROI(&roi, &scalerCropRegion);
+        }
+        awb_color_roi.roi = roi;
+        if (frame_settings.exists(QCAMERA3_AWB_ROI_COLOR)) {
+            int rgb_color[3];
+            rgb_color[0] = frame_settings.find(QCAMERA3_AWB_ROI_COLOR).data.i32[0];
+            rgb_color[1] = frame_settings.find(QCAMERA3_AWB_ROI_COLOR).data.i32[1];
+            rgb_color[2] = frame_settings.find(QCAMERA3_AWB_ROI_COLOR).data.i32[2];
+            if((rgb_color[0] <= 0) || (rgb_color[0] <= 0) || (rgb_color[0] <= 0))
+                LOGE(" Invalid RGB color");
+            awb_color_roi.rgb[0] = rgb_color[0];
+            awb_color_roi.rgb[1] = rgb_color[1];
+            awb_color_roi.rgb[2] = rgb_color[2];
+            LOGD("ROI_DBG Setting RGB Color  %d  and %d  and %d",
+                    awb_color_roi.rgb[0], awb_color_roi.rgb[1], awb_color_roi.rgb[2]);
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata,
+                    CAM_INTF_META_AWB_COLOR_ROI, awb_color_roi)) {
+                rc = BAD_VALUE;
+            }
+        }
+        else {
+            LOGE("Currently not supporting Auto AWB Region ");
         }
     }
 
