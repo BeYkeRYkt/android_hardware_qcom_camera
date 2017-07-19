@@ -7136,6 +7136,18 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_INSTANT_AEC_MODE, instant_aec_mode, 1);
     }
 
+    IF_META_AVAILABLE(cam_3a_params_t, ae_params,
+            CAM_INTF_META_AEC_INFO, metadata) {
+        camMetadata.update(QCAMERA3_TARGET_LUMA, &(ae_params->luma_info.target_luma), 1);
+        camMetadata.update(QCAMERA3_CURRENT_LUMA, &(ae_params->luma_info.curr_luma), 1);
+        float luma_range[2];
+        luma_range[0] = (float) ae_params->luma_info.luma_range.min_luma;
+        luma_range[1] = (float) ae_params->luma_info.luma_range.max_luma;
+        LOGD("Luma Range(%f - %f) Luma Value %f ",luma_range[0],luma_range[1],
+                ae_params->luma_info.target_luma);
+        camMetadata.update(QCAMERA3_LUMA_RANGE, luma_range, 2);
+    }
+
     /* In batch mode, cache the first metadata in the batch */
     if (mBatchSize && firstMetadataInBatch) {
         mCachedMetadata.clear();
