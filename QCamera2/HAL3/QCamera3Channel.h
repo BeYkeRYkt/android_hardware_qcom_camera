@@ -135,6 +135,7 @@ public:
 
     cam_format_t getStreamDefaultFormat(cam_stream_type_t type,
             uint32_t width, uint32_t height);
+    cam_format_t convertToPlain16Format(cam_format_t fmt);
     virtual int32_t timeoutFrame(__unused uint32_t frameNumber) = 0;
 
     void *mUserData;
