@@ -2789,6 +2789,11 @@ int QCamera3HardwareInterface::processCaptureRequest(
         QCamera3Channel *channel = (QCamera3Channel *)output.stream->priv;
         sp<Fence> acquireFence = new Fence(output.acquire_fence);
 
+	if (channel == NULL) {
+		ALOGE("%s: invalid channel pointer for stream", __func__);
+		continue;
+	}
+
         if (output.stream->format == HAL_PIXEL_FORMAT_BLOB) {
             //Call function to store local copy of jpeg data for encode params.
             blob_request = 1;
