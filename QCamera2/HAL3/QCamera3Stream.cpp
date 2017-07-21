@@ -443,9 +443,14 @@ int32_t QCamera3Stream::init(cam_stream_type_t streamType,
     mNumBufs = minNumBuffers;
     if (reprocess_config != NULL) {
         mStreamInfo->reprocess_config = *reprocess_config;
-        mStreamInfo->streaming_mode = CAM_STREAMING_MODE_BURST;
-        //mStreamInfo->num_of_burst = reprocess_config->offline.num_of_bufs;
-        mStreamInfo->num_of_burst = 1;
+        if (mStreamInfo->reprocess_config.pp_feature_config.feature_mask &
+            CAM_QCOM_FEATURE_RAW_PROCESSING) {
+            mStreamInfo->streaming_mode = CAM_STREAMING_MODE_CONTINUOUS;
+        } else {
+            mStreamInfo->streaming_mode = CAM_STREAMING_MODE_BURST;
+            //mStreamInfo->num_of_burst = reprocess_config->offline.num_of_bufs;
+            mStreamInfo->num_of_burst = 1;
+        }
     } else if (batchSize) {
         if (batchSize > MAX_BATCH_SIZE) {
             LOGE("batchSize:%d is very large", batchSize);
