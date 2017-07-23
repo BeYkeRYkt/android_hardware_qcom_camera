@@ -987,6 +987,11 @@ typedef struct  {
     int32_t weight; /* weight of the area, valid for focusing/metering areas */
 } cam_area_t;
 
+typedef struct  {
+   cam_area_t roi;
+   int rgb[3];
+} cam_awb_roi_color_target;
+
 typedef enum {
     CAM_STREAMING_MODE_CONTINUOUS, /* continous streaming */
     CAM_STREAMING_MODE_BURST,      /* burst streaming */
@@ -2176,6 +2181,8 @@ typedef enum {
     CAM_INTF_META_AF_STATE,
     /* List of areas to use for illuminant estimation */
     CAM_INTF_META_AWB_REGIONS,
+    /* Applying AWB on selected region based on input color */
+    CAM_INTF_META_AWB_COLOR_ROI,
     /* Current state of AWB algorithm */
     CAM_INTF_META_AWB_STATE,
     /*Whether black level compensation is frozen or free to vary*/
