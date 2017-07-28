@@ -127,7 +127,7 @@ static void mm_app_metadata_notify_cb(mm_camera_super_buf_t *bufs,
   IF_META_AVAILABLE(cam_sensor_params_t, sensor_params, CAM_INTF_META_SENSOR_INFO, pMetadata) {
       pme->mExifParams.sensor_params = *sensor_params;
   }
-
+  #ifdef CAMERA_DEBUG_DATA
   IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
           CAM_INTF_META_EXIF_DEBUG_AE, pMetadata) {
       if (pme->mExifParams.debug_params) {
@@ -194,6 +194,7 @@ static void mm_app_metadata_notify_cb(mm_camera_super_buf_t *bufs,
           pme->mExifParams.debug_params->q3a_tuning_debug_params_valid = TRUE;
       }
   }
+  #endif
   IF_META_AVAILABLE(uint32_t, afState, CAM_INTF_META_AF_STATE, pMetadata) {
     if ((cam_af_state_t)(*afState) == CAM_AF_STATE_FOCUSED_LOCKED ||
             (cam_af_state_t)(*afState) == CAM_AF_STATE_NOT_FOCUSED_LOCKED) {
