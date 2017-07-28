@@ -9385,7 +9385,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     }
 
     int64_t available_exp_time_range[EXPOSURE_TIME_RANGE_CNT];
-    for (size_t i = 0; i < count; i++)
+    for (size_t i = 0; i < EXPOSURE_TIME_RANGE_CNT; i++)
         available_exp_time_range[i] = gCamCapability[cameraId]->exposure_time_range[i];
     staticInfo.update(QCAMERA3_EXP_TIME_RANGE,
             available_exp_time_range, EXPOSURE_TIME_RANGE_CNT);
@@ -9409,6 +9409,16 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     is_hdr_confidence_range[1] = 1.0;
     staticInfo.update(QCAMERA3_STATS_IS_HDR_SCENE_CONFIDENCE_RANGE,
             is_hdr_confidence_range, 2);
+
+    if (gCamCapability[cameraId]->is_quadracfa_sensor) {
+        uint8_t is_qcfa_sensor = 1;
+        int32_t dim[2];
+        dim[0] = gCamCapability[cameraId]->quadra_cfa_dim[0].width;
+        dim[1] = gCamCapability[cameraId]->quadra_cfa_dim[0].height;
+        LOGD("vendor tag for quadra cfa, dim:%dx%d", dim[0], dim[1]);
+        staticInfo.update(QCAMERA3_IS_QUADRA_CFA_SENSOR, &is_qcfa_sensor, 1);
+        staticInfo.update(QCAMERA3_SUPPORT_QUADRA_CFA_DIM, dim, 2);
+    }
 
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
