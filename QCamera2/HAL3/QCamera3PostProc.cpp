@@ -757,7 +757,8 @@ int32_t QCamera3PostProcessor::processJpegSettingData(
  *
  * NOTE       : The frame after reprocess need to send to jpeg encoding.
  *==========================================================================*/
-int32_t QCamera3PostProcessor::processPPData(mm_camera_super_buf_t *frame)
+int32_t QCamera3PostProcessor::processPPData(mm_camera_super_buf_t *frame,
+        const metadata_buffer_t *p_metadata)
 {
     qcamera_hal3_pp_data_t *job = (qcamera_hal3_pp_data_t *)m_ongoingPPQ.dequeue();
     ATRACE_INT("Camera:Reprocess", 0);
@@ -787,6 +788,10 @@ int32_t QCamera3PostProcessor::processPPData(mm_camera_super_buf_t *frame)
         jpeg_job->metadata =
                 (metadata_buffer_t *) job->fwk_src_frame->metadata_buffer.buffer;
         jpeg_job->fwk_src_buffer = job->fwk_src_frame;
+    }
+    if (p_metadata != NULL) {
+        // update metadata content with input buffer
+        memcpy(jpeg_job->metadata, p_metadata, sizeof(metadata_buffer_t));
     }
     jpeg_job->src_metadata = job->src_metadata;
     jpeg_job->jpeg_settings = job->jpeg_settings;
@@ -1231,7 +1236,6 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
     memset(&crop, 0, sizeof(cam_rect_t));
     //TBD_later - Zoom event removed in stream
     //main_stream->getCropInfo(crop);
-
     // Set JPEG encode crop in reprocess frame metadata
     // If this JPEG crop info exist, encoder should do cropping
     IF_META_AVAILABLE(cam_stream_crop_info_t, jpeg_crop,
@@ -1609,6 +1613,7 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
     uint32_t jobId = 0;
     QCamera3Stream *main_stream = NULL;
     mm_camera_buf_def_t *main_frame = NULL;
+    cam_stream_parm_buffer_t param;
     QCamera3Channel *srcChannel = NULL;
     mm_camera_super_buf_t *recvd_frame = NULL;
     metadata_buffer_t *metadata = NULL;
@@ -1805,7 +1810,26 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
     memset(&crop, 0, sizeof(cam_rect_t));
     //TBD_later - Zoom event removed in stream
     //main_stream->getCropInfo(crop);
-
+    crop.left = 0;
+    crop.top = 0;
+    crop.height = src_dim.height;
+    crop.width = src_dim.width;
+    if (jpeg_settings->hdr_snapshot) {
+       memset(&param, 0, sizeof(cam_stream_parm_buffer_t));
+       param.type = CAM_STREAM_PARAM_TYPE_GET_OUTPUT_CROP;
+       ret = main_stream->getParameter(param);
+       if (ret != NO_ERROR) {
+          LOGE("%s: stream getParameter for reprocess failed", __func__);
+       } else {
+           for (int i = 0; i < param.outputCrop.num_of_streams; i++) {
+              if (param.outputCrop.crop_info[i].stream_id
+                  == main_stream->getMyServerID()) {
+                     crop = param.outputCrop.crop_info[i].crop;
+                     main_stream->setCropInfo(crop);
+              }
+           }
+         }
+    }
     // Set main dim job parameters and handle rotation
     if (!needJpegExifRotation && (jpeg_settings->jpeg_orientation == 90 ||
             jpeg_settings->jpeg_orientation == 270)) {
