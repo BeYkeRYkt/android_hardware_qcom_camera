@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -231,6 +231,8 @@ enum qcamera3_ext_tags {
 
     QCAMERA3_SENSOR_DYNAMIC_BLACK_LEVEL_PATTERN = QCAMERA3_SENSOR_META_DATA_START,
     QCAMERA3_SENSOR_IS_MONO_ONLY,
+    QCAMERA3_SENSOR_START_FRAME_READOUT,
+    QCAMERA3_SENSOR_FRAME_READOUT_DURATION,
     QCAMERA3_SENSOR_META_DATA_END,
 
     QCAMERA3_DUALCAM_LINK_ENABLE = QCAMERA3_DUALCAM_LINK_META_DATA_START,

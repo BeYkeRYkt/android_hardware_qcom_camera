@@ -82,9 +82,21 @@ namespace qcamera {
 
 #define MAX_RAW_STREAMS        1
 #define MAX_STALLING_STREAMS   1
+
+/* DONOT Increase MAX_PROCESSED_STREAMS for LA as it will
+   result in CTS Failtures */
+#ifdef _LE_CAMERA_
+#define MAX_PROCESSED_STREAMS  6
+#else
 #define MAX_PROCESSED_STREAMS  3
+#endif
+
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
+#ifdef _DRONE_
+#define MIN_FPS_FOR_BATCH_MODE (90)
+#else
 #define MIN_FPS_FOR_BATCH_MODE (120)
+#endif
 #define PREVIEW_FPS_FOR_HFR    (30)
 #define DEFAULT_VIDEO_FPS      (30.0)
 #define TEMPLATE_MAX_PREVIEW_FPS (30.0)
@@ -1468,6 +1480,7 @@ int QCamera3HardwareInterface::configureStreams(
     mPerfLockMgr.acquirePerfLock(PERF_LOCK_START_PREVIEW);
     rc = configureStreamsPerfLocked(streamList);
     mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
+    mPerfLockMgr.releasePerfLock(PERF_LOCK_POWERHINT_ENCODE);
 
     return rc;
 }
@@ -2938,7 +2951,7 @@ void QCamera3HardwareInterface::handleBatchMetadata(
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER_VALID, metadata);
     uint32_t *p_frame_number =
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER, metadata);
-    int64_t *p_capture_time =
+    cam_sensor_timestamp_t *p_sen_timestamp =
             POINTER_OF_META(CAM_INTF_META_SENSOR_TIMESTAMP, metadata);
     int32_t *p_urgent_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_URGENT_FRAME_NUMBER_VALID, metadata);
@@ -2946,14 +2959,14 @@ void QCamera3HardwareInterface::handleBatchMetadata(
             POINTER_OF_META(CAM_INTF_META_URGENT_FRAME_NUMBER, metadata);
 
     if ((NULL == p_frame_number_valid) || (NULL == p_frame_number) ||
-            (NULL == p_capture_time) || (NULL == p_urgent_frame_number_valid) ||
+            (NULL == p_sen_timestamp) || (NULL == p_urgent_frame_number_valid) ||
             (NULL == p_urgent_frame_number)) {
         LOGE("Invalid metadata");
         invalid_metadata = true;
     } else {
         frame_number_valid = *p_frame_number_valid;
         last_frame_number = *p_frame_number;
-        last_frame_capture_time = *p_capture_time;
+        last_frame_capture_time = p_sen_timestamp->exposure_start;
         urgent_frame_number_valid = *p_urgent_frame_number_valid;
         last_urgent_frame_number = *p_urgent_frame_number;
     }
@@ -3054,8 +3067,10 @@ void QCamera3HardwareInterface::handleBatchMetadata(
                         (((loopCount - 1) * NSEC_PER_SEC) / (double) mHFRVideoFps);
                 capture_time =
                         first_frame_capture_time + (i * NSEC_PER_SEC / (double) mHFRVideoFps);
+                cam_sensor_timestamp_t sen_timestamp;
+                sen_timestamp.exposure_start = capture_time;
                 ADD_SET_PARAM_ENTRY_TO_BATCH(metadata,
-                        CAM_INTF_META_SENSOR_TIMESTAMP, capture_time);
+                        CAM_INTF_META_SENSOR_TIMESTAMP, sen_timestamp);
                 LOGD("batch capture_time: %lld, capture_time: %lld",
                          last_frame_capture_time, capture_time);
             }
@@ -3130,7 +3145,8 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
     int32_t *p_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER_VALID, metadata);
     uint32_t *p_frame_number = POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER, metadata);
-    int64_t *p_capture_time = POINTER_OF_META(CAM_INTF_META_SENSOR_TIMESTAMP, metadata);
+    cam_sensor_timestamp_t *p_sen_timestamp =
+            POINTER_OF_META(CAM_INTF_META_SENSOR_TIMESTAMP, metadata);
     int32_t *p_urgent_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_URGENT_FRAME_NUMBER_VALID, metadata);
     uint32_t *p_urgent_frame_number =
@@ -3141,7 +3157,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
                  *p_frame_number_valid, *p_frame_number);
     }
 
-    if ((NULL == p_frame_number_valid) || (NULL == p_frame_number) || (NULL == p_capture_time) ||
+    if ((NULL == p_frame_number_valid) || (NULL == p_frame_number) || (NULL == p_sen_timestamp) ||
             (NULL == p_urgent_frame_number_valid) || (NULL == p_urgent_frame_number)) {
         LOGE("Invalid metadata");
         if (free_and_bufdone_meta_buf) {
@@ -3152,7 +3168,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
     }
     frame_number_valid =        *p_frame_number_valid;
     frame_number =              *p_frame_number;
-    capture_time =              *p_capture_time;
+    capture_time =              p_sen_timestamp->exposure_start;
     urgent_frame_number_valid = *p_urgent_frame_number_valid;
     urgent_frame_number =       *p_urgent_frame_number;
     currentSysTime =            systemTime(CLOCK_MONOTONIC);
@@ -3755,7 +3771,8 @@ void QCamera3HardwareInterface::handleBufferWithLock(
 
     if (mPreviewStarted == false) {
         QCamera3Channel *channel = (QCamera3Channel *)buffer->stream->priv;
-        if ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) {
+        if (((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) ||
+                ((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask())) {
             mPerfLockMgr.releasePerfLock(PERF_LOCK_START_PREVIEW);
             mPerfLockMgr.releasePerfLock(PERF_LOCK_OPEN_CAMERA);
             mPreviewStarted = true;
@@ -4829,6 +4846,11 @@ no_error:
         const camera3_stream_buffer_t& output = request->output_buffers[i];
         QCamera3Channel *channel = (QCamera3Channel *)output.stream->priv;
 
+        if (channel == NULL) {
+            ALOGE("%s: invalid channel pointer for stream", __func__);
+            continue;
+        }
+
         if (output.stream->format == HAL_PIXEL_FORMAT_BLOB) {
             //FIXME??:Call function to store local copy of jpeg data for encode params.
             blob_request = 1;
@@ -4880,6 +4902,7 @@ no_error:
     }
 
     if (blob_request) {
+        LOGI("[KPI Perf] : PROFILE_SNAPSHOT_REQUEST_RECEIVED");
         KPI_ATRACE_CAMSCOPE_INT("SNAPSHOT", CAMSCOPE_HAL3_SNAPSHOT, 1);
         mPerfLockMgr.acquirePerfLock(PERF_LOCK_TAKE_SNAPSHOT);
     }
@@ -6753,6 +6776,16 @@ QCamera3HardwareInterface::translateFromHalMetadata(
               mCurrFeatureState &= ~CAM_QCOM_FEATURE_IR;
         }
         camMetadata.update(QCAMERA3_IR_MODE, &fwk_ir, 1);
+    }
+    IF_META_AVAILABLE(cam_sensor_timestamp_t, p_sen_timestamp,
+                      CAM_INTF_META_SENSOR_TIMESTAMP, metadata) {
+        camMetadata.update(QCAMERA3_SENSOR_START_FRAME_READOUT,
+                           (int64_t *)&(p_sen_timestamp->start_frame_readout), 4);
+        camMetadata.update(QCAMERA3_SENSOR_FRAME_READOUT_DURATION,
+                           (int64_t *)&(p_sen_timestamp->frame_readout_duration), 4);
+        LOGD("sof_timestamp: %lld, frame_readout_duration: %lld",
+             p_sen_timestamp->start_frame_readout,
+             p_sen_timestamp->frame_readout_duration);
     }
 
     IF_META_AVAILABLE(cam_exposure_data_t, exposure, CAM_INTF_META_EXPOSURE_INFO, metadata) {
@@ -9337,6 +9370,8 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         int32_t available_iso_modes[CAM_ISO_MODE_MAX];
         size = 0;
         count = MIN(gCamCapability[cameraId]->supported_iso_modes_cnt, CAM_ISO_MODE_MAX);
+        uint8_t max_analog_mode = getIsoMode(gCamCapability[cameraId]->max_analog_sensitivity);
+        count = MIN(count, max_analog_mode + 1);
         for (size_t i = 0; i < count; i++) {
             int32_t val = lookupFwkName(ISO_MODES_MAP, METADATA_MAP_SIZE(ISO_MODES_MAP),
                     gCamCapability[cameraId]->supported_iso_modes[i]);
@@ -9588,6 +9623,43 @@ int32_t QCamera3HardwareInterface::getSensorSensitivity(int32_t iso_mode)
         break;
     }
     return sensitivity;
+}
+
+/*===========================================================================
+ * FUNCTION   : getIsoMode
+ *
+ * DESCRIPTION: round down sensor sensitivity to an integer iso mode value
+ *              i.e. 398 is converted to iso mode 3 (200), 802 is converted to iso mode 5 (800)
+ *
+ * PARAMETERS : sensitivity : the sensitivity supported by sensor
+ *
+ ** RETURN    : iso mode supported by sensor
+ *
+ *==========================================================================*/
+uint8_t QCamera3HardwareInterface::getIsoMode(int32_t sensitivity)
+{
+    // error checking, make sure sensitivity in the range [100, 3200]
+    if (sensitivity < 0) {
+        LOGE("sensitivity < 0");
+        return CAM_ISO_MODE_AUTO;
+    }
+    if (sensitivity < 100) {
+        return CAM_ISO_MODE_AUTO;
+    }
+    if (sensitivity > 3200) {
+        sensitivity = 3200;
+    }
+
+    // count the position of the highest set bit
+    sensitivity /= 100;
+    int32_t iso_mode = -1;
+    while(sensitivity > 0) {
+        iso_mode++;
+        sensitivity >>= 1;
+    }
+    iso_mode += CAM_ISO_MODE_100;
+
+    return iso_mode;
 }
 
 /*===========================================================================
@@ -11081,16 +11153,6 @@ int QCamera3HardwareInterface::translateToHalMetadata
         scalerCropSet = true;
     }
 
-    if (frame_settings.exists(ANDROID_SENSOR_EXPOSURE_TIME)) {
-        int64_t sensorExpTime =
-                frame_settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
-        LOGD("setting sensorExpTime %lld", sensorExpTime);
-        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_SENSOR_EXPOSURE_TIME,
-                sensorExpTime)) {
-            rc = BAD_VALUE;
-        }
-    }
-
     if (frame_settings.exists(ANDROID_SENSOR_FRAME_DURATION)) {
         int64_t sensorFrameDuration =
                 frame_settings.find(ANDROID_SENSOR_FRAME_DURATION).data.i64[0];
@@ -11101,19 +11163,6 @@ int QCamera3HardwareInterface::translateToHalMetadata
         LOGD("clamp sensorFrameDuration to %lld", sensorFrameDuration);
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_SENSOR_FRAME_DURATION,
                 sensorFrameDuration)) {
-            rc = BAD_VALUE;
-        }
-    }
-
-    if (frame_settings.exists(ANDROID_SENSOR_SENSITIVITY)) {
-        int32_t sensorSensitivity = frame_settings.find(ANDROID_SENSOR_SENSITIVITY).data.i32[0];
-        if (sensorSensitivity < gCamCapability[mCameraId]->sensitivity_range.min_sensitivity)
-                sensorSensitivity = gCamCapability[mCameraId]->sensitivity_range.min_sensitivity;
-        if (sensorSensitivity > gCamCapability[mCameraId]->sensitivity_range.max_sensitivity)
-                sensorSensitivity = gCamCapability[mCameraId]->sensitivity_range.max_sensitivity;
-        LOGD("clamp sensorSensitivity to %d", sensorSensitivity);
-        if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_SENSOR_SENSITIVITY,
-                sensorSensitivity)) {
             rc = BAD_VALUE;
         }
     }
@@ -11626,6 +11675,28 @@ int QCamera3HardwareInterface::translateToHalMetadata
             }
         }
     } else {
+        if (frame_settings.exists(ANDROID_SENSOR_EXPOSURE_TIME)) {
+            int64_t sensorExpTime =
+                frame_settings.find(ANDROID_SENSOR_EXPOSURE_TIME).data.i64[0];
+            LOGD("setting sensorExpTime %lld", sensorExpTime);
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_SENSOR_EXPOSURE_TIME,
+                        sensorExpTime)) {
+                rc = BAD_VALUE;
+            }
+        }
+        if (frame_settings.exists(ANDROID_SENSOR_SENSITIVITY)) {
+            int32_t sensorSensitivity = frame_settings.find(ANDROID_SENSOR_SENSITIVITY).data.i32[0];
+            if (sensorSensitivity < gCamCapability[mCameraId]->sensitivity_range.min_sensitivity)
+                sensorSensitivity = gCamCapability[mCameraId]->sensitivity_range.min_sensitivity;
+            if (sensorSensitivity > gCamCapability[mCameraId]->sensitivity_range.max_sensitivity)
+                sensorSensitivity = gCamCapability[mCameraId]->sensitivity_range.max_sensitivity;
+            LOGD("clamp sensorSensitivity to %d", sensorSensitivity);
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_META_SENSOR_SENSITIVITY,
+                        sensorSensitivity)) {
+                rc = BAD_VALUE;
+            }
+        }
+
         if (ADD_SET_PARAM_ENTRY_TO_BATCH(hal_metadata, CAM_INTF_PARM_ZSL_MODE, 0)) {
             rc = BAD_VALUE;
         }
