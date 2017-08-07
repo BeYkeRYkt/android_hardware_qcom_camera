@@ -336,6 +336,10 @@ typedef enum {
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_GRBG,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_RGGB,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_BGGR,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GBRG,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GRBG,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_RGGB,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_BGGR,
 
     /* generic 8-bit raw */
     CAM_FORMAT_JPEG_RAW_8BIT,
@@ -608,6 +612,17 @@ typedef struct {
     float video_min_fps;
     float video_max_fps;
 } cam_fps_range_t;
+
+typedef struct {
+  float min_luma;
+  float max_luma;
+}cam_luma_range_t;
+
+typedef struct {
+  float target_luma;
+  float curr_luma;
+  cam_luma_range_t luma_range;
+} cam_luma_info_t;
 
 typedef struct {
     int32_t min_sensitivity;
@@ -1643,6 +1658,7 @@ typedef struct {
     int32_t est_snap_iso_value;
     uint32_t est_snap_luma;
     uint32_t est_snap_target;
+    cam_luma_info_t luma_info;
 } cam_3a_params_t;
 
 typedef struct {
