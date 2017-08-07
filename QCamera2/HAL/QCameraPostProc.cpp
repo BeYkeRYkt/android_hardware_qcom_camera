@@ -1628,6 +1628,7 @@ int32_t QCameraPostProcessor::processPPData(mm_camera_super_buf_t *frame)
                 jpeg_job->metadata = (metadata_buffer_t *)pOfflineMetaFrame->buffer;
 
                 // Dump offline metadata for Tuning
+#ifdef CAMERA_DEBUG_DATA
                 char value[PROPERTY_VALUE_MAX];
                 property_get("persist.camera.dumpmetadata", value, "0");
                 int32_t enabled = atoi(value);
@@ -1635,6 +1636,7 @@ int32_t QCameraPostProcessor::processPPData(mm_camera_super_buf_t *frame)
                     m_parent->dumpMetadataToFile(pOfflineMetadataStream,pOfflineMetaFrame,
                                                  (char *)"Offline_isp_meta");
                 }
+#endif
             }
         }
 
@@ -2741,7 +2743,7 @@ int32_t QCameraPostProcessor::encodeData(qcamera_jpeg_data_t *jpeg_job_data,
 
     jpg_job.encode_job.mobicat_mask = m_parent->mParameters.getMobicatMask();
 
-
+  #ifdef CAMERA_DEBUG_DATA
     if (NULL != jpg_job.encode_job.p_metadata && (jpg_job.encode_job.mobicat_mask > 0)) {
 
        if (m_parent->mExifParams.debug_params) {
@@ -2810,6 +2812,7 @@ int32_t QCameraPostProcessor::encodeData(qcamera_jpeg_data_t *jpeg_job_data,
         }
 
     }
+   #endif
 
     /* Init the QTable */
     for (int i = 0; i < QTABLE_MAX; i++) {

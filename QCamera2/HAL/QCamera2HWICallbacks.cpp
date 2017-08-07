@@ -224,7 +224,7 @@ void QCamera2HardwareInterface::zsl_channel_cb(mm_camera_super_buf_t *recvd_fram
             }
         }
     }
-
+  #ifdef CAMERA_DEBUG_DATA
     property_get("persist.camera.dumpmetadata", value, "0");
     int32_t enabled = atoi(value);
     if (enabled) {
@@ -244,7 +244,7 @@ void QCamera2HardwareInterface::zsl_channel_cb(mm_camera_super_buf_t *recvd_fram
             }
         }
     }
-
+  #endif
     property_get("persist.camera.zsl_matching", value, "0");
     log_matching = atoi(value) > 0 ? true : false;
     if (log_matching) {
@@ -382,7 +382,9 @@ void QCamera2HardwareInterface::capture_channel_cb_routine(mm_camera_super_buf_t
                                                            void *userdata)
 {
     KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL1_CAPTURE_CH_CB);
+#ifdef CAMERA_DEBUG_DATA
     char value[PROPERTY_VALUE_MAX];
+#endif
     LOGH("[KPI Perf]: E PROFILE_YUV_CB_TO_HAL");
     QCamera2HardwareInterface *pme = (QCamera2HardwareInterface *)userdata;
     if (pme == NULL ||
@@ -426,7 +428,7 @@ void QCamera2HardwareInterface::capture_channel_cb_routine(mm_camera_super_buf_t
             break;
         }
     }
-
+  #ifdef CAMERA_DEBUG_DATA
     property_get("persist.camera.dumpmetadata", value, "0");
     int32_t enabled = atoi(value);
     if (enabled) {
@@ -446,7 +448,7 @@ void QCamera2HardwareInterface::capture_channel_cb_routine(mm_camera_super_buf_t
             }
         }
     }
-
+  #endif
     // Wait on Postproc initialization if needed
     // then send to postprocessor
     if ((NO_ERROR != pme->waitDeferredWork(pme->mReprocJob)) ||
@@ -1665,7 +1667,9 @@ void QCamera2HardwareInterface::snapshot_channel_cb_routine(mm_camera_super_buf_
        void *userdata)
 {
     ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL1_SNAPSHOT_CH_CB);
+#ifdef CAMERA_DEBUG_DATA
     char value[PROPERTY_VALUE_MAX];
+#endif
     QCameraChannel *pChannel = NULL;
 
     LOGH("[KPI Perf]: E");
@@ -1692,7 +1696,7 @@ void QCamera2HardwareInterface::snapshot_channel_cb_routine(mm_camera_super_buf_
         LOGE("Snapshot channel doesn't exist, return here");
         return;
     }
-
+ #ifdef CAMERA_DEBUG_DATA
     property_get("persist.camera.dumpmetadata", value, "0");
     int32_t enabled = atoi(value);
     if (enabled) {
@@ -1712,7 +1716,7 @@ void QCamera2HardwareInterface::snapshot_channel_cb_routine(mm_camera_super_buf_
             }
         }
     }
-
+  #endif
     // save a copy for the superbuf
     mm_camera_super_buf_t* frame = (mm_camera_super_buf_t *)malloc(sizeof(mm_camera_super_buf_t));
     if (frame == NULL) {
@@ -1800,7 +1804,9 @@ void QCamera2HardwareInterface::raw_channel_cb_routine(mm_camera_super_buf_t *su
 
 {
     ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL1_RAW_CH_CB);
+#ifdef CAMERA_DEBUG_DATA
     char value[PROPERTY_VALUE_MAX];
+#endif
 
     LOGH("[KPI Perf]: E");
     QCamera2HardwareInterface *pme = (QCamera2HardwareInterface *)userdata;
@@ -1825,7 +1831,7 @@ void QCamera2HardwareInterface::raw_channel_cb_routine(mm_camera_super_buf_t *su
         pChannel->bufDone(super_frame);
         return;
     }
-
+  #ifdef CAMERA_DEBUG_DATA
     property_get("persist.camera.dumpmetadata", value, "0");
     int32_t enabled = atoi(value);
     if (enabled) {
@@ -1845,7 +1851,7 @@ void QCamera2HardwareInterface::raw_channel_cb_routine(mm_camera_super_buf_t *su
             }
         }
     }
-
+  #endif
     // save a copy for the superbuf
     mm_camera_super_buf_t* frame = (mm_camera_super_buf_t *)malloc(sizeof(mm_camera_super_buf_t));
     if (frame == NULL) {
@@ -2175,12 +2181,12 @@ void QCamera2HardwareInterface::metadata_stream_cb_routine(mm_camera_super_buf_t
        //Make shutter call back in non ZSL mode once raw frame is received from VFE.
        pme->playShutter();
     }
-
+  #ifdef CAMERA_DEBUG_DATA
     if (pMetaData->is_tuning_params_valid && pme->mParameters.getRecordingHintValue() == true) {
         //Dump Tuning data for video
         pme->dumpMetadataToFile(stream,frame,(char *)"Video");
     }
-
+  #endif
     IF_META_AVAILABLE(cam_hist_stats_t, stats_data, CAM_INTF_META_HISTOGRAM, pMetaData) {
         // process histogram statistics info
         qcamera_sm_internal_evt_payload_t *payload =
@@ -2449,7 +2455,7 @@ void QCamera2HardwareInterface::metadata_stream_cb_routine(mm_camera_super_buf_t
     IF_META_AVAILABLE(cam_sensor_params_t, sensor_params, CAM_INTF_META_SENSOR_INFO, pMetaData) {
         pme->mExifParams.sensor_params = *sensor_params;
     }
-
+   #ifdef CAMERA_DEBUG_DATA
     IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
             CAM_INTF_META_EXIF_DEBUG_AE, pMetaData) {
         if (pme->mExifParams.debug_params) {
@@ -2513,7 +2519,7 @@ void QCamera2HardwareInterface::metadata_stream_cb_routine(mm_camera_super_buf_t
             pme->mExifParams.debug_params->q3a_tuning_debug_params_valid = TRUE;
         }
     }
-
+  #endif
     IF_META_AVAILABLE(uint32_t, led_mode, CAM_INTF_META_LED_MODE_OVERRIDE, pMetaData) {
         qcamera_sm_internal_evt_payload_t *payload =
                 (qcamera_sm_internal_evt_payload_t *)
@@ -2786,7 +2792,9 @@ void QCamera2HardwareInterface::dumpMetadataToFile(QCameraStream *stream,
 {
     char value[PROPERTY_VALUE_MAX];
     uint32_t frm_num = 0;
+#ifdef CAMERA_DEBUG_DATA
     metadata_buffer_t *metadata = (metadata_buffer_t *)frame->buffer;
+#endif
     property_get("persist.camera.dumpmetadata", value, "0");
     uint32_t enabled = (uint32_t) atoi(value);
     if (stream == NULL) {
@@ -2826,6 +2834,7 @@ void QCamera2HardwareInterface::dumpMetadataToFile(QCameraStream *stream,
             filePath.append(buf);
             int file_fd = open(filePath.string(), O_RDWR | O_CREAT, 0777);
             if (file_fd >= 0) {
+#ifdef CAMERA_DEBUG_DATA
                 ssize_t written_len = 0;
                 metadata->tuning_params.tuning_data_version = TUNING_DATA_VERSION;
                 void *data = (void *)((uint8_t *)&metadata->tuning_params.tuning_data_version);
@@ -2868,6 +2877,7 @@ void QCamera2HardwareInterface::dumpMetadataToFile(QCameraStream *stream,
                 data =
                 (void *)((uint8_t *)&metadata->tuning_params.data[TUNING_MOD1_AF_DATA_OFFSET]);
                 written_len += write(file_fd, data, total_size);
+#endif
                 close(file_fd);
             }else {
                 LOGE("fail t open file for image dumping");

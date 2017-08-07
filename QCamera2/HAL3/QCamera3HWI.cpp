@@ -2384,7 +2384,13 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     }
 
     // Create analysis stream all the time, even when h/w support is not available
-    if (!onlyRaw) {
+    char analysis_prop[PROPERTY_VALUE_MAX];
+    memset(analysis_prop, 0, sizeof(analysis_prop));
+    /* Disable analysis stram by default for connected camera */
+    property_get("persist.camera.analysis.enable", analysis_prop, "0");
+    int32_t analysis_enable = atoi(analysis_prop);
+
+    if ((!onlyRaw) && (analysis_enable) ) {
         cam_feature_mask_t analysisFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
         setPAAFSupport(analysisFeatureMask, CAM_STREAM_TYPE_ANALYSIS,
                 gCamCapability[mCameraId]->color_arrangement);
@@ -3393,8 +3399,9 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
                     break;
                 }
             }
-
+#ifdef CAMERA_DEBUG_DATA
             saveExifParams(metadata);
+#endif
             result.result = translateFromHalMetadata(metadata,
                     i->timestamp, i->request_id, i->jpegMetadata, i->pipeline_depth,
                     i->capture_intent, internalPproc, i->fwkCacMode,
@@ -3402,8 +3409,8 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
             restoreHdrScene(i->scene_mode, result.result);
 
             if (i->blob_request) {
-                {
                     //Dump tuning metadata if enabled and available
+                    #ifdef CAMERA_DEBUG_DATA
                     char prop[PROPERTY_VALUE_MAX];
                     memset(prop, 0, sizeof(prop));
                     property_get("persist.camera.dumpmetadata", prop, "0");
@@ -3414,8 +3421,9 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
                                enabled,
                                "Snapshot",
                                frame_number);
+
                     }
-                }
+                    #endif
             }
 
             if (!internalPproc) {
@@ -6565,8 +6573,9 @@ QCamera3HardwareInterface::translateFromHalMetadata(
     }
 
 
-
+    #ifdef CAMERA_DEBUG_DATA
     if (metadata->is_tuning_params_valid) {
+
         uint8_t tuning_meta_data_blob[sizeof(tuning_params_t)];
         uint8_t *data = (uint8_t *)&tuning_meta_data_blob[0];
         metadata->tuning_params.tuning_data_version = TUNING_DATA_VERSION;
@@ -6629,8 +6638,9 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_TUNING_META_DATA_BLOB,
                 (int32_t *)(void *)tuning_meta_data_blob,
                 (size_t)(data-tuning_meta_data_blob) / sizeof(uint32_t));
-    }
 
+    }
+    #endif
     IF_META_AVAILABLE(cam_neutral_col_point_t, neuColPoint,
             CAM_INTF_META_NEUTRAL_COL_POINT, metadata) {
         camMetadata.update(ANDROID_SENSOR_NEUTRAL_COLOR_POINT,
@@ -7101,9 +7111,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
  * RETURN     : none
  *
  *==========================================================================*/
+#ifdef CAMERA_DEBUG_DATA
 void QCamera3HardwareInterface::saveExifParams(metadata_buffer_t *metadata)
 {
-    IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
+	IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
             CAM_INTF_META_EXIF_DEBUG_AE, metadata) {
         if (mExifParams.debug_params) {
             mExifParams.debug_params->ae_debug_params = *ae_exif_debug_params;
@@ -7161,6 +7172,7 @@ void QCamera3HardwareInterface::saveExifParams(metadata_buffer_t *metadata)
     }
 }
 
+#endif
 /*===========================================================================
  * FUNCTION   : get3AExifParams
  *
@@ -10389,6 +10401,7 @@ int32_t QCamera3HardwareInterface::setReprocParameters(
         }
     }
 
+#ifdef CAMERA_DEBUG_DATA
     // Add exif debug data to internal metadata
     if (frame_settings.exists(QCAMERA3_HAL_PRIVATEDATA_EXIF_DEBUG_DATA_BLOB)) {
         mm_jpeg_debug_exif_params_t *debug_params =
@@ -10433,8 +10446,9 @@ int32_t QCamera3HardwareInterface::setReprocParameters(
         if (debug_params->q3a_tuning_debug_params_valid == TRUE) {
             ADD_SET_PARAM_ENTRY_TO_BATCH(reprocParam, CAM_INTF_META_EXIF_DEBUG_3A_TUNING,
                     debug_params->q3a_tuning_debug_params);
-        }
+       }
     }
+#endif
 
     // Add metadata which reprocess needs
     if (frame_settings.exists(QCAMERA3_HAL_PRIVATEDATA_REPROCESS_DATA_BLOB)) {
