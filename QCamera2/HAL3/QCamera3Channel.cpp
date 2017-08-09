@@ -2328,12 +2328,11 @@ void QCamera3RawChannel::streamCbRoutine(
         dumpRawSnapshot(super_frame->bufs[0]);
 
     if (mIsRaw16) {
-        cam_format_t streamFormat = stream->getStreamInfo()->fmt;
-        if ((streamFormat >= CAM_FORMAT_BAYER_MIPI_RAW_8BPP_GBRG) &&
-            (streamFormat <= CAM_FORMAT_BAYER_MIPI_RAW_12BPP_BGGR))
+        cam_format_t streamFormat = getStreamDefaultFormat(CAM_STREAM_TYPE_RAW,
+                mCamera3Stream->width, mCamera3Stream->height);
+        if (streamFormat == CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG)
             convertMipiToRaw16(super_frame->bufs[0]);
-        else if ((streamFormat >= CAM_FORMAT_BAYER_QCOM_RAW_8BPP_GBRG) &&
-                 (streamFormat <= CAM_FORMAT_BAYER_QCOM_RAW_12BPP_BGGR))
+        else
             convertLegacyToRaw16(super_frame->bufs[0]);
     }
 
