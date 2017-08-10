@@ -1323,15 +1323,11 @@ void QCamera3HardwareInterface::addToPPFeatureMask(int stream_format,
     int property_len;
 
     /* Get feature mask from property */
-#ifdef _LE_CAMERA_
     char swtnr_feature_mask_value[PROPERTY_VALUE_MAX];
     snprintf(swtnr_feature_mask_value, PROPERTY_VALUE_MAX, "%lld", CAM_QTI_FEATURE_SW_TNR);
     property_len = property_get("persist.camera.hal3.feature",
             feature_mask_value, swtnr_feature_mask_value);
-#else
-    property_len = property_get("persist.camera.hal3.feature",
-            feature_mask_value, "0");
-#endif
+
     if ((property_len > 2) && (feature_mask_value[0] == '0') &&
             (feature_mask_value[1] == 'x')) {
         args_converted = sscanf(feature_mask_value, "0x%llx", &feature_mask);
@@ -9395,7 +9391,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     }
 
     int64_t available_exp_time_range[EXPOSURE_TIME_RANGE_CNT];
-    for (size_t i = 0; i < count; i++)
+    for (size_t i = 0; i < EXPOSURE_TIME_RANGE_CNT; i++)
         available_exp_time_range[i] = gCamCapability[cameraId]->exposure_time_range[i];
     staticInfo.update(QCAMERA3_EXP_TIME_RANGE,
             available_exp_time_range, EXPOSURE_TIME_RANGE_CNT);
