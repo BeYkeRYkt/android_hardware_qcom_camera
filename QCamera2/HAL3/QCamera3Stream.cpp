@@ -308,6 +308,7 @@ QCamera3Stream::QCamera3Stream(uint32_t camHandle,
     mMemVtbl.clean_buf = clean_buf;
     mMemVtbl.set_config_ops = NULL;
     memset(&mFrameLenOffset, 0, sizeof(mFrameLenOffset));
+    memset(&mCropInfo, 0, sizeof(cam_rect_t));
     memcpy(&mPaddingInfo, paddingInfo, sizeof(cam_padding_info_t));
 }
 
@@ -923,7 +924,13 @@ int32_t QCamera3Stream::getBufs(cam_frame_len_offset_t *offset,
        LOGE("Failed getBufs being called twice in a row without a putBufs call");
        return INVALID_OPERATION;
     }
-    mStreamBufs = mChannel->getStreamBufs(mFrameLenOffset.frame_len);
+
+    if (mStreamInfo->reprocess_config.offline.input_type == CAM_STREAM_TYPE_METADATA) {
+        mStreamBufs = ((QCamera3ReprocessChannel*)mChannel)->getMetaStreamBufs(
+                mFrameLenOffset.frame_len);
+    } else {
+        mStreamBufs = mChannel->getStreamBufs(mFrameLenOffset.frame_len);
+    }
     if (!mStreamBufs) {
         LOGE("Failed to allocate stream buffers");
         return NO_MEMORY;
@@ -1044,7 +1051,11 @@ int32_t QCamera3Stream::putBufs(mm_camera_map_unmap_ops_tbl_t *ops_tbl)
         LOGE("getBuf failed previously, or calling putBufs twice");
     }
 
-    mChannel->putStreamBufs();
+    if (mStreamInfo->reprocess_config.offline.input_type == CAM_STREAM_TYPE_METADATA) {
+        ((QCamera3ReprocessChannel*)mChannel)->putMetaStreamBufs();
+    } else {
+        mChannel->putStreamBufs();
+    }
 
     //need to set mStreamBufs to null because putStreamBufs deletes that memory
     mStreamBufs = NULL;
@@ -1190,6 +1201,52 @@ uint32_t QCamera3Stream::getMyServerID() {
     } else {
         return 0;
     }
+}
+
+
+/*===========================================================================
+ * FUNCTION   : setCropInfo
+ *
+ * DESCRIPTION: set crop info of the stream
+ *
+ * PARAMETERS :
+ *   @crop    : struct to store new crop info
+ *
+ * RETURN     : int32_t type of status
+ *              NO_ERROR  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int32_t QCamera3Stream::setCropInfo(cam_rect_t crop)
+{
+    mCropInfo = crop;
+    return NO_ERROR;
+}
+
+
+/*===========================================================================
+ * FUNCTION   : getParameter
+ *
+ * DESCRIPTION: get stream based parameters
+ *
+ * PARAMETERS :
+ *   @param   : ptr to parameters to be red
+ *
+ * RETURN     : int32_t type of status
+ *              NO_ERROR  -- success
+ *              none-zero failure code
+ *==========================================================================*/
+int32_t QCamera3Stream::getParameter(cam_stream_parm_buffer_t &param)
+{
+    int32_t rc = NO_ERROR;
+    mStreamInfo->parm_buf = param;
+    rc = mCamOps->get_stream_parms(mCamHandle,
+                                   mChannelHandle,
+                                   mHandle,
+                                   &mStreamInfo->parm_buf);
+    if (rc == NO_ERROR) {
+        param = mStreamInfo->parm_buf;
+    }
+    return rc;
 }
 
 /*===========================================================================

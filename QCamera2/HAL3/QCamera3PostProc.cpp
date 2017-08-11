@@ -84,11 +84,14 @@ QCamera3PostProcessor::QCamera3PostProcessor(QCamera3ProcessingChannel* ch_ctrl)
       m_inputJpegQ(releaseJpegData, this),
       m_ongoingJpegQ(releaseJpegData, this),
       m_inputMetaQ(releaseMetadata, this),
-      m_jpegSettingsQ(NULL, this)
+      m_jpegSettingsQ(NULL, this),
+      mChannelStop(TRUE)
 {
     memset(&mJpegHandle, 0, sizeof(mJpegHandle));
     memset(&mJpegMetadata, 0, sizeof(mJpegMetadata));
     pthread_mutex_init(&mReprocJobLock, NULL);
+    pthread_mutex_init(&mHDRJobLock, NULL);
+    pthread_cond_init(&mProcChStopCond, NULL);
 }
 
 /*===========================================================================
@@ -103,6 +106,8 @@ QCamera3PostProcessor::QCamera3PostProcessor(QCamera3ProcessingChannel* ch_ctrl)
 QCamera3PostProcessor::~QCamera3PostProcessor()
 {
     pthread_mutex_destroy(&mReprocJobLock);
+    pthread_mutex_destroy(&mHDRJobLock);
+    pthread_cond_destroy(&mProcChStopCond);
 }
 
 /*===========================================================================
@@ -229,8 +234,11 @@ int32_t QCamera3PostProcessor::initJpeg(jpeg_encode_callback_t jpeg_cb,
 int32_t QCamera3PostProcessor::start(const reprocess_config_t &config)
 {
     int32_t rc = NO_ERROR;
+    pthread_mutex_lock(&mHDRJobLock);
     QCamera3HardwareInterface* hal_obj = (QCamera3HardwareInterface*)m_parent->mUserData;
-
+    if(mChannelStop == false)
+        pthread_cond_wait(&mProcChStopCond, &mHDRJobLock);
+    pthread_mutex_unlock(&mHDRJobLock);
     if (config.reprocess_type != REPROCESS_TYPE_NONE) {
         if (m_pReprocChannel != NULL) {
             m_pReprocChannel->stop();
@@ -258,7 +266,6 @@ int32_t QCamera3PostProcessor::start(const reprocess_config_t &config)
         }
     }
     m_dataProcTh.sendCmd(CAMERA_CMD_TYPE_START_DATA_PROC, TRUE, FALSE);
-
     return rc;
 }
 
@@ -303,9 +310,12 @@ int32_t QCamera3PostProcessor::flush()
  *
  * NOTE       : reprocess channel will be stopped and deleted if there is any
  *==========================================================================*/
-int32_t QCamera3PostProcessor::stop()
+int32_t QCamera3PostProcessor::stop(bool isHDR)
 {
-    m_dataProcTh.sendCmd(CAMERA_CMD_TYPE_STOP_DATA_PROC, TRUE, TRUE);
+    if(isHDR == true)
+        m_dataProcTh.sendCmd(CAMERA_CMD_TYPE_STOP_DATA_PROC, FALSE, TRUE);
+    else
+        m_dataProcTh.sendCmd(CAMERA_CMD_TYPE_STOP_DATA_PROC, TRUE, TRUE);
 
     if (m_pReprocChannel != NULL) {
         m_pReprocChannel->stop();
@@ -757,17 +767,30 @@ int32_t QCamera3PostProcessor::processJpegSettingData(
  *
  * NOTE       : The frame after reprocess need to send to jpeg encoding.
  *==========================================================================*/
-int32_t QCamera3PostProcessor::processPPData(mm_camera_super_buf_t *frame)
+int32_t QCamera3PostProcessor::processPPData(mm_camera_super_buf_t *frame,
+        const metadata_buffer_t *p_metadata)
 {
     qcamera_hal3_pp_data_t *job = (qcamera_hal3_pp_data_t *)m_ongoingPPQ.dequeue();
+    qcamera_hal3_pp_data_t *pending_job;
     ATRACE_INT("Camera:Reprocess", 0);
     if (job == NULL || ((NULL == job->src_frame) && (NULL == job->fwk_src_frame))) {
         LOGE("Cannot find reprocess job");
         return BAD_VALUE;
     }
+    LOGD("jpeg settings is :%p and %d",job->jpeg_settings, m_ongoingPPQ.getCurrentSize());
     if (job->jpeg_settings == NULL) {
         LOGE("Cannot find jpeg settings");
         return BAD_VALUE;
+    }
+
+    while((job->jpeg_settings->hdr_snapshot == 1) && (!m_ongoingPPQ.isEmpty()) ) {
+        LOGD(" Checking if empty");
+        pending_job = (qcamera_hal3_pp_data_t *)m_ongoingPPQ.dequeue();
+        if ((pending_job != NULL)) {
+            LOGD("free reprocessed buffer");
+            m_parent->freeBufferForFrame(pending_job->src_frame);
+            m_parent->metadataBufDone(pending_job->src_metadata);
+        }
     }
 
     qcamera_hal3_jpeg_data_t *jpeg_job =
@@ -787,6 +810,10 @@ int32_t QCamera3PostProcessor::processPPData(mm_camera_super_buf_t *frame)
         jpeg_job->metadata =
                 (metadata_buffer_t *) job->fwk_src_frame->metadata_buffer.buffer;
         jpeg_job->fwk_src_buffer = job->fwk_src_frame;
+    }
+    if (p_metadata != NULL) {
+        // update metadata content with input buffer
+        memcpy(jpeg_job->metadata, p_metadata, sizeof(metadata_buffer_t));
     }
     jpeg_job->src_metadata = job->src_metadata;
     jpeg_job->jpeg_settings = job->jpeg_settings;
@@ -1231,7 +1258,6 @@ int32_t QCamera3PostProcessor::encodeFWKData(qcamera_hal3_jpeg_data_t *jpeg_job_
     memset(&crop, 0, sizeof(cam_rect_t));
     //TBD_later - Zoom event removed in stream
     //main_stream->getCropInfo(crop);
-
     // Set JPEG encode crop in reprocess frame metadata
     // If this JPEG crop info exist, encoder should do cropping
     IF_META_AVAILABLE(cam_stream_crop_info_t, jpeg_crop,
@@ -1609,6 +1635,7 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
     uint32_t jobId = 0;
     QCamera3Stream *main_stream = NULL;
     mm_camera_buf_def_t *main_frame = NULL;
+    cam_stream_parm_buffer_t param;
     QCamera3Channel *srcChannel = NULL;
     mm_camera_super_buf_t *recvd_frame = NULL;
     metadata_buffer_t *metadata = NULL;
@@ -1805,7 +1832,26 @@ int32_t QCamera3PostProcessor::encodeData(qcamera_hal3_jpeg_data_t *jpeg_job_dat
     memset(&crop, 0, sizeof(cam_rect_t));
     //TBD_later - Zoom event removed in stream
     //main_stream->getCropInfo(crop);
-
+    crop.left = 0;
+    crop.top = 0;
+    crop.height = src_dim.height;
+    crop.width = src_dim.width;
+    if (jpeg_settings->hdr_snapshot) {
+       memset(&param, 0, sizeof(cam_stream_parm_buffer_t));
+       param.type = CAM_STREAM_PARAM_TYPE_GET_OUTPUT_CROP;
+       ret = main_stream->getParameter(param);
+       if (ret != NO_ERROR) {
+          LOGE("%s: stream getParameter for reprocess failed", __func__);
+       } else {
+           for (int i = 0; i < param.outputCrop.num_of_streams; i++) {
+              if (param.outputCrop.crop_info[i].stream_id
+                  == main_stream->getMyServerID()) {
+                     crop = param.outputCrop.crop_info[i].crop;
+                     main_stream->setCropInfo(crop);
+              }
+           }
+         }
+    }
     // Set main dim job parameters and handle rotation
     if (!needJpegExifRotation && (jpeg_settings->jpeg_orientation == 90 ||
             jpeg_settings->jpeg_orientation == 270)) {
@@ -2065,7 +2111,6 @@ void *QCamera3PostProcessor::dataProcessRoutine(void *data)
             {
                 LOGH("stop data proc");
                 is_active = FALSE;
-
                 // cancel all ongoing jpeg jobs
                 qcamera_hal3_jpeg_data_t *jpeg_job =
                     (qcamera_hal3_jpeg_data_t *)pme->m_ongoingJpegQ.dequeue();
@@ -2103,6 +2148,10 @@ void *QCamera3PostProcessor::dataProcessRoutine(void *data)
 
                 // signal cmd is completed
                 cam_sem_post(&cmdThread->sync_sem);
+                pthread_mutex_lock(&pme->mHDRJobLock);
+                pme->mChannelStop = true;
+                pthread_cond_signal(&pme->mProcChStopCond);
+                pthread_mutex_unlock(&pme->mHDRJobLock);
             }
             break;
         case CAMERA_CMD_TYPE_DO_NEXT_JOB:

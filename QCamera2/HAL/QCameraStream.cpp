@@ -1178,7 +1178,7 @@ void *QCameraStream::dataProcRoutine(void *data)
         switch (cmd) {
         case CAMERA_CMD_TYPE_DO_NEXT_JOB:
             {
-                LOGH("Do next job");
+                LOGD("Do next job");
                 mm_camera_super_buf_t *frame =
                     (mm_camera_super_buf_t *)pme->mDataQ.dequeue();
                 if (NULL != frame) {
@@ -1325,6 +1325,19 @@ int32_t QCameraStream::bufDone(const void *opaque, bool isMetaData)
     }
 
     return rc;
+}
+/*===========================================================================
+ * FUNCTION   : getBuffer
+ *
+ * DESCRIPTION: get buffer from buffer index
+ *
+ * PARAMETERS :
+ *
+ * RETURN     : buffer address
+ *==========================================================================*/
+mm_camera_buf_def_t *QCameraStream::getBuffer(int32_t index)
+{
+    return &mBufDefs[index];
 }
 
 /*===========================================================================

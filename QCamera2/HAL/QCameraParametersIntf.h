@@ -330,8 +330,10 @@ public:
     void initDCSettings(int32_t state, uint32_t camMaster,
         bool bundleSnapshot, cam_fallback_mode_t fallbackMode);
     bool needAnalysisStream();
+    void setLowPower(bool value);
     uint32_t getBlurLevel();
     void setBokehSnaphot(bool enable);
+    void getDepthMapSize(int &width, int &height);
 private:
     QCameraParameters *mImpl;
     mutable Mutex mLock;

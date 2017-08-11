@@ -954,8 +954,11 @@ public:
     void initDCSettings(int32_t state, uint32_t camMaster,
             bool bundleSnapshot, cam_fallback_mode_t fallback);
     bool needAnalysisStream();
+    bool isLowPowerMode() {return m_bisLowPower;};
+    void setLowPower(bool lowPowerMode) {m_bisLowPower = lowPowerMode;};
     inline uint32_t getBlurLevel() {return m_bBokehBlurLevel;};
     void setBokehSnaphot(bool enable);
+    void getDepthMapSize(int &width, int &height);
 private:
     int32_t setPreviewSize(const QCameraParameters& );
     int32_t setVideoSize(const QCameraParameters& );
@@ -1180,7 +1183,6 @@ private:
     bool isBayer(cam_capability_t *caps);
     bool isMono(cam_capability_t *caps);
     inline bool isBayerMono() { return (mDualCamType == DUAL_CAM_BAYER_MONO); };
-    void getDepthMapSize(int &width, int &height);
     bool isDualCamAvailable();
 
     // Map from strings to values
@@ -1364,6 +1366,7 @@ private:
     cam_fallback_mode_t mFallback;
     bool mAsymmetricSnapMode;
     bool mAsymmetricPreviewMode;
+    bool m_bisLowPower;
     cam_hal_pp_type_t m_halPPType;
     cam_hal_pp_type_t m_defaultHalPPType;
     uint32_t m_bBokehMode;
