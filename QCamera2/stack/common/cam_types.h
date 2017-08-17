@@ -54,7 +54,7 @@
 #define CEILING2(X)  (((X) + 0x0001) & 0xFFFE)
 
 #define MAX_ZOOMS_CNT 91
-#define MAX_SIZES_CNT 50
+#define MAX_SIZES_CNT 60
 #define MAX_EXP_BRACKETING_LENGTH 32
 #define MAX_ROI 10
 #define MAX_STREAM_NUM_IN_BUNDLE 8
@@ -336,6 +336,10 @@ typedef enum {
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_GRBG,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_RGGB,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_BGGR,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GBRG,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GRBG,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_RGGB,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_BGGR,
 
     /* generic 8-bit raw */
     CAM_FORMAT_JPEG_RAW_8BIT,
@@ -608,6 +612,17 @@ typedef struct {
     float video_min_fps;
     float video_max_fps;
 } cam_fps_range_t;
+
+typedef struct {
+  float min_luma;
+  float max_luma;
+}cam_luma_range_t;
+
+typedef struct {
+  float target_luma;
+  float curr_luma;
+  cam_luma_range_t luma_range;
+} cam_luma_info_t;
 
 typedef struct {
     int32_t min_sensitivity;
@@ -986,6 +1001,11 @@ typedef struct  {
     cam_rect_t rect;
     int32_t weight; /* weight of the area, valid for focusing/metering areas */
 } cam_area_t;
+
+typedef struct  {
+   cam_area_t roi;
+   int rgb[3];
+} cam_awb_roi_color_target;
 
 typedef enum {
     CAM_STREAMING_MODE_CONTINUOUS, /* continous streaming */
@@ -1638,6 +1658,7 @@ typedef struct {
     int32_t est_snap_iso_value;
     uint32_t est_snap_luma;
     uint32_t est_snap_target;
+    cam_luma_info_t luma_info;
 } cam_3a_params_t;
 
 typedef struct {
@@ -2176,6 +2197,8 @@ typedef enum {
     CAM_INTF_META_AF_STATE,
     /* List of areas to use for illuminant estimation */
     CAM_INTF_META_AWB_REGIONS,
+    /* Applying AWB on selected region based on input color */
+    CAM_INTF_META_AWB_COLOR_ROI,
     /* Current state of AWB algorithm */
     CAM_INTF_META_AWB_STATE,
     /*Whether black level compensation is frozen or free to vary*/

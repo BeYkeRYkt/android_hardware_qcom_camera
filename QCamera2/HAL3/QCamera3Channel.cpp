@@ -502,9 +502,13 @@ void QCamera3Channel::dumpYUV(mm_camera_buf_def_t *frame, cam_dimension_t dim,
     char buf[FILENAME_MAX];
     memset(buf, 0, sizeof(buf));
     static int counter = 0;
+#if (defined(_ANDROID_) && !defined(_DRONE_))
     char prop[PROPERTY_VALUE_MAX];
     property_get("persist.camera.dumpimg", prop, "0");
     mYUVDump = (uint32_t)atoi(prop);
+#else
+    mYUVDump = 0;
+#endif
     if (mYUVDump & dump_type) {
         mFrmNum = ((mYUVDump & 0xffff0000) >> 16);
         if (mFrmNum == 0) {
@@ -856,6 +860,8 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
 {
     if (mStreamType == CAM_STREAM_TYPE_PREVIEW) {
         KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_PREVIEW_STRM_CB);
+    } else if (mStreamType == CAM_STREAM_TYPE_VIDEO) {
+        KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_VIDEO_STRM_CB);
     } else {
         ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_PROC_CH_STRM_CB);
     }
@@ -2293,11 +2299,12 @@ void QCamera3RawChannel::streamCbRoutine(
         dumpRawSnapshot(super_frame->bufs[0]);
 
     if (mIsRaw16) {
-        cam_format_t streamFormat = getStreamDefaultFormat(CAM_STREAM_TYPE_RAW,
-                mCamera3Stream->width, mCamera3Stream->height);
-        if (streamFormat == CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG)
+        cam_format_t streamFormat = stream->getStreamInfo()->fmt;
+        if ((streamFormat >= CAM_FORMAT_BAYER_MIPI_RAW_8BPP_GBRG) &&
+            (streamFormat <= CAM_FORMAT_BAYER_MIPI_RAW_12BPP_BGGR))
             convertMipiToRaw16(super_frame->bufs[0]);
-        else
+        else if ((streamFormat >= CAM_FORMAT_BAYER_QCOM_RAW_8BPP_GBRG) &&
+                 (streamFormat <= CAM_FORMAT_BAYER_QCOM_RAW_12BPP_BGGR))
             convertLegacyToRaw16(super_frame->bufs[0]);
     }
 
