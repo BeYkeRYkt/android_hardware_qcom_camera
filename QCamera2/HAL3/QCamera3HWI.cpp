@@ -3422,16 +3422,13 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
 #else
                     int32_t enabled = 0;
 #endif
-                    #ifdef CAMERA_DEBUG_DATA
                     if (enabled && metadata->is_tuning_params_valid) {
                         dumpMetadataToFile(metadata->tuning_params,
                                mMetaFrameCount,
                                enabled,
                                "Snapshot",
                                frame_number);
-
                     }
-                    #endif
                 }
             }
 
@@ -6629,9 +6626,8 @@ QCamera3HardwareInterface::translateFromHalMetadata(
     }
 
 
-    #ifdef CAMERA_DEBUG_DATA
-    if (metadata->is_tuning_params_valid) {
 
+    if (metadata->is_tuning_params_valid) {
         uint8_t tuning_meta_data_blob[sizeof(tuning_params_t)];
         uint8_t *data = (uint8_t *)&tuning_meta_data_blob[0];
         metadata->tuning_params.tuning_data_version = TUNING_DATA_VERSION;
@@ -6694,9 +6690,8 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_TUNING_META_DATA_BLOB,
                 (int32_t *)(void *)tuning_meta_data_blob,
                 (size_t)(data-tuning_meta_data_blob) / sizeof(uint32_t));
-
     }
-    #endif
+
     IF_META_AVAILABLE(cam_neutral_col_point_t, neuColPoint,
             CAM_INTF_META_NEUTRAL_COL_POINT, metadata) {
         camMetadata.update(ANDROID_SENSOR_NEUTRAL_COLOR_POINT,
@@ -7186,8 +7181,7 @@ QCamera3HardwareInterface::translateFromHalMetadata(
  *==========================================================================*/
 void QCamera3HardwareInterface::saveExifParams(metadata_buffer_t *metadata)
 {
-    #ifdef CAMERA_DEBUG_DATA
-	IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
+    IF_META_AVAILABLE(cam_ae_exif_debug_t, ae_exif_debug_params,
             CAM_INTF_META_EXIF_DEBUG_AE, metadata) {
         if (mExifParams.debug_params) {
             mExifParams.debug_params->ae_debug_params = *ae_exif_debug_params;
@@ -7243,7 +7237,6 @@ void QCamera3HardwareInterface::saveExifParams(metadata_buffer_t *metadata)
             mExifParams.debug_params->q3a_tuning_debug_params_valid = TRUE;
         }
     }
-    #endif
 }
 
 /*===========================================================================
@@ -10484,7 +10477,6 @@ int32_t QCamera3HardwareInterface::setReprocParameters(
                 (mm_jpeg_debug_exif_params_t *)frame_settings.find
                 (QCAMERA3_HAL_PRIVATEDATA_EXIF_DEBUG_DATA_BLOB).data.u8;
         // AE
-        #ifdef CAMERA_DEBUG_DATA
         if (debug_params->ae_debug_params_valid == TRUE) {
             ADD_SET_PARAM_ENTRY_TO_BATCH(reprocParam, CAM_INTF_META_EXIF_DEBUG_AE,
                     debug_params->ae_debug_params);
@@ -10523,8 +10515,7 @@ int32_t QCamera3HardwareInterface::setReprocParameters(
         if (debug_params->q3a_tuning_debug_params_valid == TRUE) {
             ADD_SET_PARAM_ENTRY_TO_BATCH(reprocParam, CAM_INTF_META_EXIF_DEBUG_3A_TUNING,
                     debug_params->q3a_tuning_debug_params);
-       }
-       #endif
+        }
     }
 
     // Add metadata which reprocess needs
