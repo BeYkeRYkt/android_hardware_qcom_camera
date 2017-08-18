@@ -1326,7 +1326,8 @@ void QCamera3HardwareInterface::addToPPFeatureMask(int stream_format,
     /* Get feature mask from property */
 #ifdef _LE_CAMERA_
     char swtnr_feature_mask_value[PROPERTY_VALUE_MAX];
-    snprintf(swtnr_feature_mask_value, PROPERTY_VALUE_MAX, "%lld", CAM_QTI_FEATURE_SW_TNR);
+    snprintf(swtnr_feature_mask_value, PROPERTY_VALUE_MAX, "%lld",
+            (CAM_QTI_FEATURE_SW_TNR|CAM_QCOM_FEATURE_LCAC));
     property_len = property_get("persist.camera.hal3.feature",
             feature_mask_value, swtnr_feature_mask_value);
 #else
@@ -6937,6 +6938,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
         camMetadata.update(QCAMERA3_TNR_INTENSITY, tnr_intensity, 1);
     }
 
+    IF_META_AVAILABLE(uint8_t, lcac_enable, CAM_INTF_META_LCAC_YUV, metadata) {
+        camMetadata.update(QCAMERA3_LCAC_PROCESSING_ENABLE, lcac_enable, 1);
+    }
+
     IF_META_AVAILABLE(float, motion_detection_sensitivity,
             CAM_INTF_META_TNR_MOTION_SENSITIVITY, metadata) {
         camMetadata.update(QCAMERA3_TNR_MOTION_DETECTION_SENSITIVITY,
@@ -11527,6 +11532,16 @@ int QCamera3HardwareInterface::translateToHalMetadata
                 CAM_INTF_META_TNR_INTENSITY, value)) {
                 rc = BAD_VALUE;
             }
+        }
+    }
+
+    // LCAC - YUV
+    if (frame_settings.exists(QCAMERA3_LCAC_PROCESSING_ENABLE)) {
+        uint8_t enable = frame_settings.find(QCAMERA3_LCAC_PROCESSING_ENABLE).data.u8[0];
+        LOGD("LCAC YUV is enabled : %d", enable);
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                CAM_INTF_META_LCAC_YUV, enable)) {
+                rc = BAD_VALUE;
         }
     }
 
