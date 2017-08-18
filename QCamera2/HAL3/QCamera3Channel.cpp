@@ -2893,6 +2893,7 @@ int32_t QCamera3YUVChannel::request(buffer_handle_t *buffer,
 {
     int32_t rc = NO_ERROR;
     Mutex::Autolock lock(mOfflinePpLock);
+    QCamera3HardwareInterface* hal_obj = (QCamera3HardwareInterface*)mUserData;
 
     LOGD("pInputBuffer is %p frame number %d", pInputBuffer, frameNumber);
     if (NULL == buffer || NULL == metadata) {
@@ -2905,7 +2906,10 @@ int32_t QCamera3YUVChannel::request(buffer_handle_t *buffer,
     ppInfo.frameNumber = frameNumber;
     ppInfo.offlinePpFlag = false;
     if (mBypass && !pInputBuffer ) {
-        ppInfo.offlinePpFlag = needsFramePostprocessing(metadata);
+        if(hal_obj->mOpMode != QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE)
+            ppInfo.offlinePpFlag = needsFramePostprocessing(metadata);
+        else
+            ppInfo.offlinePpFlag = false;
         ppInfo.output = buffer;
         mOfflinePpInfoList.push_back(ppInfo);
     }
