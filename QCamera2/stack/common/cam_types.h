@@ -723,6 +723,12 @@ typedef enum {
 } cam_ae_mode_type;
 
 typedef enum {
+    CAM_LCAC_YUV_MODE_OFF,
+    CAM_LCAC_YUV_MODE_ON,
+    CAM_LCAC_YUV_MODE_MAX
+} cam_lac_yuv_mode;
+
+typedef enum {
     DEWARP_NONE,
     DEWARP_LDC,
     DEWARP_CUSTOM,
@@ -2467,6 +2473,8 @@ typedef enum {
     CAM_INTF_META_OIS_READ_DATA,
     /* TNR Intensity */
     CAM_INTF_META_TNR_INTENSITY,
+    /* LCAC YUV processing */
+    CAM_INTF_META_LCAC_YUV,
     /* Motion Detection Sensitivity */
     CAM_INTF_META_TNR_MOTION_SENSITIVITY,
     /*event to flush stream buffers*/
