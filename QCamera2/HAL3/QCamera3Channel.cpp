@@ -3590,6 +3590,12 @@ void QCamera3PicChannel::jpegEvtHandle(jpeg_job_status_t status,
                }
                obj->m_postprocessor.stop(true);
             }
+
+            QCamera3HardwareInterface *hw = (QCamera3HardwareInterface *)obj->mUserData;
+            if (hw->isQuadCfaSensor()) {
+                hw->deleteQCFARawChannel();
+            }
+
         }
 
         return;
