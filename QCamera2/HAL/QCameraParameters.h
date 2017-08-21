@@ -961,6 +961,7 @@ public:
     void setLowPower(bool lowPowerMode) {m_bisLowPower = lowPowerMode;};
     inline uint32_t getBlurLevel() {return m_bBokehBlurLevel;};
     void setBokehSnaphot(bool enable);
+    void getDepthMapSize(int &width, int &height);
 private:
     int32_t setPreviewSize(const QCameraParameters& );
     int32_t setVideoSize(const QCameraParameters& );
@@ -1187,7 +1188,6 @@ private:
     bool isBayer(cam_capability_t *caps);
     bool isMono(cam_capability_t *caps);
     inline bool isBayerMono() { return (mDualCamType == DUAL_CAM_BAYER_MONO); };
-    void getDepthMapSize(int &width, int &height);
     bool isDualCamAvailable();
 
     // Map from strings to values
