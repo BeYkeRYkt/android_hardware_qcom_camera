@@ -202,6 +202,7 @@ LOCAL_SHARED_LIBRARIES:= \
          libcutils libdl libmmcamera_interface liblog
 
 LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib
 
 LOCAL_MODULE:= libmm-qcamera
 LOCAL_CLANG := false

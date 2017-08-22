@@ -82,6 +82,7 @@ LOCAL_MODULE           := mm-jpegdec-interface-test
 LOCAL_32_BIT_ONLY := true
 LOCAL_PRELINK_MODULE   := false
 LOCAL_SHARED_LIBRARIES := libcutils libdl libmmjpeg_interface liblog
+LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib
 
 include $(BUILD_EXECUTABLE)
 
