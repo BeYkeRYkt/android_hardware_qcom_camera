@@ -54,7 +54,7 @@
 #define CEILING2(X)  (((X) + 0x0001) & 0xFFFE)
 
 #define MAX_ZOOMS_CNT 91
-#define MAX_SIZES_CNT 50
+#define MAX_SIZES_CNT 60
 #define MAX_EXP_BRACKETING_LENGTH 32
 #define MAX_ROI 10
 #define MAX_STREAM_NUM_IN_BUNDLE 8
@@ -721,6 +721,12 @@ typedef enum {
     CAM_AE_MODE_ON,
     CAM_AE_MODE_MAX
 } cam_ae_mode_type;
+
+typedef enum {
+    CAM_LCAC_YUV_MODE_OFF,
+    CAM_LCAC_YUV_MODE_ON,
+    CAM_LCAC_YUV_MODE_MAX
+} cam_lac_yuv_mode;
 
 typedef enum {
     DEWARP_NONE,
@@ -2467,6 +2473,8 @@ typedef enum {
     CAM_INTF_META_OIS_READ_DATA,
     /* TNR Intensity */
     CAM_INTF_META_TNR_INTENSITY,
+    /* LCAC YUV processing */
+    CAM_INTF_META_LCAC_YUV,
     /* Motion Detection Sensitivity */
     CAM_INTF_META_TNR_MOTION_SENSITIVITY,
     /*event to flush stream buffers*/
