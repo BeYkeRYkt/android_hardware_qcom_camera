@@ -3569,6 +3569,7 @@ no_error:
             if(ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                 CAM_INTF_META_FRAME_NUMBER, request->frame_number)) {
                 ALOGE("%s: Failed to set the frame number in the parameters", __func__);
+                pthread_mutex_unlock(&mMutex);
                 return BAD_VALUE;
             }
         }
