@@ -33,6 +33,11 @@ ifneq (,$(filter msm8996 msmcobalt sdm660 msm8998,$(TARGET_BOARD_PLATFORM)))
     LOCAL_CFLAGS += -DUBWC_PRESENT
 endif
 
+ifeq ($(strip $(DRONE_TARGET)),true)
+LOCAL_CFLAGS += -DCAMERA_DEBUG_DATA
+endif
+
+
 LOCAL_CFLAGS += -D_ANDROID_ -DQCAMERA_REDEFINE_LOG
 LOCAL_COPY_HEADERS_TO := mm-camera-interface
 LOCAL_COPY_HEADERS += ../common/cam_intf.h

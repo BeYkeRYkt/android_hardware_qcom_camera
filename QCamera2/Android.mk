@@ -42,8 +42,8 @@ LOCAL_CFLAGS := -Wall -Wextra -Werror
 
 ifeq ($(DRONE_TARGET),true)
 LOCAL_CFLAGS += -D_DRONE_
+LOCAL_CFLAGS += -DCAMERA_DEBUG_DATA
 endif
-
 
 #HAL 1.0 source
 
