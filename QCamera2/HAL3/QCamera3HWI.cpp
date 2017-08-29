@@ -2487,8 +2487,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
         mStreamConfigInfo.num_streams++;
     }
 
-    if (!onlyRaw && isSupportChannelNeeded(streamList, mStreamConfigInfo) &&
-            (mOpMode != QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE)) {
+    if (!onlyRaw && isSupportChannelNeeded(streamList, mStreamConfigInfo)) {
         cam_analysis_info_t supportInfo;
         memset(&supportInfo, 0, sizeof(cam_analysis_info_t));
         cam_feature_mask_t callbackFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
