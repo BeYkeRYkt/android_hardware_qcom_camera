@@ -13,6 +13,7 @@ LOCAL_SRC_FILES := \
         QCameraPostProc.cpp \
         QCamera2HWICallbacks.cpp \
         QCameraParameters.cpp \
+        CameraParameters.cpp \
         QCameraThermalAdapter.cpp \
         wrapper/QualcommCamera.cpp
 
@@ -29,10 +30,6 @@ endif
 
 #ifeq ($(TARGET_USE_VENDOR_CAMERA_EXT),true)
 #LOCAL_CFLAGS += -DUSE_VENDOR_CAMERA_EXT
-#endif
-
-#ifeq ($(TARGET_USES_AOSP),true)
-#LOCAL_CFLAGS += -DVANILLA_HAL
 #endif
 
 ifneq ($(call is-platform-sdk-version-at-least,18),true)
@@ -79,15 +76,18 @@ LOCAL_C_INCLUDES += $(LOCAL_PATH)/tsMakeuplib/include
 endif
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
-LOCAL_SHARED_LIBRARIES := libcamera_client liblog libhardware libutils libcutils libdl
+LOCAL_SHARED_LIBRARIES := liblog libhardware libutils libcutils libdl libsync
 LOCAL_SHARED_LIBRARIES += libmmcamera_interface libmmjpeg_interface libqdMetaData
 ifeq ($(TARGET_TS_MAKEUP),true)
 LOCAL_SHARED_LIBRARIES += libts_face_beautify_hal libts_detected_face_hal
 endif
 LOCAL_SHARED_LIBRARIES += libqdMetaData libqservice libbinder
 
+LOCAL_STATIC_LIBRARIES := android.hardware.camera.common@1.0-helper
+
 LOCAL_MODULE_RELATIVE_PATH    := hw
 LOCAL_MODULE := camera.$(TARGET_BOARD_PLATFORM)
+LOCAL_VENDOR_MODULE := true
 LOCAL_CLANG := false
 LOCAL_32_BIT_ONLY := true
 LOCAL_MODULE_TAGS := optional
