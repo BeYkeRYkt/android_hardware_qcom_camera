@@ -2601,6 +2601,11 @@ int QCamera3HardwareInterface::processCaptureRequest(
         for (size_t i = 0; i < request->num_output_buffers; i++) {
             const camera3_stream_buffer_t& output = request->output_buffers[i];
             QCamera3Channel *channel = (QCamera3Channel *)output.stream->priv;
+            if (channel == NULL) {
+                ALOGE("%s: invalid channel pointer for stream", __func__);
+                continue;
+            }
+
             /*for livesnapshot stream is_type will be DIS*/
             if (setEis && output.stream->format == HAL_PIXEL_FORMAT_BLOB) {
                 rc = channel->registerBuffer(output.buffer, IS_TYPE_DIS);
