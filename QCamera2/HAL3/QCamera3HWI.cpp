@@ -1326,7 +1326,8 @@ void QCamera3HardwareInterface::addToPPFeatureMask(int stream_format,
     /* Get feature mask from property */
 #ifdef _LE_CAMERA_
     char swtnr_feature_mask_value[PROPERTY_VALUE_MAX];
-    snprintf(swtnr_feature_mask_value, PROPERTY_VALUE_MAX, "%lld", CAM_QTI_FEATURE_SW_TNR);
+    snprintf(swtnr_feature_mask_value, PROPERTY_VALUE_MAX, "%lld",
+            (CAM_QTI_FEATURE_SW_TNR|CAM_QCOM_FEATURE_LCAC));
     property_len = property_get("persist.camera.hal3.feature",
             feature_mask_value, swtnr_feature_mask_value);
 #else
@@ -2092,16 +2093,21 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
             case HAL_PIXEL_FORMAT_YCbCr_420_888:
                 onlyRaw = false; // There is non-raw stream - bypass flag if set
                 mStreamConfigInfo.type[mStreamConfigInfo.num_streams] = CAM_STREAM_TYPE_CALLBACK;
-                if (isOnEncoder(maxViewfinderSize, newStream->width, newStream->height)) {
-                    if (bUseCommonFeatureMask)
-                        mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
-                                commonFeatureMask;
-                    else
-                        mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                if(mOpMode == QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE) {
+                    mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
                                 CAM_QCOM_FEATURE_NONE;
                 } else {
-                    mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
-                            CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
+                    if (isOnEncoder(maxViewfinderSize, newStream->width, newStream->height)) {
+                        if (bUseCommonFeatureMask)
+                            mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                                    commonFeatureMask;
+                        else
+                            mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                                    CAM_QCOM_FEATURE_NONE;
+                    } else {
+                        mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
+                                CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
+                    }
                 }
             break;
             case HAL_PIXEL_FORMAT_BLOB:
@@ -2481,7 +2487,8 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
         mStreamConfigInfo.num_streams++;
     }
 
-    if (!onlyRaw && isSupportChannelNeeded(streamList, mStreamConfigInfo)) {
+    if (!onlyRaw && isSupportChannelNeeded(streamList, mStreamConfigInfo) &&
+            (mOpMode != QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE)) {
         cam_analysis_info_t supportInfo;
         memset(&supportInfo, 0, sizeof(cam_analysis_info_t));
         cam_feature_mask_t callbackFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
@@ -6930,6 +6937,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
 
     IF_META_AVAILABLE(float, tnr_intensity, CAM_INTF_META_TNR_INTENSITY, metadata) {
         camMetadata.update(QCAMERA3_TNR_INTENSITY, tnr_intensity, 1);
+    }
+
+    IF_META_AVAILABLE(uint8_t, lcac_enable, CAM_INTF_META_LCAC_YUV, metadata) {
+        camMetadata.update(QCAMERA3_LCAC_PROCESSING_ENABLE, lcac_enable, 1);
     }
 
     IF_META_AVAILABLE(float, motion_detection_sensitivity,
@@ -11522,6 +11533,16 @@ int QCamera3HardwareInterface::translateToHalMetadata
                 CAM_INTF_META_TNR_INTENSITY, value)) {
                 rc = BAD_VALUE;
             }
+        }
+    }
+
+    // LCAC - YUV
+    if (frame_settings.exists(QCAMERA3_LCAC_PROCESSING_ENABLE)) {
+        uint8_t enable = frame_settings.find(QCAMERA3_LCAC_PROCESSING_ENABLE).data.u8[0];
+        LOGD("LCAC YUV is enabled : %d", enable);
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                CAM_INTF_META_LCAC_YUV, enable)) {
+                rc = BAD_VALUE;
         }
     }
 
