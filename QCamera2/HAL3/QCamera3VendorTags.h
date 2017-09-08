@@ -72,6 +72,8 @@ enum qcamera3_ext_section {
     QCAMERA3_DEWARP,
     QCAMERA3_STRICT_ANTIBANDING,
     QCAMERA3_AWB_ROI,
+    QCAMERA3_LUMA_INFO,
+    QCAMERA3_LCAC_PROCESSING,
     QCAMERA3_SECTIONS_END
 };
 
@@ -105,7 +107,9 @@ enum qcamera3_ext_section_ranges {
     QCAMERA3_TNR_TUNING_START = QCAMERA3_TNR_TUNING << 16,
     QCAMERA3_DEWARP_START = QCAMERA3_DEWARP << 16,
     QCAMERA3_STRICT_ANTIBANDING_START = QCAMERA3_STRICT_ANTIBANDING << 16,
-    QCAMERA3_AWB_ROI_START = QCAMERA3_AWB_ROI << 16
+    QCAMERA3_AWB_ROI_START = QCAMERA3_AWB_ROI << 16,
+    QCAMERA3_LUMA_INFO_START = QCAMERA3_LUMA_INFO << 16,
+    QCAMERA3_LCAC_PROCESSING_START = QCAMERA3_LCAC_PROCESSING << 16
 };
 
 enum qcamera3_ext_tags {
@@ -469,7 +473,16 @@ enum qcamera3_ext_tags {
     QCAMERA3_STRICT_ANTIBANDING_END,
 
     QCAMERA3_AWB_ROI_COLOR = QCAMERA3_AWB_ROI_START,
-    QCAMERA3_AWB_ROI_END
+    QCAMERA3_AWB_ROI_END,
+
+    QCAMERA3_TARGET_LUMA = QCAMERA3_LUMA_INFO_START,
+    QCAMERA3_CURRENT_LUMA,
+    QCAMERA3_LUMA_RANGE,
+    QCAMERA3_LUMA_INFO_END,
+
+    QCAMERA3_LCAC_PROCESSING_ENABLE = QCAMERA3_LCAC_PROCESSING_START,
+    QCAMERA3_LCAC_PROCESSING_END
+
 };
 
 // QCAMERA3_OPAQUE_RAW_FORMAT
@@ -546,6 +559,16 @@ typedef enum {
      *   on image/sensor statistics and YUV streams will be disabled.
      */
     QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE = 0x8000,
+
+    /* Controlling Postprocessing of YUV stream from App. This is required to
+     * reduce the performance overhead while multiple callback streams are running
+     * by disabling postprocessing which improves power, performance.
+     * When App notifies this mode to HAL, HAL doesnt link CPP with any stream
+     * This mode has following limitations:
+     *    - All YUV stream under this mode wont be connecting CPP
+     *    - Postprocessing cant be done.
+     */
+    QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE = 0x8001
 } QCamera3VendorStreamConfiguration;
 
 // QCAMERA3_DUALCAM_LINK_3A_SYNC_MODE
@@ -572,6 +595,8 @@ typedef enum camera_metadata_enum_ext_dewarp_type {
     QCAMERA3_DEWARP_CUSTOM,
     QCAMERA3_DEWARP_LDC_CUSTOM
 } camera_metadata_enum_ext_dewarp_type_t;
+
+
 
 class QCamera3VendorTags {
 

@@ -72,7 +72,9 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_TNR_TUNING_END,
         QCAMERA3_DEWARP_END,
         QCAMERA3_STRICT_ANTIBANDING_END,
-        QCAMERA3_AWB_ROI_END
+        QCAMERA3_AWB_ROI_END,
+        QCAMERA3_LUMA_INFO_END,
+        QCAMERA3_LCAC_PROCESSING_END
 };
 
 typedef struct vendor_tag_info {
@@ -111,7 +113,9 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.tnr_tuning",
     "org.codeaurora.qcamera3.dewarp",
     "org.codeaurora.qcamera3.strict_antibanding",
-    "org.codeaurora.qcamera3.awb_roi"
+    "org.codeaurora.qcamera3.awb_roi",
+    "org.codeaurora.qcamera3.luma_info",
+    "org.codeaurora.qcamera3.lcac_enable"
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -323,6 +327,18 @@ vendor_tag_info_t qcamera3_awb_roi[QCAMERA3_AWB_ROI_END -
     { "awb_color", TYPE_INT32 }
 };
 
+vendor_tag_info_t qcamera3_luma_info[QCAMERA3_LUMA_INFO_END-
+        QCAMERA3_LUMA_INFO_START] = {
+    { "target_luma", TYPE_FLOAT },
+    { "current_luma", TYPE_FLOAT },
+    { "luma_range", TYPE_FLOAT},
+};
+
+vendor_tag_info_t qcamera3_lcac_enable[QCAMERA3_LCAC_PROCESSING_END-
+        QCAMERA3_LCAC_PROCESSING_START] = {
+    { "lcac_enable", TYPE_BYTE }
+};
+
 
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
@@ -355,7 +371,9 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_tnr_tuning,
     qcamera3_dewarp,
     qcamera3_strict_antibanding,
-    qcamera3_awb_roi
+    qcamera3_awb_roi,
+    qcamera3_luma_info,
+    qcamera3_lcac_enable
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -501,8 +519,15 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)QCAMERA3_STRICT_ANTIBANDING_MODE,
 
     //QCAMERA3_AWB_ROI
-    (uint32_t)QCAMERA3_AWB_ROI_COLOR
+    (uint32_t)QCAMERA3_AWB_ROI_COLOR,
 
+    //QCAMERA3_LUMA_INFO
+    (uint32_t)QCAMERA3_TARGET_LUMA,
+    (uint32_t)QCAMERA3_CURRENT_LUMA,
+    (uint32_t)QCAMERA3_LUMA_RANGE,
+
+    //QCAMERA3_LCAC_PROCESSING_END
+    (uint32_t)QCAMERA3_LCAC_PROCESSING_ENABLE
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;

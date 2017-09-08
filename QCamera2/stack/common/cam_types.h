@@ -54,7 +54,7 @@
 #define CEILING2(X)  (((X) + 0x0001) & 0xFFFE)
 
 #define MAX_ZOOMS_CNT 91
-#define MAX_SIZES_CNT 50
+#define MAX_SIZES_CNT 60
 #define MAX_EXP_BRACKETING_LENGTH 32
 #define MAX_ROI 10
 #define MAX_STREAM_NUM_IN_BUNDLE 8
@@ -336,6 +336,10 @@ typedef enum {
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_GRBG,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_RGGB,
     CAM_FORMAT_BAYER_IDEAL_RAW_PLAIN16_12BPP_BGGR,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GBRG,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GRBG,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_RGGB,
+    CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_BGGR,
 
     /* generic 8-bit raw */
     CAM_FORMAT_JPEG_RAW_8BIT,
@@ -610,6 +614,17 @@ typedef struct {
 } cam_fps_range_t;
 
 typedef struct {
+  float min_luma;
+  float max_luma;
+}cam_luma_range_t;
+
+typedef struct {
+  float target_luma;
+  float curr_luma;
+  cam_luma_range_t luma_range;
+} cam_luma_info_t;
+
+typedef struct {
     int32_t min_sensitivity;
     int32_t max_sensitivity;
 } cam_sensitivity_range_t;
@@ -706,6 +721,12 @@ typedef enum {
     CAM_AE_MODE_ON,
     CAM_AE_MODE_MAX
 } cam_ae_mode_type;
+
+typedef enum {
+    CAM_LCAC_YUV_MODE_OFF,
+    CAM_LCAC_YUV_MODE_ON,
+    CAM_LCAC_YUV_MODE_MAX
+} cam_lac_yuv_mode;
 
 typedef enum {
     DEWARP_NONE,
@@ -1643,6 +1664,7 @@ typedef struct {
     int32_t est_snap_iso_value;
     uint32_t est_snap_luma;
     uint32_t est_snap_target;
+    cam_luma_info_t luma_info;
 } cam_3a_params_t;
 
 typedef struct {
@@ -2451,6 +2473,8 @@ typedef enum {
     CAM_INTF_META_OIS_READ_DATA,
     /* TNR Intensity */
     CAM_INTF_META_TNR_INTENSITY,
+    /* LCAC YUV processing */
+    CAM_INTF_META_LCAC_YUV,
     /* Motion Detection Sensitivity */
     CAM_INTF_META_TNR_MOTION_SENSITIVITY,
     /*event to flush stream buffers*/

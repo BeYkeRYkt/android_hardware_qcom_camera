@@ -135,6 +135,7 @@ int encodeData(mm_camera_test_obj_t *test_obj, mm_camera_super_buf_t* recvd_fram
     if (NULL != job.encode_job.p_metadata && (job.encode_job.mobicat_mask > 0)) {
 
        if (test_obj->mExifParams.debug_params) {
+       #ifdef CAMERA_DEBUG_DATA
            memcpy(job.encode_job.cam_exif_params.debug_params,
                    test_obj->mExifParams.debug_params, (sizeof(mm_jpeg_debug_exif_params_t)));
 
@@ -197,6 +198,7 @@ int encodeData(mm_camera_test_obj_t *test_obj, mm_camera_super_buf_t* recvd_fram
                 job.encode_job.p_metadata->statsdebug_3a_tuning_data =
                         job.encode_job.cam_exif_params.debug_params->q3a_tuning_debug_params;
             }
+        #endif
         }
 
     }

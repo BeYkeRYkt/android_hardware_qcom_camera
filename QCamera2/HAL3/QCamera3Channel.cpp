@@ -502,9 +502,13 @@ void QCamera3Channel::dumpYUV(mm_camera_buf_def_t *frame, cam_dimension_t dim,
     char buf[FILENAME_MAX];
     memset(buf, 0, sizeof(buf));
     static int counter = 0;
+#if (defined(_ANDROID_) && !defined(_DRONE_))
     char prop[PROPERTY_VALUE_MAX];
     property_get("persist.camera.dumpimg", prop, "0");
     mYUVDump = (uint32_t)atoi(prop);
+#else
+    mYUVDump = 0;
+#endif
     if (mYUVDump & dump_type) {
         mFrmNum = ((mYUVDump & 0xffff0000) >> 16);
         if (mFrmNum == 0) {
@@ -752,6 +756,31 @@ cam_format_t QCamera3Channel::getStreamDefaultFormat(cam_stream_type_t type,
     return streamFormat;
 }
 
+/*===========================================================================
+* FUNCTION   : convertToPlain16Format
+ *
+ * DESCRIPTION: return plain 16 buffer format for the given MIPI foramt
+ *
+ * PARAMETERS : fmt : mipi format
+ *
+ ** RETURN    : plain 16 format with same pattern and bit depth
+ *
+ *==========================================================================*/
+cam_format_t QCamera3Channel::convertToPlain16Format(cam_format_t fmt)
+{
+    switch(fmt) {
+    case CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG:
+        return CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GBRG;
+    case CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GRBG:
+        return CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_GRBG;
+    case CAM_FORMAT_BAYER_MIPI_RAW_10BPP_RGGB:
+        return CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_RGGB;
+    case CAM_FORMAT_BAYER_MIPI_RAW_10BPP_BGGR:
+        return CAM_FORMAT_BAYER_RAW_PLAIN16_10BPP_BGGR;
+    default:
+        return CAM_FORMAT_MAX;
+    }
+}
 
 /* QCamera3ProcessingChannel methods */
 
@@ -856,6 +885,8 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
 {
     if (mStreamType == CAM_STREAM_TYPE_PREVIEW) {
         KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_PREVIEW_STRM_CB);
+    } else if (mStreamType == CAM_STREAM_TYPE_VIDEO) {
+        KPI_ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_VIDEO_STRM_CB);
     } else {
         ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_PROC_CH_STRM_CB);
     }
@@ -1623,6 +1654,16 @@ int32_t QCamera3ProcessingChannel::setReprocConfig(reprocess_config_t &reproc_cf
                     pInputBuffer->stream->format);
             return rc;
         }
+
+        // this is temp work around until plain16 raw capture is ready
+        if (pInputBuffer->stream->format == HAL_PIXEL_FORMAT_RAW16) {
+            reproc_cfg.stream_format =
+                    convertToPlain16Format(reproc_cfg.stream_format);
+            if (reproc_cfg.stream_format == CAM_FORMAT_MAX) {
+                LOGE("Unsupported format %d", reproc_cfg.stream_format);
+                return -1;
+            }
+        }
     } else {
         reproc_cfg.stream_type = mStreamType;
         reproc_cfg.stream_format = streamFormat;
@@ -2293,11 +2334,12 @@ void QCamera3RawChannel::streamCbRoutine(
         dumpRawSnapshot(super_frame->bufs[0]);
 
     if (mIsRaw16) {
-        cam_format_t streamFormat = getStreamDefaultFormat(CAM_STREAM_TYPE_RAW,
-                mCamera3Stream->width, mCamera3Stream->height);
-        if (streamFormat == CAM_FORMAT_BAYER_MIPI_RAW_10BPP_GBRG)
+        cam_format_t streamFormat = stream->getStreamInfo()->fmt;
+        if ((streamFormat >= CAM_FORMAT_BAYER_MIPI_RAW_8BPP_GBRG) &&
+            (streamFormat <= CAM_FORMAT_BAYER_MIPI_RAW_12BPP_BGGR))
             convertMipiToRaw16(super_frame->bufs[0]);
-        else
+        else if ((streamFormat >= CAM_FORMAT_BAYER_QCOM_RAW_8BPP_GBRG) &&
+                 (streamFormat <= CAM_FORMAT_BAYER_QCOM_RAW_12BPP_BGGR))
             convertLegacyToRaw16(super_frame->bufs[0]);
     }
 
@@ -2851,6 +2893,7 @@ int32_t QCamera3YUVChannel::request(buffer_handle_t *buffer,
 {
     int32_t rc = NO_ERROR;
     Mutex::Autolock lock(mOfflinePpLock);
+    QCamera3HardwareInterface* hal_obj = (QCamera3HardwareInterface*)mUserData;
 
     LOGD("pInputBuffer is %p frame number %d", pInputBuffer, frameNumber);
     if (NULL == buffer || NULL == metadata) {
@@ -2863,7 +2906,10 @@ int32_t QCamera3YUVChannel::request(buffer_handle_t *buffer,
     ppInfo.frameNumber = frameNumber;
     ppInfo.offlinePpFlag = false;
     if (mBypass && !pInputBuffer ) {
-        ppInfo.offlinePpFlag = needsFramePostprocessing(metadata);
+        if(hal_obj->mOpMode != QCAMERA3_VENDOR_STREAM_CONFIGURATION_PP_DISABLED_MODE)
+            ppInfo.offlinePpFlag = needsFramePostprocessing(metadata);
+        else
+            ppInfo.offlinePpFlag = false;
         ppInfo.output = buffer;
         mOfflinePpInfoList.push_back(ppInfo);
     }

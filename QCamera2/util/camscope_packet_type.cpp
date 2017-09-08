@@ -194,6 +194,7 @@ const char * camscope_atrace_names[CAMSCOPE_EVENT_NAME_SIZE] = {
     "encodeData",
     "preview_stream_cb_routine",
     "stop_preview",
+    "video_stream_cb_routine",
     "capture_channel_cb_routine"
 };
 
