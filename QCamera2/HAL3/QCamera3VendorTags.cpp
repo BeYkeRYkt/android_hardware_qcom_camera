@@ -70,7 +70,8 @@ enum qcamera3_ext_tags qcamera3_ext3_section_bounds[QCAMERA3_SECTIONS_END -
         QCAMERA3_WNR_END,
         QCAMERA3_EXPOSURE_DATA_END,
         QCAMERA3_TNR_TUNING_END,
-        QCAMERA3_DEWARP_END
+        QCAMERA3_DEWARP_END,
+        QCAMERA3_HAL_FLUSH_RESTART_END
 };
 
 typedef struct vendor_tag_info {
@@ -108,6 +109,7 @@ const char *qcamera3_ext_section_names[QCAMERA3_SECTIONS_END -
     "org.codeaurora.qcamera3.exposure",
     "org.codeaurora.qcamera3.tnr_tuning",
     "org.codeaurora.qcamera3.dewarp"
+    "org.codeaurora.qcamera3.flush_restart"
 };
 
 vendor_tag_info_t qcamera3_privatedata[QCAMERA3_PRIVATEDATA_END - QCAMERA3_PRIVATEDATA_START] = {
@@ -309,6 +311,11 @@ vendor_tag_info_t qcamera3_dewarp[QCAMERA3_DEWARP_END -
     { "dewarp_supported_modes", TYPE_INT32}
 };
 
+vendor_tag_info_t qcamera3_flush_restart[QCAMERA3_HAL_FLUSH_RESTART_END -
+        QCAMERA3_HAL_FLUSH_RESTART_START] = {
+    { "restart_mode", TYPE_BYTE },
+};
+
 vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
         VENDOR_SECTION] = {
     qcamera3_privatedata,
@@ -338,7 +345,8 @@ vendor_tag_info_t *qcamera3_tag_info[QCAMERA3_SECTIONS_END -
     qcamera3_wnr,
     qcamera3_exposure,
     qcamera3_tnr_tuning,
-    qcamera3_dewarp
+    qcamera3_dewarp,
+    qcamera3_flush_restart
 };
 
 uint32_t qcamera3_all_tags[] = {
@@ -478,9 +486,10 @@ uint32_t qcamera3_all_tags[] = {
 
     // QCAMERA3_DEWARP
     (uint32_t)QCAMERA3_DEWARP_MODE,
-    (uint32_t)QCAMERA3_DEWARP_AVAILABLE_MODES
+    (uint32_t)QCAMERA3_DEWARP_AVAILABLE_MODES,
 
-
+    // QCAMERA3_HAL_FLUSH_RESTART
+    (uint32_t)QCAMERA3_HAL_FLUSH_RESTART_MODE
 };
 
 const vendor_tag_ops_t* QCamera3VendorTags::Ops = NULL;
