@@ -5396,9 +5396,11 @@ no_error:
                 LOGE("set_parms failed");
             }
             /* reset to zero coz, the batch is queued */
-            mToBeQueuedVidBufs = 0;
-            mPendingBatchMap.add(frameNumber, mFirstFrameNumberInBatch);
-            memset(&mBatchedStreamsArray, 0, sizeof(cam_stream_ID_t));
+            if (mBatchSize) {
+                mToBeQueuedVidBufs = 0;
+                mPendingBatchMap.add(frameNumber, mFirstFrameNumberInBatch);
+                memset(&mBatchedStreamsArray, 0, sizeof(cam_stream_ID_t));
+           }
         } else if (mBatchSize && isVidBufRequested && (mToBeQueuedVidBufs != mBatchSize)) {
             for (uint32_t k = 0; k < streamsArray.num_streams; k++) {
                 uint32_t m = 0;
