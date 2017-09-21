@@ -600,6 +600,7 @@ int32_t QCameraBokeh::doBokehProcess(
         uint8_t* pDepthMap)
 {
     LOGD(":E");
+    ATRACE_BEGIN("doBokehProcess");
     int32_t rc = NO_ERROR;
     QCameraStream* pStream = NULL;
     uint32_t focusX,focusY;
@@ -642,9 +643,27 @@ int32_t QCameraBokeh::doBokehProcess(
     cam_rect_t goodRoi = {0,0,0,0};
     const float focalLengthPrimaryCamera = m_pCaps->main_cam_cap->focal_length;
     bool isAuxMono = (m_pCaps->aux_cam_cap->color_arrangement == CAM_FILTER_ARRANGEMENT_Y);
+    qrcp::SensorConfiguration config =
+            isAuxMono ? qrcp::SYMMETRIC_BAYER_MONO : qrcp::STANDARD_WIDE_BAYER_BAYER;
+
+    qrcp::DepthMapMode ddmMode = qrcp::DepthMapMode::ENHANCED_MODE;
+    if (QCameraCommon::is_target_SDM630())
+        ddmMode = qrcp::DepthMapMode::NORMAL_MODE;
+
+    char prop[PROPERTY_VALUE_MAX];
+    memset(prop, 0, sizeof(prop));
+    property_get("persist.camera.bokeh.ddmmode", prop, "");
+    if (strlen(prop) > 0) {
+        if (!strcmp(prop, "normal"))
+            ddmMode = qrcp::DepthMapMode::NORMAL_MODE;
+        else if (!strcmp(prop, "enhanced"))
+            ddmMode = qrcp::DepthMapMode::ENHANCED_MODE;
+    }
 
     DUMP("\nDepthStride = %d \nfocalLengthPrimaryCamera = %f \n"
-            "isAuxMono = %d", depthStride, focalLengthPrimaryCamera, isAuxMono);
+            "SensorConfiguration = %d", depthStride, focalLengthPrimaryCamera, config);
+    DUMP("\nDepthmap mode = %s ", (ddmMode == qrcp::DepthMapMode::NORMAL_MODE) ?
+            "normal" : "enhanced");
 
     LOGI("[KPI Perf]: PROFILE_BOKEH_PROCESS : E");
     qrcp::DDMWrapperStatus status = qrcp::dualCameraGenerateDDM(
@@ -654,8 +673,9 @@ int32_t QCameraBokeh::doBokehProcess(
             auxiliaryStrideY, auxiliaryStrideVU,
             pDepthMap, depthStride,
             goodRoi.left, goodRoi.top, goodRoi.width,goodRoi.height,
-            inParams.sAuxReprocessInfo.string(), inParams.sMainReprocessInfo.string(),
-            inParams.sCalibData.string(), focalLengthPrimaryCamera, isAuxMono);
+            inParams.sMainReprocessInfo.string(), inParams.sAuxReprocessInfo.string(),
+            inParams.sCalibData.string(), focalLengthPrimaryCamera, config, ddmMode);
+
     if (!status.ok()) {
         LOGE("depth map generation failed: %s, errorcode %d",
                 status.getErrorMessage().c_str(), status.getErrorCode());
@@ -725,6 +745,7 @@ done:
     if (effectObj) {
         delete effectObj;
     }
+    ATRACE_END();
     LOGD("X");
     return rc;
 }
