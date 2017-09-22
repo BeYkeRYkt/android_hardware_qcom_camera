@@ -87,6 +87,10 @@ if MSM8996
 AM_CPPFLAGS += -DTARGET_MSM8996
 endif
 
+if MSM8998
+AM_CPPFLAGS += -DTARGET_MSM8998
+endif
+
 AM_CPPFLAGS += -DUSE_CAMERA_METABUFFER_UTILS
 
 AM_CPPFLAGS += -D__unused="__attribute__((__unused__))"
