@@ -501,10 +501,17 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
     // TODO: hardcode for now until mctl add support for min_num_pp_bufs
     //TBD - To see if this hardcoding is needed. Check by printing if this is filled by mctl to 3
     gCamCapability[cameraId]->min_num_pp_bufs = 3;
+    pthread_condattr_t mCondAttr;
 
-    pthread_cond_init(&mBuffersCond, NULL);
+    pthread_condattr_init(&mCondAttr);
+    pthread_condattr_setclock(&mCondAttr, CLOCK_MONOTONIC);
 
-    pthread_cond_init(&mRequestCond, NULL);
+    pthread_cond_init(&mBuffersCond, &mCondAttr);
+
+    pthread_cond_init(&mRequestCond, &mCondAttr);
+
+    pthread_condattr_destroy(&mCondAttr);
+
     mPendingLiveRequest = 0;
     mCurrentRequestId = -1;
     pthread_mutex_init(&mMutex, NULL);
@@ -719,7 +726,6 @@ QCamera3HardwareInterface::~QCamera3HardwareInterface()
     mPerfLockMgr.releasePerfLock(PERF_LOCK_CLOSE_CAMERA);
 
     pthread_cond_destroy(&mRequestCond);
-
     pthread_cond_destroy(&mBuffersCond);
 
     pthread_mutex_destroy(&mMutex);
@@ -5396,9 +5402,11 @@ no_error:
                 LOGE("set_parms failed");
             }
             /* reset to zero coz, the batch is queued */
-            mToBeQueuedVidBufs = 0;
-            mPendingBatchMap.add(frameNumber, mFirstFrameNumberInBatch);
-            memset(&mBatchedStreamsArray, 0, sizeof(cam_stream_ID_t));
+            if (mBatchSize) {
+                mToBeQueuedVidBufs = 0;
+                mPendingBatchMap.add(frameNumber, mFirstFrameNumberInBatch);
+                memset(&mBatchedStreamsArray, 0, sizeof(cam_stream_ID_t));
+           }
         } else if (mBatchSize && isVidBufRequested && (mToBeQueuedVidBufs != mBatchSize)) {
             for (uint32_t k = 0; k < streamsArray.num_streams; k++) {
                 uint32_t m = 0;
@@ -5425,7 +5433,7 @@ no_error:
     // Added a timed condition wait
     struct timespec ts;
     uint8_t isValidTimeout = 1;
-    rc = clock_gettime(CLOCK_REALTIME, &ts);
+    rc = clock_gettime(CLOCK_MONOTONIC, &ts);
     if (rc < 0) {
       isValidTimeout = 0;
       LOGE("Error reading the real time clock!!");
@@ -5675,7 +5683,7 @@ int QCamera3HardwareInterface::flushPerf()
     }
 
     /* wait on a signal that buffers were received */
-    rc = clock_gettime(CLOCK_REALTIME, &timeout);
+    rc = clock_gettime(CLOCK_MONOTONIC, &timeout);
     if (rc < 0) {
         LOGE("Error reading the real time clock, cannot use timed wait");
     } else {
