@@ -176,12 +176,16 @@ typedef struct {
     volatile int                        prvwCmdPending;
     volatile int                        prvwCmd;
     pthread_t                           previewThread;
+    pthread_t                           recordingThread;
     pthread_t                           takePictureThread;
 
     camera_notify_callback              notify_cb;
     camera_data_callback                data_cb;
     camera_data_timestamp_callback      data_cb_timestamp;
     camera_request_memory               get_memory;
+    Vector<camera_memory_t*>            prevFreeBufs;
+    Vector<camera_memory_t*>            pictFreeBufs;
+    Vector<camera_memory_t*>            videoFreeBufs;
     void*                               cb_ctxt;
 
     /* capture related members */
@@ -195,12 +199,19 @@ typedef struct {
     int                                 videoHeight;
     QCameraHalMemory_t                  videoMem;
     /* captureFormat is internal setting for USB camera buffers */
+    int                                 recordingFormat;
+    int                                 previewFormat;
     int                                 captureFormat;
     char                                dev_name[FILENAME_LENGTH];
     int                                 fd;
+    char                                h264_dev_name[FILENAME_LENGTH];
+    int                                 h264_fd;
     unsigned int                        n_buffers;
+    unsigned int                        n_h264_buffers;
     struct v4l2_buffer                  curCaptureBuf;
+    struct v4l2_buffer                  curVideoBuf;
     struct bufObj                       *buffers;
+    struct bufObj                       *h264Buffers;
 
     /* Display related members */
     preview_stream_ops*                 window;
@@ -219,6 +230,9 @@ typedef struct {
     int                                 pictWidth;
     int                                 pictHeight;
     int                                 pictJpegQlty;
+    Vector<Size>                        prevSizes;
+    Vector<Size>                        pictSizes;
+    Vector<Size>                        videoSizes;
     int                                 thumbnailWidth;
     int                                 thumbnailHeight;
     int                                 thumbnailJpegQlty;
@@ -230,9 +244,12 @@ typedef struct {
 
     /* */
     QCameraParameters                   qCamParams;
+    String8                             prevSizeValue;
     String8                             prevSizeValues;
+    String8                             pictSizeValue;
     String8                             pictSizeValues;
     String8                             thumbnailSizeValues;
+    String8                             vidSizeValue;
     String8                             vidSizeValues;
     String8                             pictFormatValues;
     String8                             prevFormatValues;
@@ -240,6 +257,30 @@ typedef struct {
 
     camera_memory_t *mMetadata[MM_CAMERA_MAX_NUM_FRAMES];
     native_handle_t *mNativeHandle[MM_CAMERA_MAX_NUM_FRAMES];
+
+    camera_memory_t* getFreePrevBuffer(){
+        if(prevFreeBufs.size() == 0)
+            return 0;
+        camera_memory_t* ret = prevFreeBufs.editTop();
+        prevFreeBufs.pop();
+        return ret;
+    }
+
+    void returnFreePrevBuffer(camera_memory_t* buf){
+        prevFreeBufs.push_front(buf);
+    }
+
+    camera_memory_t* getFreeVideoBuffer(){
+        if(videoFreeBufs.size() == 0)
+            return 0;
+        camera_memory_t* ret = videoFreeBufs.editTop();
+        videoFreeBufs.pop();
+        return ret;
+    }
+
+    void returnFreeVideoBuffer(camera_memory_t* buf){
+        videoFreeBufs.push_front(buf);
+    }
 
 } camera_hardware_t;
 

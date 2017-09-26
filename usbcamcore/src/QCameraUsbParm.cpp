@@ -104,14 +104,14 @@ static const str_map preview_formats[] = {
     {HAL_PIXEL_FORMAT_YV12, CAMERA_YUV_420_YV12, CAMERA_PAD_TO_WORD, 3}
 };*/
 
-static struct camera_size_type previewSizes[] = {
+/*static struct camera_size_type previewSizes[] = {
     { 1920, 1088}, //1080p
     { 1280, 720}, // 720P,
     { 640, 480}, // VGA
     { 512, 384},
     { 480, 320},
     { 320, 240}, // QVGA
-};
+};*/
 
 // All fps ranges which can be supported. This list will be filtered according
 // to the min and max fps supported by hardware
@@ -132,15 +132,15 @@ static const str_map picture_formats[] = {
     //{QCameraParameters::PIXEL_FORMAT_RAW, PICTURE_FORMAT_RAW}
 };
 
-static camera_size_type picture_sizes[] = {
+/*static camera_size_type picture_sizes[] = {
     { 1280, 720}, //HD720
     { 640, 480}, // VGA
     { 320, 240}, // QVGA
-};
+};*/
 
-static camera_size_type video_sizes[] = {
+/*static camera_size_type video_sizes[] = {
     { 640, 480}, // VGA
-};
+};*/
 
 /* aspect ratio removed */
 static camera_size_type thumbnail_sizes[] = {
@@ -193,18 +193,11 @@ int usbCamInitDefaultParameters(camera_hardware_t *camHal)
 
     /* Default initializations */
     camHal->prevFormat          = DEFAULT_USBCAM_PRVW_FMT;
-    camHal->prevWidth           = DEFAULT_USBCAM_PRVW_WD;
-    camHal->prevHeight          = DEFAULT_USBCAM_PRVW_HT;
-
-    camHal->videoWidth           = DEFAULT_USBCAM_PRVW_WD;
-    camHal->videoHeight          = DEFAULT_USBCAM_PRVW_HT;
 
     camHal->dispFormat          = camHal->prevFormat;
     camHal->dispWidth           = camHal->prevWidth;
     camHal->dispHeight          = camHal->prevHeight;
     camHal->pictFormat          = DEFAULT_USBCAM_PICT_FMT;
-    camHal->pictWidth           = DEFAULT_USBCAM_PICT_WD;
-    camHal->pictHeight          = DEFAULT_USBCAM_PICT_HT;
     camHal->pictJpegQlty        = DEFAULT_USBCAM_PICT_QLTY;
     camHal->thumbnailWidth      = DEFAULT_USBCAM_THUMBNAIL_WD;
     camHal->thumbnailHeight     = DEFAULT_USBCAM_THUMBNAIL_HT;
@@ -214,9 +207,6 @@ int usbCamInitDefaultParameters(camera_hardware_t *camHal)
     camHal->prvwCmdPending      = 0;
     camHal->takePictInProgress  = 0;
 
-    //Set picture size values
-    camHal->pictSizeValues = create_sizes_str(
-        picture_sizes, sizeof(picture_sizes) / sizeof(camera_size_type));
     camHal->qCamParams.set(QCameraParameters::KEY_SUPPORTED_PICTURE_SIZES,
         camHal->pictSizeValues.string());
     camHal->qCamParams.CameraParameters::setPictureSize(camHal->pictWidth, camHal->pictHeight);
@@ -229,13 +219,14 @@ int usbCamInitDefaultParameters(camera_hardware_t *camHal)
     if(PICTURE_FORMAT_JPEG == camHal->pictFormat)
         camHal->qCamParams.CameraParameters::setPictureFormat(QCameraParameters::PIXEL_FORMAT_YUV420SP);
 
-    camHal->vidSizeValues = create_sizes_str(
-        video_sizes, sizeof(video_sizes) / sizeof(camera_size_type));
     camHal->qCamParams.set(QCameraParameters::KEY_SUPPORTED_VIDEO_SIZES, camHal->vidSizeValues.string());
-    camera_size_type preferVideoSize = {camHal->pictWidth, camHal->pictHeight};
-    camHal->qCamParams.set(QCameraParameters::KEY_VIDEO_SIZE, create_sizes_str(&preferVideoSize, 1).string());
-    camHal->qCamParams.set(QCameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, create_sizes_str(&preferVideoSize, 1).string());
-    camHal->qCamParams.set(QCameraParameters::KEY_VIDEO_FRAME_FORMAT,QCameraParameters::PIXEL_FORMAT_YUV420SP);
+    camHal->qCamParams.set(QCameraParameters::KEY_VIDEO_SIZE, camHal->vidSizeValue.string());
+    camHal->qCamParams.set(QCameraParameters::KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO, camHal->prevSizeValue.string());
+    if(camHal->h264_dev_name[0] == 0) {
+        camHal->qCamParams.set(QCameraParameters::KEY_VIDEO_FRAME_FORMAT,QCameraParameters::PIXEL_FORMAT_YUV420SP);
+    } else {
+        camHal->qCamParams.set(QCameraParameters::KEY_VIDEO_FRAME_FORMAT, "h264");
+    }
 
     camHal->qCamParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,"10,15,30,60");
     camHal->qCamParams.set(CameraParameters::KEY_PREVIEW_FPS_RANGE,"5000,120000");
@@ -274,8 +265,6 @@ int usbCamInitDefaultParameters(camera_hardware_t *camHal)
         camHal->qCamParams.CameraParameters::setPreviewFormat(QCameraParameters::PIXEL_FORMAT_YUV420SP);
 
     //Set Preview size
-    camHal->prevSizeValues = create_sizes_str(
-        previewSizes,  sizeof(previewSizes) / sizeof(camera_size_type));
     camHal->qCamParams.set(QCameraParameters::KEY_SUPPORTED_PREVIEW_SIZES,
                     camHal->prevSizeValues.string());
     camHal->qCamParams.CameraParameters::setPreviewSize(camHal->prevWidth, camHal->prevHeight);
@@ -286,7 +275,8 @@ int usbCamInitDefaultParameters(camera_hardware_t *camHal)
 
     camHal->qCamParams.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE,
                         camHal->prevFpsRangesValues);
-    //camHal->qCamParams.CameraParameters::setPreviewFpsRange(MIN_PREV_FPS, MAX_PREV_FPS);
+
+    camHal->qCamParams.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP, 0);
 
     ALOGD("%s: X", __func__);
 
@@ -319,6 +309,13 @@ int usbCamSetParameters(camera_hardware_t *camHal, const char *params)
         PRINT_PARAM_STR(params);
 
     qParam.unflatten(str);
+    CameraParameters qOldParam = camHal->qCamParams;
+    ALOGI("-------------BEGIN OLD PARAMETERS---------------");
+    qOldParam.dump();
+    ALOGI("-------------END OLD PARAMETERS---------------");
+    ALOGI("-------------BEGIN NEW PARAMETERS---------------");
+    ((CameraParameters)qParam).dump();
+    ALOGI("-------------END NEW PARAMETERS---------------");
 
     if(usbCamSetPrvwSize(camHal, qParam))
         rc = -1;
@@ -353,8 +350,10 @@ char* usbCamGetParameters(camera_hardware_t *camHal)
     char* rc = NULL;
     String8 str;
 
-    //QCameraParameters qParam = camHal->qCamParams;
-    //qParam.dump();
+    CameraParameters qParam = camHal->qCamParams;
+    ALOGI("-------------BEGIN PARAMETERS---------------");
+    qParam.dump();
+    ALOGI("-------------END PARAMETERS---------------");
     str = camHal->qCamParams.flatten( );
     rc = (char *)malloc(sizeof(char)*(str.length()+1));
     if(rc != NULL){
@@ -364,7 +363,7 @@ char* usbCamGetParameters(camera_hardware_t *camHal)
     parms = rc;
     }
 
-    PRINT_PARAM_STR(parms);
+    //PRINT_PARAM_STR(parms);
 
     ALOGD("%s: X", __func__);
     return (parms);
@@ -528,10 +527,10 @@ static int usbCamSetPrvwSize(   camera_hardware_t           *camHal,
     ALOGI("%s: Requested preview size %d x %d", __func__, width, height);
 
     // Validate the preview size
-    numPrvwSizes = sizeof(previewSizes) / sizeof(camera_size_type);
+    numPrvwSizes = camHal->prevSizes.size();
     for (i = 0, validSize = 0; i <  numPrvwSizes; i++) {
-        if (width ==  previewSizes[i].width
-           && height ==  previewSizes[i].height) {
+        if (width ==  camHal->prevSizes[i].width
+           && height ==  camHal->prevSizes[i].height) {
             validSize = 1;
 
             camHal->qCamParams.CameraParameters::setPreviewSize(width, height);
@@ -582,10 +581,10 @@ static int usbCamSetPictSize(   camera_hardware_t           *camHal,
     ALOGI("%s: Requested picture size %d x %d", __func__, width, height);
 
     // Validate the picture size
-    numPictSizes = sizeof(picture_sizes) / sizeof(camera_size_type);
+    numPictSizes = camHal->pictSizes.size();
     for (i = 0, validSize = 0; i <  numPictSizes; i++) {
-        if (width ==  picture_sizes[i].width
-           && height ==  picture_sizes[i].height) {
+        if (width ==  camHal->pictSizes[i].width
+           && height ==  camHal->pictSizes[i].height) {
             validSize = 1;
 
             camHal->qCamParams.CameraParameters::setPictureSize(width, height);
