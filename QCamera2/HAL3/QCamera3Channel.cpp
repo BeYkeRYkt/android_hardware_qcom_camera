@@ -1008,10 +1008,29 @@ void QCamera3ProcessingChannel::streamCbRoutine(mm_camera_super_buf_t *super_fra
                     hal_obj->getCameraID(),
                     resultFrameNumber, frameIndex, lowestFrameNumber, oldestBufIndex);
             if ((lowestFrameNumber != -1) && (lowestFrameNumber < resultFrameNumber)) {
-                LOGE("camera id %d, Multiple frame dropped requesting cancel for frame %d, idx:%d",
-                        hal_obj->getCameraID(),lowestFrameNumber, oldestBufIndex);
-                stream->cancelBuffer(oldestBufIndex);
-                return;
+                int32_t ret = NO_ERROR;
+                LOGE("Multiple frame dropped requesting cancel for frame %d, idx:%d",
+                        lowestFrameNumber, oldestBufIndex);
+                ret = stream->cancelBuffer(oldestBufIndex);
+                if (NO_ERROR == ret) {
+                    return;
+                } else {
+                    //check if the buffer already exists in the out of sequence list
+                    auto it = mOutOfSequenceBuffers.begin();
+                    for (;it != mOutOfSequenceBuffers.end(); it++) {
+                        mm_camera_super_buf_t *frame = *it;
+                        if (frame->bufs[0]->buf_idx == oldestBufIndex) {
+                            LOGE("buffer already in mOutOfSequenceBuffers list");
+                            frameIndex = oldestBufIndex;
+                            mOutOfSequenceBuffers.erase(it);
+                            break;
+                        }
+                    }
+                    if (it == mOutOfSequenceBuffers.end()) {
+                        LOGE("SHOULD NOT BE HERE, BUFFER LOST !!!");
+                        return;
+                    }
+                }
              } else if (lowestFrameNumber == resultFrameNumber) {
                 LOGE("camera id %d, Time to flush out head of list continue loop with this new super frame",
                         hal_obj->getCameraID());
