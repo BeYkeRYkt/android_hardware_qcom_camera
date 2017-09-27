@@ -1617,6 +1617,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     cam_dimension_t previewSize = {0, 0};
 
     cam_padding_info_t padding_info = gCamCapability[mCameraId]->padding_info;
+    cam_is_type_t is_type;
 
     /*EIS configuration*/
     bool oisSupported = false;
@@ -1984,7 +1985,8 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
 
     char is_type_value[PROPERTY_VALUE_MAX];
     property_get("persist.camera.is_type", is_type_value, "4");
-    m_bEis3PropertyEnabled = (atoi(is_type_value) == IS_TYPE_EIS_3_0);
+    is_type = static_cast<cam_is_type_t>(atoi(is_type_value));
+    m_bEis3PropertyEnabled = (is_type == IS_TYPE_EIS_3_0);
 
     //Create metadata channel and initialize it
     cam_feature_mask_t metadataFeatureMask = CAM_QCOM_FEATURE_NONE;
@@ -2067,6 +2069,11 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                     if (m_bEis3PropertyEnabled /* hint for EIS 3 needed here */) {
                         mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] |=
                             CAM_QTI_FEATURE_PPEISCORE;
+                    }
+                    if (IS_TYPE_DIG_GIMB == is_type) {
+                        mStreamConfigInfo.postprocess_mask[
+                                mStreamConfigInfo.num_streams] |=
+                            CAM_QTI_FEATURE_PPDGCORE;
                     }
                 } else {
                         mStreamConfigInfo.type[mStreamConfigInfo.num_streams] =
