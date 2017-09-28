@@ -3273,7 +3273,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
         }
         goto done_metadata;
     }
-    LOGE("valid frame_number = %u, capture_time = %lld",
+    LOGH("valid frame_number = %u, capture_time = %lld",
             frame_number, capture_time);
 
     for (pendingRequestIterator i = mPendingRequestsList.begin();
@@ -3744,7 +3744,7 @@ void QCamera3HardwareInterface::handleBufferWithLock(
         }
         buffer->status |= mPendingBuffersMap.getBufErrStatus(buffer->buffer);
         result.output_buffers = buffer;
-        LOGE("result frame_number = %d, buffer = %p",
+        LOGH("result frame_number = %d, buffer = %p",
                  frame_number, buffer->buffer);
 
         mPendingBuffersMap.removeBuf(buffer->buffer);
@@ -3808,7 +3808,7 @@ void QCamera3HardwareInterface::handleBufferWithLock(
                         j->buffer = (camera3_stream_buffer_t *)malloc(
                             sizeof(camera3_stream_buffer_t));
                         *(j->buffer) = *buffer;
-                        LOGE("cache buffer %p at result frame_number %u",
+                        LOGH("cache buffer %p at result frame_number %u",
                              buffer->buffer, frame_number);
                     }
                 }
@@ -4915,7 +4915,7 @@ no_error:
         request_id = mCurrentRequestId;
     }
 
-    LOGE("num_output_buffers = %d input_buffer = %p frame_number = %d",
+    LOGH("num_output_buffers = %d input_buffer = %p frame_number = %d",
                                     request->num_output_buffers,
                                     request->input_buffer,
                                     frameNumber);
@@ -5123,7 +5123,7 @@ no_error:
         bufferInfo.stream = request->output_buffers[i].stream;
         bufsForCurRequest.mPendingBufferList.push_back(bufferInfo);
         QCamera3Channel *channel = (QCamera3Channel *)bufferInfo.stream->priv;
-        LOGE("frame = %d, buffer = %p, streamTypeMask = %d, stream format = %d",
+        LOGH("frame = %d, buffer = %p, streamTypeMask = %d, stream format = %d",
             frameNumber, bufferInfo.buffer,
             channel->getStreamTypeMask(), bufferInfo.stream->format);
     }
@@ -5413,7 +5413,7 @@ no_error:
                 return BAD_VALUE;
             }
             for (uint32_t i = 0; i < streamsArray.num_streams; i++) {
-                LOGE("Stream Id: %d and Buf Index: %d and framenum = %d", streamsArray.stream_request[i].streamID,
+                LOGH("Stream Id: %d and Buf Index: %d and framenum = %d", streamsArray.stream_request[i].streamID,
                         streamsArray.stream_request[i].buf_index, frameNumber);
             }
 
