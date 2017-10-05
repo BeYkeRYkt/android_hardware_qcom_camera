@@ -39,6 +39,7 @@
 #include MMAN_H
 
 // Camera dependencies
+#include "cam_types.h"
 #include "mm_qcamera_dbg.h"
 #include "mm_qcamera_app.h"
 
@@ -280,7 +281,7 @@ void mm_app_dump_jpeg_frame(const void * data, size_t size, char* name,
     int file_fd;
     if ( data != NULL) {
         snprintf(buf, sizeof(buf),
-                QCAMERA_DUMP_FRM_LOCATION"test/%s_%u.%s", name, index, ext);
+                QCAMERA_DUMP_FRM_LOCATION"%s_%u.%s", name, index, ext);
         LOGD("%s size =%zu, jobId=%u",  buf, size, index);
         file_fd = open(buf, O_RDWR | O_CREAT, 0777);
         write(file_fd, data, size);

@@ -167,6 +167,7 @@ bool QCameraHAL3Test::processThreadCreate(
 {
     int32_t ret = 0;
     pthread_attr_t attr;
+    static int temp_queued = 1;
     if (pipe(pfd) < 0) {
         LOGE("%s: Error in creating the pipe", __func__);
     }
@@ -180,6 +181,9 @@ bool QCameraHAL3Test::processThreadCreate(
     thread.writefd = pfd[1];
     thread.data_obj = obj;
     thread.testcase = testcase;
+    thread.camera_obj = CamObj_handle;
+    thread.stop_flag = (bool *)&test_case_end;
+    thread.queued = &temp_queued;
     pthread_mutex_lock(&thread.mutex);
     ret = pthread_create(&thread.td, &attr, processBuffers, &thread );
     pthread_setname_np(thread.td, "TestApp_Thread");
