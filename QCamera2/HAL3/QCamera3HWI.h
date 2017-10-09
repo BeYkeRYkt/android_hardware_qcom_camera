@@ -631,6 +631,7 @@ private:
     State mState;
     //Dual camera related params
     bool mIsDeviceLinked;
+    bool mFlushRestart;
     bool mIsMainCamera;
     uint8_t mLinkedCameraId;
     cam_dual_camera_role_t mDualCamRole;
