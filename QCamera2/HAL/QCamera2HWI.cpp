@@ -11852,6 +11852,8 @@ void QCamera2HardwareInterface::configureSnapshotSkip(bool skip)
                     }
                 }
             }
+            if (skip)
+                ((QCameraPicChannel *)pChannel)->flushSuperbuffer(mActiveCameras, 0);
         }
     }
 }
