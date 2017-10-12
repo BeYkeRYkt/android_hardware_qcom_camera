@@ -109,6 +109,10 @@ ifeq ($(strip $(TARGET_USES_ION)),true)
 LOCAL_CFLAGS += -DUSE_ION
 endif
 
+ifeq ($(DRONE_TARGET),true)
+LOCAL_CFLAGS += -DCAMERA_DEBUG_DATA
+endif
+
 LOCAL_CFLAGS += -D_ANDROID_ -DQCAMERA_REDEFINE_LOG
 
 # System header file path prefix
