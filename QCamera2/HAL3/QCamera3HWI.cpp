@@ -4939,6 +4939,7 @@ no_error:
     // Acquire all request buffers first
     streamsArray.num_streams = 0;
     int blob_request = 0;
+    int blob_request_under_batch_mode = 0;
     uint32_t snapshotStreamId = 0;
     for (size_t i = 0; i < request->num_output_buffers; i++) {
         const camera3_stream_buffer_t& output = request->output_buffers[i];
@@ -4952,6 +4953,8 @@ no_error:
         if (output.stream->format == HAL_PIXEL_FORMAT_BLOB) {
             //FIXME??:Call function to store local copy of jpeg data for encode params.
             blob_request = 1;
+            if (mBatchSize)
+                blob_request_under_batch_mode = 1;
             snapshotStreamId = channel->getStreamID(channel->getStreamTypeMask());
         }
 
@@ -5446,7 +5449,7 @@ no_error:
                 LOGE("set_parms failed");
             }
             /* reset to zero coz, the batch is queued */
-            if (mBatchSize) {
+           if (mBatchSize ||blob_request_under_batch_mode) {
                 mToBeQueuedVidBufs = 0;
                 mPendingBatchMap.add(frameNumber, mFirstFrameNumberInBatch);
                 memset(&mBatchedStreamsArray, 0, sizeof(cam_stream_ID_t));
