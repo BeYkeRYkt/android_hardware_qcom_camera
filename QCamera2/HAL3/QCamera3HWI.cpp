@@ -3164,6 +3164,8 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
     uint32_t frame_number, urgent_frame_number;
     int64_t capture_time;
     nsecs_t currentSysTime;
+    int rc = 0;
+    struct timespec curr_ts;
 
     int32_t *p_frame_number_valid =
             POINTER_OF_META(CAM_INTF_META_FRAME_NUMBER_VALID, metadata);
@@ -3194,7 +3196,11 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
     capture_time =              p_sen_timestamp->exposure_start;
     urgent_frame_number_valid = *p_urgent_frame_number_valid;
     urgent_frame_number =       *p_urgent_frame_number;
-    currentSysTime =            systemTime(CLOCK_MONOTONIC);
+    rc = clock_gettime(CLOCK_MONOTONIC, &curr_ts);
+    if (rc < 0) {
+        LOGE("Error reading the real time clock!!");
+    }
+    currentSysTime = (curr_ts.tv_sec*NSEC_PER_SEC) + curr_ts.tv_nsec;
 
     // Detect if buffers from any requests are overdue
     for (auto &req : mPendingBuffersMap.mPendingBuffersInRequest) {
@@ -3273,7 +3279,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
         }
         goto done_metadata;
     }
-    LOGE("valid frame_number = %u, capture_time = %lld",
+    LOGH("valid frame_number = %u, capture_time = %lld",
             frame_number, capture_time);
 
     for (pendingRequestIterator i = mPendingRequestsList.begin();
@@ -3625,6 +3631,8 @@ void QCamera3HardwareInterface::handleInputBufferWithLock(uint32_t frame_number)
 {
     ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_HANDLE_IN_BUF_LKD);
     pendingRequestIterator i = mPendingRequestsList.begin();
+    struct timespec temp_ts;
+    int rc = 0;
     while (i != mPendingRequestsList.end() && i->frame_number != frame_number){
         i++;
     }
@@ -3634,7 +3642,11 @@ void QCamera3HardwareInterface::handleInputBufferWithLock(uint32_t frame_number)
             CameraMetadata settings;
             camera3_notify_msg_t notify_msg;
             memset(&notify_msg, 0, sizeof(camera3_notify_msg_t));
-            nsecs_t capture_time = systemTime(CLOCK_MONOTONIC);
+            rc = clock_gettime(CLOCK_MONOTONIC, &temp_ts);
+            if (rc < 0) {
+                LOGE("Error reading the real time clock!!");
+            }
+            nsecs_t capture_time = (temp_ts.tv_sec * NSEC_PER_SEC) + temp_ts.tv_nsec;
             if(i->settings) {
                 settings = i->settings;
                 if (settings.exists(ANDROID_SENSOR_TIMESTAMP)) {
@@ -3694,6 +3706,7 @@ void QCamera3HardwareInterface::handleBufferWithLock(
     camera3_stream_buffer_t *buffer, uint32_t frame_number)
 {
     ATRACE_CAMSCOPE_CALL(CAMSCOPE_HAL3_HANDLE_BUF_LKD);
+    struct timespec temp_ts;
 
     if (buffer->stream->format == HAL_PIXEL_FORMAT_BLOB) {
         mPerfLockMgr.releasePerfLock(PERF_LOCK_TAKE_SNAPSHOT);
@@ -3744,7 +3757,7 @@ void QCamera3HardwareInterface::handleBufferWithLock(
         }
         buffer->status |= mPendingBuffersMap.getBufErrStatus(buffer->buffer);
         result.output_buffers = buffer;
-        LOGE("result frame_number = %d, buffer = %p",
+        LOGH("result frame_number = %d, buffer = %p",
                  frame_number, buffer->buffer);
 
         mPendingBuffersMap.removeBuf(buffer->buffer);
@@ -3755,7 +3768,11 @@ void QCamera3HardwareInterface::handleBufferWithLock(
             CameraMetadata settings;
             camera3_notify_msg_t notify_msg;
             memset(&notify_msg, 0, sizeof(camera3_notify_msg_t));
-            nsecs_t capture_time = systemTime(CLOCK_MONOTONIC);
+            int ret = clock_gettime(CLOCK_MONOTONIC, &temp_ts);
+            if (ret < 0) {
+                LOGE("Error reading the real time clock!!");
+            }
+            nsecs_t capture_time = (temp_ts.tv_sec * NSEC_PER_SEC) + temp_ts.tv_nsec;
             if(i->settings) {
                 settings = i->settings;
                 if (settings.exists(ANDROID_SENSOR_TIMESTAMP)) {
@@ -3808,7 +3825,7 @@ void QCamera3HardwareInterface::handleBufferWithLock(
                         j->buffer = (camera3_stream_buffer_t *)malloc(
                             sizeof(camera3_stream_buffer_t));
                         *(j->buffer) = *buffer;
-                        LOGE("cache buffer %p at result frame_number %u",
+                        LOGH("cache buffer %p at result frame_number %u",
                              buffer->buffer, frame_number);
                     }
                 }
@@ -4915,7 +4932,7 @@ no_error:
         request_id = mCurrentRequestId;
     }
 
-    LOGE("num_output_buffers = %d input_buffer = %p frame_number = %d",
+    LOGH("num_output_buffers = %d input_buffer = %p frame_number = %d",
                                     request->num_output_buffers,
                                     request->input_buffer,
                                     frameNumber);
@@ -5108,7 +5125,13 @@ no_error:
     PendingBuffersInRequest bufsForCurRequest;
     bufsForCurRequest.frame_number = frameNumber;
     // Mark current timestamp for the new request
-    bufsForCurRequest.timestamp = systemTime(CLOCK_MONOTONIC);
+
+    struct timespec temp_ts;
+    rc = clock_gettime(CLOCK_MONOTONIC, &temp_ts);
+    if (rc < 0) {
+        LOGE("Error reading the real time clock!!");
+    }
+    bufsForCurRequest.timestamp = (temp_ts.tv_sec * NSEC_PER_SEC) + temp_ts.tv_nsec;
 
     for (size_t i = 0; i < request->num_output_buffers; i++) {
         RequestedBufferInfo requestedBuf;
@@ -5123,7 +5146,7 @@ no_error:
         bufferInfo.stream = request->output_buffers[i].stream;
         bufsForCurRequest.mPendingBufferList.push_back(bufferInfo);
         QCamera3Channel *channel = (QCamera3Channel *)bufferInfo.stream->priv;
-        LOGE("frame = %d, buffer = %p, streamTypeMask = %d, stream format = %d",
+        LOGH("frame = %d, buffer = %p, streamTypeMask = %d, stream format = %d",
             frameNumber, bufferInfo.buffer,
             channel->getStreamTypeMask(), bufferInfo.stream->format);
     }
@@ -5413,7 +5436,7 @@ no_error:
                 return BAD_VALUE;
             }
             for (uint32_t i = 0; i < streamsArray.num_streams; i++) {
-                LOGE("Stream Id: %d and Buf Index: %d and framenum = %d", streamsArray.stream_request[i].streamID,
+                LOGH("Stream Id: %d and Buf Index: %d and framenum = %d", streamsArray.stream_request[i].streamID,
                         streamsArray.stream_request[i].buf_index, frameNumber);
             }
 
