@@ -3315,7 +3315,7 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
             memset(&notify_msg, 0, sizeof(camera3_notify_msg_t));
             for (List<RequestedBufferInfo>::iterator j = i->buffers.begin();
                     j != i->buffers.end(); j++) {
-                bool dropFrame = false;
+                dropFrame = false;
                 QCamera3ProcessingChannel *channel = (QCamera3ProcessingChannel *)j->stream->priv;
                 uint32_t streamID = channel->getStreamID(channel->getStreamTypeMask());
                 if (p_cam_frame_drop) {
