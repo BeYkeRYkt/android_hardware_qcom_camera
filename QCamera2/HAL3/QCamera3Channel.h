@@ -528,6 +528,7 @@ public:
     virtual void putStreamBufs();
     virtual reprocess_type_t getReprocessType();
     virtual int32_t timeoutFrame(uint32_t frameNumber);
+    virtual uint32_t getStreamTypeMask();
 
     QCamera3Exif *getExifData(metadata_buffer_t *metadata,
             jpeg_settings_t *jpeg_settings);
