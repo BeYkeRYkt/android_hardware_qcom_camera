@@ -1360,9 +1360,13 @@ void QCamera3HardwareInterface::addToPPFeatureMask(int stream_format,
                     |= CAM_QTI_FEATURE_SW_TNR;
             LOGH("Added SW TNR to pp feature mask");
         } else if ((m_bIsVideo) && (feature_mask & CAM_QCOM_FEATURE_LLVD)) {
+          #ifdef _DRONE_
+            LOGH("not added llvd SeeMore to pp feature mask");
+          #else
             mStreamConfigInfo.postprocess_mask[stream_idx]
                     |= CAM_QCOM_FEATURE_LLVD;
             LOGH("Added LLVD SeeMore to pp feature mask");
+          #endif
         }
 
         if (feature_mask & CAM_QCOM_FEATURE_LCAC) {
