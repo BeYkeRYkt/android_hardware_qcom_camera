@@ -613,13 +613,15 @@ QCamera3HardwareInterface::~QCamera3HardwareInterface()
         if (mIsMainCamera == 1) {
             m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
+            m_pRelCamSyncBuf->sync_3a_config =
+                    {CAM_3A_SYNC_FOLLOW, CAM_3A_SYNC_FOLLOW};
             // related session id should be session id of linked session
             m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         } else {
             m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
+            m_pRelCamSyncBuf->sync_3a_config =
+                    {CAM_3A_SYNC_FOLLOW, CAM_3A_SYNC_FOLLOW};
             m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         }
         pthread_mutex_unlock(&gCamLock);
@@ -4489,6 +4491,11 @@ int32_t QCamera3HardwareInterface::captureQuadraCfaRawInternal(camera3_capture_r
     delete mMetadataChannel;
     mMetadataChannel = NULL;
 
+    LOGD("reset quadra cfa mode after capture done.");
+    bool enable = false;
+    ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_PARM_QUADRA_CFA, enable);
+    mCameraHandle->ops->set_parms(mCameraHandle->camera_handle, mParameters);
+
     mStreamInfo.clear();
     pthread_mutex_unlock(&mMutex);
     configureStreamsPerfLocked(&mStreamList);
@@ -5107,14 +5114,16 @@ int QCamera3HardwareInterface::processCaptureRequest(
             if (mIsMainCamera == 1) {
                 m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
                 m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-                m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
+                m_pRelCamSyncBuf->sync_3a_config =
+                        {CAM_3A_SYNC_FOLLOW, CAM_3A_SYNC_FOLLOW};
                 m_pRelCamSyncBuf->cam_role = CAM_ROLE_BAYER;
                 // related session id should be session id of linked session
                 m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
             } else {
                 m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
                 m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-                m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
+                m_pRelCamSyncBuf->sync_3a_config =
+                        {CAM_3A_SYNC_FOLLOW, CAM_3A_SYNC_FOLLOW};
                 m_pRelCamSyncBuf->cam_role = CAM_ROLE_MONO;
                 m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
             }
@@ -5971,13 +5980,15 @@ int QCamera3HardwareInterface::flush(bool restartChannels)
         if (mIsMainCamera == 1) {
             m_pRelCamSyncBuf->mode = CAM_MODE_PRIMARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_MAIN;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
+            m_pRelCamSyncBuf->sync_3a_config =
+                        {CAM_3A_SYNC_FOLLOW, CAM_3A_SYNC_FOLLOW};
             // related session id should be session id of linked session
             m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         } else {
             m_pRelCamSyncBuf->mode = CAM_MODE_SECONDARY;
             m_pRelCamSyncBuf->type = CAM_TYPE_AUX;
-            m_pRelCamSyncBuf->sync_3a_mode = CAM_3A_SYNC_FOLLOW;
+            m_pRelCamSyncBuf->sync_3a_config =
+                        {CAM_3A_SYNC_FOLLOW, CAM_3A_SYNC_FOLLOW};
             m_pRelCamSyncBuf->related_sensor_session_id = sessionId[mLinkedCameraId];
         }
         pthread_mutex_unlock(&gCamLock);
@@ -6316,6 +6327,10 @@ int32_t QCamera3HardwareInterface::getReprocessibleOutputStreamId(uint32_t &id)
                 LOGD("Found reprocessible output stream! %p", *it);
                 LOGD("input stream usage 0x%x, current stream usage 0x%x",
                          stream->usage, mInputStreamInfo.usage);
+                if (stream->usage & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER)) {
+                    LOGD("stream with HW_TEXTURE/HW_COMPOSER usage (preview stream), skip it.");
+                    continue;
+                }
 
                 QCamera3Channel *channel = (QCamera3Channel *)stream->priv;
                 if (channel != NULL && channel->mStreams[0]) {

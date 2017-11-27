@@ -4363,6 +4363,12 @@ int QCamera2HardwareInterface::autoFocus()
             // Force the cameras to stream for auto focus on both
             forceCameraWakeup();
         }
+        //Send dummy focus event if the active camera doesn't support AF.
+        if (isDualCamera() && !mParameters.isAutoFocusSupported(mActiveCameras)) {
+            mActiveAF = false;
+            rc = sendEvtNotify(CAMERA_MSG_FOCUS, true, 0);
+            break;
+        }
         LOGI("Send AUTO FOCUS event. focusMode=%d, m_currentFocusState=%d \
                 mActiveCameras %d, mMasterCamera %d",
                 focusMode, m_currentFocusState, mActiveCameras, mMasterCamera);
@@ -11909,6 +11915,8 @@ void QCamera2HardwareInterface::configureSnapshotSkip(bool skip)
                     }
                 }
             }
+            if (skip)
+                ((QCameraPicChannel *)pChannel)->flushSuperbuffer(mActiveCameras, 0);
         }
     }
 }
