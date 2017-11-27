@@ -959,6 +959,7 @@ public:
     inline uint32_t getBlurLevel() {return m_bBokehBlurLevel;};
     void setBokehSnaphot(bool enable);
     void getDepthMapSize(int &width, int &height);
+    bool isAutoFocusSupported(uint32_t cam_type);
 private:
     int32_t setPreviewSize(const QCameraParameters& );
     int32_t setVideoSize(const QCameraParameters& );
