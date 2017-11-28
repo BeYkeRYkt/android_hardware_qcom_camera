@@ -152,7 +152,6 @@ bool gHdrPlusClientOpening = false; // If HDR+ client is being opened.
 std::condition_variable gHdrPlusClientOpenCond; // Used to synchronize HDR+ client opening.
 bool gEaselProfilingEnabled = false; // If Easel profiling is enabled.
 bool gExposeEnableZslKey = false; // If HAL makes android.control.enableZsl available.
-bool gEnableMultipleHdrplusOutputs = false; // Whether to enable multiple output from Easel HDR+.
 
 // If Easel is in bypass only mode. If true, Easel HDR+ won't be enabled.
 bool gEaselBypassOnly;
@@ -511,6 +510,7 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
       mAecSkipDisplayFrameBound(0),
       mInstantAecFrameIdxCount(0),
       mLastRequestedLensShadingMapMode(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF),
+      mLastRequestedFaceDetectMode(ANDROID_STATISTICS_FACE_DETECT_MODE_OFF),
       mCurrFeatureState(0),
       mLdafCalibExist(false),
       mLastCustIntentFrmNum(-1),
@@ -523,10 +523,12 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
       m_pDualCamCmdPtr(NULL),
       mHdrPlusModeEnabled(false),
       mZslEnabled(false),
+      mEaselMipiStarted(false),
       mIsApInputUsedForHdrPlus(false),
       mFirstPreviewIntentSeen(false),
       m_bSensorHDREnabled(false),
-      mAfTrigger()
+      mAfTrigger(),
+      mSceneDistance(-1)
 {
     getLogLevel();
     mCommon.init(gCamCapability[cameraId]);
@@ -569,6 +571,7 @@ QCamera3HardwareInterface::QCamera3HardwareInterface(uint32_t cameraId,
     memset(mLdafCalib, 0, sizeof(mLdafCalib));
 
     memset(mEaselFwVersion, 0, sizeof(mEaselFwVersion));
+    mEaselFwUpdated = false;
 
     memset(prop, 0, sizeof(prop));
     property_get("persist.camera.tnr.preview", prop, "0");
@@ -634,6 +637,19 @@ QCamera3HardwareInterface::~QCamera3HardwareInterface()
     mPerfLockMgr.releasePerfLock(PERF_LOCK_POWERHINT_ENCODE);
     mPerfLockMgr.acquirePerfLock(PERF_LOCK_CLOSE_CAMERA);
 
+    // Close HDR+ client first before destroying HAL.
+    {
+        std::unique_lock<std::mutex> l(gHdrPlusClientLock);
+        finishHdrPlusClientOpeningLocked(l);
+        if (gHdrPlusClient != nullptr) {
+            // Disable HDR+ mode.
+            disableHdrPlusModeLocked();
+            // Disconnect Easel if it's connected.
+            gEaselManagerClient->closeHdrPlusClient(std::move(gHdrPlusClient));
+            gHdrPlusClient = nullptr;
+        }
+    }
+
     // unlink of dualcam during close camera
     if (mIsDeviceLinked) {
         cam_dual_camera_bundle_info_t *m_pRelCamSyncBuf =
@@ -692,9 +708,7 @@ QCamera3HardwareInterface::~QCamera3HardwareInterface()
         mMetadataChannel->stop();
     }
     if (mChannelHandle) {
-        mCameraHandle->ops->stop_channel(mCameraHandle->camera_handle,
-                mChannelHandle, /*stop_immediately*/false);
-        LOGD("stopping channel %d", mChannelHandle);
+        stopChannelLocked(/*stop_immediately*/false);
     }
 
     for (List<stream_info_t *>::iterator it = mStreamInfo.begin();
@@ -900,6 +914,7 @@ int QCamera3HardwareInterface::openCamera(struct hw_device_t **hw_device)
                 ALOGE("%s: Resuming Easel failed: %s (%d)", __FUNCTION__, strerror(-rc), rc);
                 return rc;
             }
+            mEaselFwUpdated = false;
         }
     }
 
@@ -1108,21 +1123,7 @@ int QCamera3HardwareInterface::closeCamera()
 
     {
         std::unique_lock<std::mutex> l(gHdrPlusClientLock);
-        finishHdrPlusClientOpeningLocked(l);
-        if (gHdrPlusClient != nullptr) {
-            // Disable HDR+ mode.
-            disableHdrPlusModeLocked();
-            // Disconnect Easel if it's connected.
-            gEaselManagerClient->closeHdrPlusClient(std::move(gHdrPlusClient));
-            gHdrPlusClient = nullptr;
-        }
-
         if (EaselManagerClientOpened) {
-            rc = gEaselManagerClient->stopMipi(mCameraId);
-            if (rc != 0) {
-                ALOGE("%s: Stopping MIPI failed: %s (%d)", __FUNCTION__, strerror(-rc), rc);
-            }
-
             rc = gEaselManagerClient->suspend();
             if (rc != 0) {
                 ALOGE("%s: Suspending Easel failed: %s (%d)", __FUNCTION__, strerror(-rc), rc);
@@ -1808,6 +1809,13 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
         return rc;
     }
 
+    // Disable HDR+ if it's enabled;
+    {
+        std::unique_lock<std::mutex> l(gHdrPlusClientLock);
+        finishHdrPlusClientOpeningLocked(l);
+        disableHdrPlusModeLocked();
+    }
+
     /* first invalidate all the steams in the mStreamList
      * if they appear again, they will be validated */
     for (List<stream_info_t*>::iterator it = mStreamInfo.begin();
@@ -1842,9 +1850,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
         mMetadataChannel->stop();
     }
     if (mChannelHandle) {
-        mCameraHandle->ops->stop_channel(mCameraHandle->camera_handle,
-                mChannelHandle, /*stop_immediately*/false);
-        LOGD("stopping channel %d", mChannelHandle);
+        stopChannelLocked(/*stop_immediately*/false);
     }
 
     pthread_mutex_lock(&mMutex);
@@ -2237,7 +2243,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
             stream_info->stream = newStream;
             stream_info->status = VALID;
             stream_info->channel = NULL;
-            stream_info->id = i;
+            stream_info->id = i; // ID will be re-assigned in cleanAndSortStreamInfo().
             mStreamInfo.push_back(stream_info);
         }
         /* Covers Opaque ZSL and API1 F/W ZSL */
@@ -3063,13 +3069,6 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
 
     mFirstPreviewIntentSeen = false;
 
-    // Disable HRD+ if it's enabled;
-    {
-        std::unique_lock<std::mutex> l(gHdrPlusClientLock);
-        finishHdrPlusClientOpeningLocked(l);
-        disableHdrPlusModeLocked();
-    }
-
     // Update state
     mState = CONFIGURED;
 
@@ -3735,9 +3734,10 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
                  i->frame_number, urgent_frame_number);
 
             if ((!i->input_buffer) && (!i->hdrplus) && (i->frame_number < urgent_frame_number) &&
-                (i->partial_result_cnt == 0)) {
+                    (i->partial_result_cnt == 0)) {
                 LOGE("Error: HAL missed urgent metadata for frame number %d",
                          i->frame_number);
+                i->partialResultDropped = true;
                 i->partial_result_cnt++;
             }
 
@@ -3836,7 +3836,13 @@ void QCamera3HardwareInterface::handleMetadataWithLock(
 
     for (auto & pendingRequest : mPendingRequestsList) {
         // Find the pending request with the frame number.
-        if (pendingRequest.frame_number == frame_number) {
+        if (pendingRequest.frame_number < frame_number) {
+            // Workaround for case where shutter is missing due to dropped
+            // metadata
+            if (!pendingRequest.hdrplus && (pendingRequest.input_buffer == nullptr)) {
+                mShutterDispatcher.markShutterReady(pendingRequest.frame_number, capture_time);
+            }
+        } else if (pendingRequest.frame_number == frame_number) {
             // Update the sensor timestamp.
             pendingRequest.timestamp = capture_time;
 
@@ -4227,6 +4233,34 @@ void QCamera3HardwareInterface::handleBufferWithLock(
     }
 }
 
+void QCamera3HardwareInterface::removeUnrequestedMetadata(pendingRequestIterator requestIter,
+        camera_metadata_t *resultMetadata) {
+    CameraMetadata metadata;
+    metadata.acquire(resultMetadata);
+
+    // Remove len shading map if it's not requested.
+    if (requestIter->requestedLensShadingMapMode == ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF &&
+            metadata.exists(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE) &&
+            metadata.find(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF).data.u8[0] !=
+            ANDROID_STATISTICS_FACE_DETECT_MODE_OFF) {
+        metadata.erase(ANDROID_STATISTICS_LENS_SHADING_MAP);
+        metadata.update(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE,
+            &requestIter->requestedLensShadingMapMode, 1);
+    }
+
+    // Remove face information if it's not requested.
+    if (requestIter->requestedFaceDetectMode == ANDROID_STATISTICS_FACE_DETECT_MODE_OFF &&
+            metadata.exists(ANDROID_STATISTICS_FACE_DETECT_MODE) &&
+            metadata.find(ANDROID_STATISTICS_FACE_DETECT_MODE).data.u8[0] !=
+            ANDROID_STATISTICS_FACE_DETECT_MODE_OFF) {
+        metadata.erase(ANDROID_STATISTICS_FACE_RECTANGLES);
+        metadata.update(ANDROID_STATISTICS_FACE_DETECT_MODE,
+                &requestIter->requestedFaceDetectMode, 1);
+    }
+
+    requestIter->resultMetadata = metadata.release();
+}
+
 void QCamera3HardwareInterface::handlePendingResultMetadataWithLock(uint32_t frameNumber,
         camera_metadata_t *resultMetadata)
 {
@@ -4269,15 +4303,8 @@ void QCamera3HardwareInterface::handlePendingResultMetadataWithLock(uint32_t fra
         }
     }
 
-    // Remove len shading map if it's not requested.
-    if (requestIter->requestedLensShadingMapMode == ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_OFF) {
-        CameraMetadata metadata;
-        metadata.acquire(resultMetadata);
-        metadata.erase(ANDROID_STATISTICS_LENS_SHADING_MAP);
-        metadata.update(ANDROID_STATISTICS_LENS_SHADING_MAP_MODE,
-            &requestIter->requestedLensShadingMapMode, 1);
-
-        requestIter->resultMetadata = metadata.release();
+    if (requestIter->input_buffer == nullptr) {
+        removeUnrequestedMetadata(requestIter, resultMetadata);
     }
 
     dispatchResultMetadataWithLock(frameNumber, liveRequest);
@@ -4301,6 +4328,7 @@ void QCamera3HardwareInterface::dispatchResultMetadataWithLock(uint32_t frameNum
         }
 
         bool thisLiveRequest = iter->hdrplus == false && iter->input_buffer == nullptr;
+        bool errorResult = false;
 
         camera3_capture_result_t result = {};
         result.frame_number = iter->frame_number;
@@ -4317,30 +4345,27 @@ void QCamera3HardwareInterface::dispatchResultMetadataWithLock(uint32_t frameNum
                 iter++;
                 continue;
             }
+            // Notify ERROR_RESULT if partial result was dropped.
+            errorResult = iter->partialResultDropped;
         } else if (iter->frame_number < frameNumber && isLiveRequest && thisLiveRequest) {
             // If the result metadata belongs to a live request, notify errors for previous pending
             // live requests.
             mPendingLiveRequest--;
 
-            CameraMetadata dummyMetadata;
-            dummyMetadata.update(ANDROID_REQUEST_ID, &(iter->request_id), 1);
-            result.result = dummyMetadata.release();
-
-            notifyError(iter->frame_number, CAMERA3_MSG_ERROR_RESULT);
-
-            // partial_result should be PARTIAL_RESULT_CNT in case of
-            // ERROR_RESULT.
-            iter->partial_result_cnt = PARTIAL_RESULT_COUNT;
-            result.partial_result = PARTIAL_RESULT_COUNT;
+            LOGE("Error: HAL missed metadata for frame number %d", iter->frame_number);
+            errorResult = true;
         } else {
             iter++;
             continue;
         }
 
-        result.output_buffers = nullptr;
-        result.num_output_buffers = 0;
-        orchestrateResult(&result);
-
+        if (errorResult) {
+            notifyError(iter->frame_number, CAMERA3_MSG_ERROR_RESULT);
+        } else {
+            result.output_buffers = nullptr;
+            result.num_output_buffers = 0;
+            orchestrateResult(&result);
+        }
         // For reprocessing, result metadata is the same as settings so do not free it here to
         // avoid double free.
         if (result.result != iter->settings) {
@@ -5440,6 +5465,11 @@ no_error:
         requestedLensShadingMapMode = mLastRequestedLensShadingMapMode;
     }
 
+    if (meta.exists(ANDROID_STATISTICS_FACE_DETECT_MODE)) {
+        mLastRequestedFaceDetectMode =
+                meta.find(ANDROID_STATISTICS_FACE_DETECT_MODE).data.u8[0];
+    }
+
     bool hdrPlusRequest = false;
     HdrPlusPendingRequest pendingHdrPlusRequest = {};
 
@@ -5479,12 +5509,14 @@ no_error:
             }
 
             {
-                // If HDR+ mode is enabled, override lens shading mode to ON so lens shading map
-                // will be reported in result metadata.
+                // If HDR+ mode is enabled, override the following modes so the necessary metadata
+                // will be included in the result metadata sent to Easel HDR+.
                 std::unique_lock<std::mutex> l(gHdrPlusClientLock);
                 if (mHdrPlusModeEnabled) {
                     ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_META_LENS_SHADING_MAP_MODE,
                         ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_ON);
+                    ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters, CAM_INTF_META_STATS_FACEDETECT_MODE,
+                        ANDROID_STATISTICS_FACE_DETECT_MODE_SIMPLE);
                 }
             }
         }
@@ -5548,6 +5580,7 @@ no_error:
     pendingRequest.blob_request = blob_request;
     pendingRequest.timestamp = 0;
     pendingRequest.requestedLensShadingMapMode = requestedLensShadingMapMode;
+    pendingRequest.requestedFaceDetectMode = mLastRequestedFaceDetectMode;
     if (request->input_buffer) {
         pendingRequest.input_buffer =
                 (camera3_stream_buffer_t*)malloc(sizeof(camera3_stream_buffer_t));
@@ -6075,42 +6108,9 @@ no_error:
                 }
 
                 // Configure modules for stream on.
-                rc = mCameraHandle->ops->start_channel(mCameraHandle->camera_handle,
-                        mChannelHandle, /*start_sensor_streaming*/false);
+                rc = startChannelLocked();
                 if (rc != NO_ERROR) {
-                    LOGE("start_channel failed %d", rc);
-                    pthread_mutex_unlock(&mMutex);
-                    return rc;
-                }
-
-                {
-                    // Configure Easel for stream on.
-                    std::unique_lock<std::mutex> l(gHdrPlusClientLock);
-
-                    // Now that sensor mode should have been selected, get the selected sensor mode
-                    // info.
-                    memset(&mSensorModeInfo, 0, sizeof(mSensorModeInfo));
-                    getCurrentSensorModeInfo(mSensorModeInfo);
-
-                    if (EaselManagerClientOpened) {
-                        logEaselEvent("EASEL_STARTUP_LATENCY", "Starting MIPI");
-                        rc = gEaselManagerClient->startMipi(mCameraId, mSensorModeInfo.op_pixel_clk,
-                                /*enableCapture*/true);
-                        if (rc != OK) {
-                            ALOGE("%s: Failed to start MIPI rate for camera %u to %u", __FUNCTION__,
-                                    mCameraId, mSensorModeInfo.op_pixel_clk);
-                            pthread_mutex_unlock(&mMutex);
-                            return rc;
-                        }
-                        logEaselEvent("EASEL_STARTUP_LATENCY", "Starting MIPI done");
-                    }
-                }
-
-                // Start sensor streaming.
-                rc = mCameraHandle->ops->start_sensor_streaming(mCameraHandle->camera_handle,
-                        mChannelHandle);
-                if (rc != NO_ERROR) {
-                    LOGE("start_sensor_stream_on failed %d", rc);
+                    LOGE("startChannelLocked failed %d", rc);
                     pthread_mutex_unlock(&mMutex);
                     return rc;
                 }
@@ -6118,14 +6118,16 @@ no_error:
         }
     }
 
-    // Enable HDR+ mode for the first PREVIEW_INTENT request.
+    // Enable HDR+ mode for the first PREVIEW_INTENT request that doesn't disable HDR+.
     {
         std::unique_lock<std::mutex> l(gHdrPlusClientLock);
         if (gEaselManagerClient != nullptr && gEaselManagerClient->isEaselPresentOnDevice() &&
                 !gEaselBypassOnly && !mFirstPreviewIntentSeen &&
                 meta.exists(ANDROID_CONTROL_CAPTURE_INTENT) &&
                 meta.find(ANDROID_CONTROL_CAPTURE_INTENT).data.u8[0] ==
-                ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW) {
+                ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW &&
+                meta.exists(NEXUS_EXPERIMENTAL_2017_DISABLE_HDRPLUS) &&
+                meta.find(NEXUS_EXPERIMENTAL_2017_DISABLE_HDRPLUS).data.i32[0] == 0) {
 
             if (isSessionHdrPlusModeCompatible()) {
                 rc = enableHdrPlusModeLocked();
@@ -6190,6 +6192,70 @@ no_error:
     pthread_mutex_unlock(&mMutex);
 
     return rc;
+}
+
+int32_t QCamera3HardwareInterface::startChannelLocked()
+{
+    // Configure modules for stream on.
+    int32_t rc = mCameraHandle->ops->start_channel(mCameraHandle->camera_handle,
+            mChannelHandle, /*start_sensor_streaming*/false);
+    if (rc != NO_ERROR) {
+        LOGE("start_channel failed %d", rc);
+        return rc;
+    }
+
+    {
+        // Configure Easel for stream on.
+        std::unique_lock<std::mutex> l(gHdrPlusClientLock);
+        if (EaselManagerClientOpened) {
+            // Now that sensor mode should have been selected, get the selected sensor mode
+            // info.
+            memset(&mSensorModeInfo, 0, sizeof(mSensorModeInfo));
+            rc = getCurrentSensorModeInfo(mSensorModeInfo);
+            if (rc != NO_ERROR) {
+                ALOGE("%s: Get current sensor mode failed, bail out: %s (%d).", __FUNCTION__,
+                        strerror(-rc), rc);
+                return rc;
+            }
+            logEaselEvent("EASEL_STARTUP_LATENCY", "Starting MIPI");
+            rc = gEaselManagerClient->startMipi(mCameraId, mSensorModeInfo.op_pixel_clk,
+                    /*enableCapture*/true);
+            if (rc != OK) {
+                ALOGE("%s: Failed to start MIPI rate for camera %u to %u", __FUNCTION__,
+                        mCameraId, mSensorModeInfo.op_pixel_clk);
+                return rc;
+            }
+            logEaselEvent("EASEL_STARTUP_LATENCY", "Starting MIPI done");
+            mEaselMipiStarted = true;
+        }
+    }
+
+    // Start sensor streaming.
+    rc = mCameraHandle->ops->start_sensor_streaming(mCameraHandle->camera_handle,
+            mChannelHandle);
+    if (rc != NO_ERROR) {
+        LOGE("start_sensor_stream_on failed %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+void QCamera3HardwareInterface::stopChannelLocked(bool stopChannelImmediately)
+{
+    mCameraHandle->ops->stop_channel(mCameraHandle->camera_handle,
+            mChannelHandle, stopChannelImmediately);
+
+    {
+        std::unique_lock<std::mutex> l(gHdrPlusClientLock);
+        if (EaselManagerClientOpened && mEaselMipiStarted) {
+            int32_t rc = gEaselManagerClient->stopMipi(mCameraId);
+            if (rc != 0) {
+                ALOGE("%s: Stopping MIPI failed: %s (%d)", __FUNCTION__, strerror(-rc), rc);
+            }
+            mEaselMipiStarted = false;
+        }
+    }
 }
 
 /*===========================================================================
@@ -6278,6 +6344,13 @@ int QCamera3HardwareInterface::flush(bool restartChannels, bool stopChannelImmed
     mFlush = true;
     pthread_mutex_unlock(&mMutex);
 
+    // Disable HDR+ if it's enabled;
+    {
+        std::unique_lock<std::mutex> l(gHdrPlusClientLock);
+        finishHdrPlusClientOpeningLocked(l);
+        disableHdrPlusModeLocked();
+    }
+
     rc = stopAllChannels();
     // unlink of dualcam
     if (mIsDeviceLinked) {
@@ -6314,8 +6387,7 @@ int QCamera3HardwareInterface::flush(bool restartChannels, bool stopChannelImmed
         return rc;
     }
     if (mChannelHandle) {
-        mCameraHandle->ops->stop_channel(mCameraHandle->camera_handle,
-                mChannelHandle, stopChannelImmediately);
+        stopChannelLocked(stopChannelImmediately);
     }
 
     // Reset bundle info
@@ -6350,10 +6422,10 @@ int QCamera3HardwareInterface::flush(bool restartChannels, bool stopChannelImmed
             return rc;
         }
         if (mChannelHandle) {
-            mCameraHandle->ops->start_channel(mCameraHandle->camera_handle,
-                        mChannelHandle, /*start_sensor_streaming*/true);
+            // Configure modules for stream on.
+            rc = startChannelLocked();
             if (rc < 0) {
-                LOGE("start_channel failed");
+                LOGE("startChannelLocked failed");
                 pthread_mutex_unlock(&mMutex);
                 return rc;
             }
@@ -6760,12 +6832,12 @@ QCamera3HardwareInterface::translateFromHalMetadata(
             camMetadata.update(DEVCAMDEBUG_AF_LENS_POSITION, &fwk_DevCamDebug_af_lens_position, 1);
         }
         IF_META_AVAILABLE(int32_t, DevCamDebug_af_tof_confidence,
-                CAM_INTF_META_DEV_CAM_AF_TOF_CONFIDENCE, metadata) {
+                CAM_INTF_META_AF_TOF_CONFIDENCE, metadata) {
             int32_t fwk_DevCamDebug_af_tof_confidence = *DevCamDebug_af_tof_confidence;
             camMetadata.update(DEVCAMDEBUG_AF_TOF_CONFIDENCE, &fwk_DevCamDebug_af_tof_confidence, 1);
         }
         IF_META_AVAILABLE(int32_t, DevCamDebug_af_tof_distance,
-                CAM_INTF_META_DEV_CAM_AF_TOF_DISTANCE, metadata) {
+                CAM_INTF_META_AF_TOF_DISTANCE, metadata) {
             int32_t fwk_DevCamDebug_af_tof_distance = *DevCamDebug_af_tof_distance;
             camMetadata.update(DEVCAMDEBUG_AF_TOF_DISTANCE, &fwk_DevCamDebug_af_tof_distance, 1);
         }
@@ -8168,16 +8240,10 @@ QCamera3HardwareInterface::translateFromHalMetadata(
 
     // OIS Data
     IF_META_AVAILABLE(cam_frame_ois_info_t, frame_ois_data, CAM_INTF_META_FRAME_OIS_DATA, metadata) {
-        camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_FRAME_TIMESTAMP_VSYNC,
-            &(frame_ois_data->frame_sof_timestamp_vsync), 1);
         camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_FRAME_TIMESTAMP_BOOTTIME,
             &(frame_ois_data->frame_sof_timestamp_boottime), 1);
         camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_TIMESTAMPS_BOOTTIME,
             frame_ois_data->ois_sample_timestamp_boottime, frame_ois_data->num_ois_sample);
-        camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_X,
-            frame_ois_data->ois_sample_shift_x, frame_ois_data->num_ois_sample);
-        camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_Y,
-            frame_ois_data->ois_sample_shift_y, frame_ois_data->num_ois_sample);
         camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_PIXEL_X,
             frame_ois_data->ois_sample_shift_pixel_x, frame_ois_data->num_ois_sample);
         camMetadata.update(NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_PIXEL_Y,
@@ -8469,6 +8535,24 @@ QCamera3HardwareInterface::translateCbUrgentMetadataToResultMetadata
             }
         }
     }
+
+    IF_META_AVAILABLE(int32_t, af_tof_confidence,
+            CAM_INTF_META_AF_TOF_CONFIDENCE, metadata) {
+        IF_META_AVAILABLE(int32_t, af_tof_distance,
+                CAM_INTF_META_AF_TOF_DISTANCE, metadata) {
+            int32_t fwk_af_tof_confidence = *af_tof_confidence;
+            int32_t fwk_af_tof_distance = *af_tof_distance;
+            if (fwk_af_tof_confidence == 1) {
+                mSceneDistance = fwk_af_tof_distance;
+            } else {
+                mSceneDistance = -1;
+            }
+            LOGD("tof_distance %d, tof_confidence %d, mSceneDistance %d",
+                     fwk_af_tof_distance, fwk_af_tof_confidence, mSceneDistance);
+        }
+    }
+    camMetadata.update(NEXUS_EXPERIMENTAL_2017_SCENE_DISTANCE, &mSceneDistance, 1);
+
     resultMetadata = camMetadata.release();
     return resultMetadata;
 }
@@ -8628,6 +8712,13 @@ void QCamera3HardwareInterface::cleanAndSortStreamInfo()
     }
 
     mStreamInfo = newStreamInfo;
+
+    // Make sure that stream IDs are unique.
+    uint32_t id = 0;
+    for (auto streamInfo : mStreamInfo) {
+        streamInfo->id = id++;
+    }
+
 }
 
 /*===========================================================================
@@ -9312,6 +9403,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     bool limitedDevice = false;
     char prop[PROPERTY_VALUE_MAX];
     bool supportBurst = false;
+    Vector<int32_t> available_characteristics_keys;
 
     supportBurst = supportBurstCapture(cameraId);
 
@@ -9464,6 +9556,9 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
     }
     staticInfo.update(NEXUS_EXPERIMENTAL_2017_HISTOGRAM_SUPPORTED_BINS,
             histBins.data(), histBins.size());
+    if (!histBins.empty()) {
+        available_characteristics_keys.add(NEXUS_EXPERIMENTAL_2017_HISTOGRAM_SUPPORTED_BINS);
+    }
 
     int32_t sharpness_map_size[] = {
             gCamCapability[cameraId]->sharpness_map_size.width,
@@ -9517,6 +9612,23 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         int32_t pd_dimensions [] = {depthWidth, depthHeight, depthStride};
         staticInfo.update(NEXUS_EXPERIMENTAL_2017_PD_DATA_DIMENSIONS,
                 pd_dimensions, sizeof(pd_dimensions) / sizeof(pd_dimensions[0]));
+        available_characteristics_keys.add(NEXUS_EXPERIMENTAL_2017_PD_DATA_DIMENSIONS);
+
+        staticInfo.update(NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_RIGHT_GAINS,
+                reinterpret_cast<uint8_t *>(gCamCapability[cameraId]->pdaf_cal.right_gain_map),
+                sizeof(gCamCapability[cameraId]->pdaf_cal.right_gain_map));
+        available_characteristics_keys.add(NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_RIGHT_GAINS);
+
+        staticInfo.update(NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_LEFT_GAINS,
+                reinterpret_cast<uint8_t *>(gCamCapability[cameraId]->pdaf_cal.left_gain_map),
+                sizeof(gCamCapability[cameraId]->pdaf_cal.left_gain_map));
+        available_characteristics_keys.add(NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_LEFT_GAINS);
+
+        staticInfo.update(NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_CONV_COEFF,
+                reinterpret_cast<uint8_t *>(gCamCapability[cameraId]->pdaf_cal.conversion_coeff),
+                sizeof(gCamCapability[cameraId]->pdaf_cal.conversion_coeff));
+        available_characteristics_keys.add(NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_CONV_COEFF);
+
     }
 
     int32_t scalar_formats[] = {
@@ -10257,6 +10369,23 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
        ANDROID_STATISTICS_LENS_SHADING_MAP_MODE, ANDROID_TONEMAP_CURVE_BLUE,
        ANDROID_TONEMAP_CURVE_GREEN, ANDROID_TONEMAP_CURVE_RED, ANDROID_TONEMAP_MODE,
        ANDROID_BLACK_LEVEL_LOCK, NEXUS_EXPERIMENTAL_2016_HYBRID_AE_ENABLE,
+       QCAMERA3_PRIVATEDATA_REPROCESS, QCAMERA3_CDS_MODE, QCAMERA3_CDS_INFO,
+       QCAMERA3_CROP_COUNT_REPROCESS, QCAMERA3_CROP_REPROCESS,
+       QCAMERA3_CROP_ROI_MAP_REPROCESS, QCAMERA3_TEMPORAL_DENOISE_ENABLE,
+       QCAMERA3_TEMPORAL_DENOISE_PROCESS_TYPE, QCAMERA3_USE_ISO_EXP_PRIORITY,
+       QCAMERA3_SELECT_PRIORITY, QCAMERA3_USE_SATURATION,
+       QCAMERA3_EXPOSURE_METER, QCAMERA3_USE_AV_TIMER,
+       QCAMERA3_DUALCAM_LINK_ENABLE, QCAMERA3_DUALCAM_LINK_IS_MAIN,
+       QCAMERA3_DUALCAM_LINK_RELATED_CAMERA_ID,
+       QCAMERA3_HAL_PRIVATEDATA_REPROCESS_FLAGS,
+       QCAMERA3_HAL_PRIVATEDATA_REPROCESS_DATA_BLOB,
+       QCAMERA3_HAL_PRIVATEDATA_EXIF_DEBUG_DATA_BLOB,
+       QCAMERA3_JPEG_ENCODE_CROP_ENABLE, QCAMERA3_JPEG_ENCODE_CROP_RECT,
+       QCAMERA3_JPEG_ENCODE_CROP_ROI, QCAMERA3_VIDEO_HDR_MODE,
+       QCAMERA3_IR_MODE, QCAMERA3_AEC_CONVERGENCE_SPEED,
+       QCAMERA3_AWB_CONVERGENCE_SPEED, QCAMERA3_INSTANT_AEC_MODE,
+       QCAMERA3_SHARPNESS_STRENGTH, QCAMERA3_HISTOGRAM_MODE,
+       QCAMERA3_BINNING_CORRECTION_MODE,
        /* DevCamDebug metadata request_keys_basic */
        DEVCAMDEBUG_META_ENABLE,
        /* DevCamDebug metadata end */
@@ -10265,6 +10394,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
        TANGO_MODE_DATA_SENSOR_FULLFOV,
        NEXUS_EXPERIMENTAL_2017_TRACKING_AF_TRIGGER,
        NEXUS_EXPERIMENTAL_2017_PD_DATA_ENABLE,
+       NEXUS_EXPERIMENTAL_2017_EXIF_MAKERNOTE
        };
 
     size_t request_keys_cnt =
@@ -10312,6 +10442,24 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
 #endif
        NEXUS_EXPERIMENTAL_2016_HYBRID_AE_ENABLE,
        NEXUS_EXPERIMENTAL_2016_AF_SCENE_CHANGE,
+       QCAMERA3_PRIVATEDATA_REPROCESS, QCAMERA3_CDS_MODE, QCAMERA3_CDS_INFO,
+       QCAMERA3_CROP_COUNT_REPROCESS, QCAMERA3_CROP_REPROCESS,
+       QCAMERA3_CROP_ROI_MAP_REPROCESS, QCAMERA3_TUNING_META_DATA_BLOB,
+       QCAMERA3_TEMPORAL_DENOISE_ENABLE, QCAMERA3_TEMPORAL_DENOISE_PROCESS_TYPE,
+       QCAMERA3_EXPOSURE_METER, QCAMERA3_SENSOR_DYNAMIC_BLACK_LEVEL_PATTERN,
+       QCAMERA3_DUALCAM_LINK_ENABLE, QCAMERA3_DUALCAM_LINK_IS_MAIN,
+       QCAMERA3_DUALCAM_LINK_RELATED_CAMERA_ID,
+       QCAMERA3_HAL_PRIVATEDATA_REPROCESS_FLAGS,
+       QCAMERA3_HAL_PRIVATEDATA_REPROCESS_DATA_BLOB,
+       QCAMERA3_HAL_PRIVATEDATA_EXIF_DEBUG_DATA_BLOB, QCAMERA3_VIDEO_HDR_MODE,
+       QCAMERA3_IR_MODE, QCAMERA3_AEC_CONVERGENCE_SPEED,
+       QCAMERA3_AWB_CONVERGENCE_SPEED, QCAMERA3_INSTANT_AEC_MODE,
+       QCAMERA3_HISTOGRAM_MODE, QCAMERA3_BINNING_CORRECTION_MODE,
+       QCAMERA3_STATS_IS_HDR_SCENE, QCAMERA3_STATS_IS_HDR_SCENE_CONFIDENCE,
+       QCAMERA3_STATS_BLINK_DETECTED, QCAMERA3_STATS_BLINK_DEGREE,
+       QCAMERA3_STATS_SMILE_DEGREE, QCAMERA3_STATS_SMILE_CONFIDENCE,
+       QCAMERA3_STATS_GAZE_ANGLE, QCAMERA3_STATS_GAZE_DIRECTION,
+       QCAMERA3_STATS_GAZE_DEGREE,
        // DevCamDebug metadata result_keys_basic
        DEVCAMDEBUG_META_ENABLE,
        // DevCamDebug metadata result_keys AF
@@ -10380,7 +10528,16 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM_BINS,
        NEXUS_EXPERIMENTAL_2017_HISTOGRAM,
        NEXUS_EXPERIMENTAL_2017_AF_REGIONS_CONFIDENCE,
+       NEXUS_EXPERIMENTAL_2017_TRACKING_AF_TRIGGER,
        NEXUS_EXPERIMENTAL_2017_EXP_TIME_BOOST,
+       NEXUS_EXPERIMENTAL_2017_SCENE_DISTANCE,
+       NEXUS_EXPERIMENTAL_2017_OIS_FRAME_TIMESTAMP_VSYNC,
+       NEXUS_EXPERIMENTAL_2017_OIS_FRAME_TIMESTAMP_BOOTTIME,
+       NEXUS_EXPERIMENTAL_2017_OIS_TIMESTAMPS_BOOTTIME,
+       NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_X,
+       NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_Y,
+       NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_PIXEL_X,
+       NEXUS_EXPERIMENTAL_2017_OIS_SHIFT_PIXEL_Y
        };
 
     size_t result_keys_cnt =
@@ -10404,7 +10561,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         available_result_keys.add(ANDROID_STATISTICS_FACE_LANDMARKS);
     }
 #ifndef USE_HAL_3_3
-    if (hasBlackRegions) {
+    {
         available_result_keys.add(ANDROID_SENSOR_DYNAMIC_BLACK_LEVEL);
         available_result_keys.add(ANDROID_SENSOR_DYNAMIC_WHITE_LEVEL);
     }
@@ -10478,9 +10635,14 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
        ANDROID_SENSOR_OPAQUE_RAW_SIZE,
        ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE,
 #endif
+       QCAMERA3_OPAQUE_RAW_FORMAT, QCAMERA3_EXP_TIME_RANGE,
+       QCAMERA3_SATURATION_RANGE, QCAMERA3_SENSOR_IS_MONO_ONLY,
+       QCAMERA3_DUALCAM_CALIB_META_DATA_BLOB,
+       QCAMERA3_SHARPNESS_RANGE,
+       QCAMERA3_HISTOGRAM_BUCKETS, QCAMERA3_HISTOGRAM_MAX_COUNT,
+       QCAMERA3_STATS_BSGC_AVAILABLE
        };
 
-    Vector<int32_t> available_characteristics_keys;
     available_characteristics_keys.appendArray(characteristics_keys_basic,
             sizeof(characteristics_keys_basic)/sizeof(int32_t));
 #ifndef USE_HAL_3_3
@@ -10500,10 +10662,6 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         available_characteristics_keys.appendArray(depthKeys,
                 sizeof(depthKeys) / sizeof(depthKeys[0]));
     }
-
-    staticInfo.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
-                      available_characteristics_keys.array(),
-                      available_characteristics_keys.size());
 
     /*available stall durations depend on the hw + sw and will be different for different devices */
     /*have to add for raw after implementation*/
@@ -10573,8 +10731,12 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
             &gCamCapability[cameraId]->padding_info, &buf_planes);
         strides.add(buf_planes.plane_info.mp[0].stride);
     }
-    staticInfo.update(QCAMERA3_OPAQUE_RAW_STRIDES, strides.array(),
-            strides.size());
+
+    if (!strides.isEmpty()) {
+        staticInfo.update(QCAMERA3_OPAQUE_RAW_STRIDES, strides.array(),
+                strides.size());
+        available_characteristics_keys.add(QCAMERA3_OPAQUE_RAW_STRIDES);
+    }
 
     //TBD: remove the following line once backend advertises zzHDR in feature mask
     gCamCapability[cameraId]->qcom_supported_feature_mask |= CAM_QCOM_FEATURE_ZIGZAG_HDR;
@@ -10589,6 +10751,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         size_t vhdr_mode_count = sizeof(vhdr_mode) / sizeof(int32_t);
         staticInfo.update(QCAMERA3_AVAILABLE_VIDEO_HDR_MODES,
                     vhdr_mode, vhdr_mode_count);
+        available_characteristics_keys.add(QCAMERA3_AVAILABLE_VIDEO_HDR_MODES);
     }
 
     staticInfo.update(QCAMERA3_DUALCAM_CALIB_META_DATA_BLOB,
@@ -10644,6 +10807,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
         staticInfo.update(QCAMERA3_IR_AVAILABLE_MODES,
                 avail_ir_modes, size);
+        available_characteristics_keys.add(QCAMERA3_IR_AVAILABLE_MODES);
     }
 
     if (gCamCapability[cameraId]->supported_instant_aec_modes_cnt > 0) {
@@ -10661,6 +10825,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
         staticInfo.update(QCAMERA3_INSTANT_AEC_AVAILABLE_MODES,
                 available_instant_aec_modes, size);
+        available_characteristics_keys.add(QCAMERA3_INSTANT_AEC_AVAILABLE_MODES);
     }
 
     int32_t sharpness_range[] = {
@@ -10684,6 +10849,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
         staticInfo.update(QCAMERA3_AVAILABLE_BINNING_CORRECTION_MODES,
                 avail_binning_modes, size);
+        available_characteristics_keys.add(QCAMERA3_AVAILABLE_BINNING_CORRECTION_MODES);
     }
 
     if (gCamCapability[cameraId]->supported_aec_modes_cnt > 0) {
@@ -10698,6 +10864,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
         staticInfo.update(QCAMERA3_EXPOSURE_METER_AVAILABLE_MODES,
                 available_aec_modes, size);
+        available_characteristics_keys.add(QCAMERA3_EXPOSURE_METER_AVAILABLE_MODES);
     }
 
     if (gCamCapability[cameraId]->supported_iso_modes_cnt > 0) {
@@ -10712,6 +10879,7 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
         staticInfo.update(QCAMERA3_ISO_AVAILABLE_MODES,
                 available_iso_modes, size);
+        available_characteristics_keys.add(QCAMERA3_ISO_AVAILABLE_MODES);
     }
 
     int64_t available_exp_time_range[EXPOSURE_TIME_RANGE_CNT];
@@ -10755,7 +10923,12 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
         }
         staticInfo.update(NEXUS_EXPERIMENTAL_2017_EEPROM_VERSION_INFO,
                 gCamCapability[cameraId]->eeprom_version_info, eepromLength);
+        available_characteristics_keys.add(NEXUS_EXPERIMENTAL_2017_EEPROM_VERSION_INFO);
     }
+
+    staticInfo.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS,
+                      available_characteristics_keys.array(),
+                      available_characteristics_keys.size());
 
     gStaticMetadata[cameraId] = staticInfo.release();
     return rc;
@@ -11004,10 +11177,8 @@ int QCamera3HardwareInterface::initHdrPlusClientLocked() {
             ALOGE("%s: Suspending Easel failed: %s (%d)", __FUNCTION__, strerror(-res), res);
         }
 
-        gEaselBypassOnly = !property_get_bool("persist.camera.hdrplus.enable", true);
+        gEaselBypassOnly = !property_get_bool("persist.camera.hdrplus.enable", false);
         gEaselProfilingEnabled = property_get_bool("persist.camera.hdrplus.profiling", false);
-        gEnableMultipleHdrplusOutputs =
-                property_get_bool("persist.camera.hdrplus.multiple_outputs", false);
 
         // Expose enableZsl key only when HDR+ mode is enabled.
         gExposeEnableZslKey = !gEaselBypassOnly;
@@ -11560,8 +11731,10 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
         settings.update(NEXUS_EXPERIMENTAL_2017_POSTVIEW, &postview, 1);
         int32_t continuousZslCapture = 0;
         settings.update(NEXUS_EXPERIMENTAL_2017_CONTINUOUS_ZSL_CAPTURE, &continuousZslCapture, 1);
-        // Disable HDR+ for templates other than CAMERA3_TEMPLATE_STILL_CAPTURE.
-        int32_t disableHdrplus = (type == CAMERA3_TEMPLATE_STILL_CAPTURE) ? 0 : 1;
+        // Disable HDR+ for templates other than CAMERA3_TEMPLATE_STILL_CAPTURE and
+        // CAMERA3_TEMPLATE_PREVIEW.
+        int32_t disableHdrplus = (type == CAMERA3_TEMPLATE_STILL_CAPTURE ||
+                                  type == CAMERA3_TEMPLATE_PREVIEW) ? 0 : 1;
         settings.update(NEXUS_EXPERIMENTAL_2017_DISABLE_HDRPLUS, &disableHdrplus, 1);
 
         // Set hybrid_ae tag in PREVIEW and STILL_CAPTURE templates to 1 so that
@@ -12299,6 +12472,8 @@ int QCamera3HardwareInterface::translateFwkMetadataToHalMetadata(
                     rc = BAD_VALUE;
                 }
             }
+        } else {
+            LOGE("Fatal: Missing ANDROID_CONTROL_AF_MODE");
         }
     } else {
         uint8_t focusMode = (uint8_t)CAM_FOCUS_MODE_INFINITY;
@@ -14094,22 +14269,15 @@ const uint32_t *QCamera3HardwareInterface::getLdafCalib()
 * PARAMETERS : None
 *
 * RETURN     : string describing Firmware version
-*              "\0" if Easel manager client is not open
+*              "\0" if version is not up to date
 *==========================================================================*/
 const char *QCamera3HardwareInterface::getEaselFwVersion()
 {
-    int rc = NO_ERROR;
-
-    std::unique_lock<std::mutex> l(gHdrPlusClientLock);
-    ALOGD("%s: Querying Easel firmware version", __FUNCTION__);
-    if (EaselManagerClientOpened) {
-        rc = gEaselManagerClient->getFwVersion(mEaselFwVersion);
-        if (rc != OK)
-            ALOGD("%s: Failed to query Easel firmware version", __FUNCTION__);
-        else
-            return (const char *)&mEaselFwVersion[0];
+    if (mEaselFwUpdated) {
+        return (const char *)&mEaselFwVersion[0];
+    } else {
+        return NULL;
     }
-    return NULL;
 }
 
 /*===========================================================================
@@ -14744,29 +14912,41 @@ void QCamera3HardwareInterface::updateHdrPlusResultMetadata(
 
     IF_META_AVAILABLE(double, gps_coords, CAM_INTF_META_JPEG_GPS_COORDINATES, settings) {
         resultMetadata.update(ANDROID_JPEG_GPS_COORDINATES, gps_coords, 3);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_GPS_COORDINATES);
     }
 
     IF_META_AVAILABLE(uint8_t, gps_methods, CAM_INTF_META_JPEG_GPS_PROC_METHODS, settings) {
         String8 str((const char *)gps_methods);
         resultMetadata.update(ANDROID_JPEG_GPS_PROCESSING_METHOD, str);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_GPS_PROCESSING_METHOD);
     }
 
     IF_META_AVAILABLE(int64_t, gps_timestamp, CAM_INTF_META_JPEG_GPS_TIMESTAMP, settings) {
         resultMetadata.update(ANDROID_JPEG_GPS_TIMESTAMP, gps_timestamp, 1);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_GPS_TIMESTAMP);
     }
 
     IF_META_AVAILABLE(int32_t, jpeg_orientation, CAM_INTF_META_JPEG_ORIENTATION, settings) {
         resultMetadata.update(ANDROID_JPEG_ORIENTATION, jpeg_orientation, 1);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_ORIENTATION);
     }
 
     IF_META_AVAILABLE(uint32_t, jpeg_quality, CAM_INTF_META_JPEG_QUALITY, settings) {
         uint8_t fwk_jpeg_quality = static_cast<uint8_t>(*jpeg_quality);
         resultMetadata.update(ANDROID_JPEG_QUALITY, &fwk_jpeg_quality, 1);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_QUALITY);
     }
 
     IF_META_AVAILABLE(uint32_t, thumb_quality, CAM_INTF_META_JPEG_THUMB_QUALITY, settings) {
         uint8_t fwk_thumb_quality = static_cast<uint8_t>(*thumb_quality);
         resultMetadata.update(ANDROID_JPEG_THUMBNAIL_QUALITY, &fwk_thumb_quality, 1);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_THUMBNAIL_QUALITY);
     }
 
     IF_META_AVAILABLE(cam_dimension_t, thumb_size, CAM_INTF_META_JPEG_THUMB_SIZE, settings) {
@@ -14774,11 +14954,15 @@ void QCamera3HardwareInterface::updateHdrPlusResultMetadata(
         fwk_thumb_size[0] = thumb_size->width;
         fwk_thumb_size[1] = thumb_size->height;
         resultMetadata.update(ANDROID_JPEG_THUMBNAIL_SIZE, fwk_thumb_size, 2);
+    } else {
+        resultMetadata.erase(ANDROID_JPEG_THUMBNAIL_SIZE);
     }
 
     IF_META_AVAILABLE(uint32_t, intent, CAM_INTF_META_CAPTURE_INTENT, settings) {
         uint8_t fwk_intent = intent[0];
         resultMetadata.update(ANDROID_CONTROL_CAPTURE_INTENT, &fwk_intent, 1);
+    } else {
+        resultMetadata.erase(ANDROID_CONTROL_CAPTURE_INTENT);
     }
 }
 
@@ -14840,6 +15024,13 @@ bool QCamera3HardwareInterface::isRequestHdrPlusCompatible(
         return false;
     }
 
+    // TODO (b/66500626): support AE compensation.
+    if (!metadata.exists(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION) ||
+            metadata.find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION).data.i32[0] != 0) {
+        ALOGV("%s: ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION is not 0.", __FUNCTION__);
+        return false;
+    }
+
     // TODO (b/32585046): support non-ZSL.
     if (!metadata.exists(ANDROID_CONTROL_ENABLE_ZSL) ||
          metadata.find(ANDROID_CONTROL_ENABLE_ZSL).data.u8[0] != ANDROID_CONTROL_ENABLE_ZSL_TRUE) {
@@ -14854,47 +15045,16 @@ bool QCamera3HardwareInterface::isRequestHdrPlusCompatible(
         return false;
     }
 
-    // TODO (b/36492953): support digital zoom.
-    if (!metadata.exists(ANDROID_SCALER_CROP_REGION) ||
-         metadata.find(ANDROID_SCALER_CROP_REGION).data.i32[0] != 0 ||
-         metadata.find(ANDROID_SCALER_CROP_REGION).data.i32[1] != 0 ||
-         metadata.find(ANDROID_SCALER_CROP_REGION).data.i32[2] !=
-                gCamCapability[mCameraId]->active_array_size.width ||
-         metadata.find(ANDROID_SCALER_CROP_REGION).data.i32[3] !=
-                gCamCapability[mCameraId]->active_array_size.height) {
-        ALOGV("%s: ANDROID_SCALER_CROP_REGION is not the same as active array region.",
-                __FUNCTION__);
-        return false;
-    }
-
     if (!metadata.exists(ANDROID_TONEMAP_MODE) ||
          metadata.find(ANDROID_TONEMAP_MODE).data.u8[0] != ANDROID_TONEMAP_MODE_HIGH_QUALITY) {
         ALOGV("%s: ANDROID_TONEMAP_MODE is not HQ.", __FUNCTION__);
         return false;
     }
 
-
-    // TODO (b/36693254, b/36690506): support other outputs.
-    if (!gEnableMultipleHdrplusOutputs && request.num_output_buffers != 1) {
-        ALOGV("%s: Only support 1 output: %d", __FUNCTION__, request.num_output_buffers);
-        return false;
-    }
-
     switch (request.output_buffers[0].stream->format) {
         case HAL_PIXEL_FORMAT_BLOB:
-            break;
         case HAL_PIXEL_FORMAT_YCbCr_420_888:
         case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
-            // TODO (b/36693254): Only support full size.
-            if (!gEnableMultipleHdrplusOutputs) {
-                if (static_cast<int>(request.output_buffers[0].stream->width) !=
-                        gCamCapability[mCameraId]->picture_sizes_tbl[0].width ||
-                    static_cast<int>(request.output_buffers[0].stream->height) !=
-                        gCamCapability[mCameraId]->picture_sizes_tbl[0].height) {
-                    ALOGV("%s: Only full size is supported.", __FUNCTION__);
-                    return false;
-                }
-            }
             break;
         default:
             ALOGV("%s: Not an HDR+ request: Only Jpeg and YUV output is supported.", __FUNCTION__);
@@ -15145,6 +15305,8 @@ status_t QCamera3HardwareInterface::configureHdrPlusStreamsLocked()
     inputConfig.sensorMode.activeArrayHeight = mSensorModeInfo.active_array_size.height;
     inputConfig.sensorMode.outputPixelClkHz = mSensorModeInfo.op_pixel_clk;
     inputConfig.sensorMode.timestampOffsetNs = mSensorModeInfo.timestamp_offset;
+    inputConfig.sensorMode.timestampCropOffsetNs = mSensorModeInfo.timestamp_crop_offset;
+
     if (mSensorModeInfo.num_raw_bits != 10) {
         ALOGE("%s: Only RAW10 is supported but this sensor mode has %d raw bits.", __FUNCTION__,
                 mSensorModeInfo.num_raw_bits);
@@ -15190,10 +15352,8 @@ status_t QCamera3HardwareInterface::configureHdrPlusStreamsLocked()
     return OK;
 }
 
-void QCamera3HardwareInterface::onEaselFatalError(std::string errMsg)
+void QCamera3HardwareInterface::handleEaselFatalError()
 {
-    ALOGE("%s: Got an Easel fatal error: %s", __FUNCTION__, errMsg.c_str());
-    // Set HAL state to error.
     pthread_mutex_lock(&mMutex);
     mState = ERROR;
     pthread_mutex_unlock(&mMutex);
@@ -15201,8 +15361,28 @@ void QCamera3HardwareInterface::onEaselFatalError(std::string errMsg)
     handleCameraDeviceError(/*stopChannelImmediately*/true);
 }
 
+void QCamera3HardwareInterface::handleEaselFatalErrorAsync()
+{
+    if (mEaselErrorFuture.valid()) {
+        // The error future has been invoked.
+        return;
+    }
+
+    // Launch a future to handle the fatal error.
+    mEaselErrorFuture = std::async(std::launch::async,
+            &QCamera3HardwareInterface::handleEaselFatalError, this);
+}
+
+void QCamera3HardwareInterface::onEaselFatalError(std::string errMsg)
+{
+    ALOGE("%s: Got an Easel fatal error: %s", __FUNCTION__, errMsg.c_str());
+    handleEaselFatalErrorAsync();
+}
+
 void QCamera3HardwareInterface::onOpened(std::unique_ptr<HdrPlusClient> client)
 {
+    int rc = NO_ERROR;
+
     if (client == nullptr) {
         ALOGE("%s: Opened client is null.", __FUNCTION__);
         return;
@@ -15236,6 +15416,16 @@ void QCamera3HardwareInterface::onOpened(std::unique_ptr<HdrPlusClient> client)
     if (res != OK) {
         LOGE("%s: Failed to configure HDR+ streams.", __FUNCTION__);
     }
+
+    // Get Easel firmware version
+    if (EaselManagerClientOpened) {
+        rc = gEaselManagerClient->getFwVersion(mEaselFwVersion);
+        if (rc != OK) {
+            ALOGD("%s: Failed to query Easel firmware version", __FUNCTION__);
+        } else {
+            mEaselFwUpdated = true;
+        }
+    }
 }
 
 void QCamera3HardwareInterface::onOpenFailed(status_t err)
@@ -15248,14 +15438,8 @@ void QCamera3HardwareInterface::onOpenFailed(status_t err)
 
 void QCamera3HardwareInterface::onFatalError()
 {
-    ALOGE("%s: HDR+ client has a fatal error.", __FUNCTION__);
-
-    // Set HAL state to error.
-    pthread_mutex_lock(&mMutex);
-    mState = ERROR;
-    pthread_mutex_unlock(&mMutex);
-
-    handleCameraDeviceError(/*stopChannelImmediately*/true);
+    ALOGE("%s: HDR+ client encountered a fatal error.", __FUNCTION__);
+    handleEaselFatalErrorAsync();
 }
 
 void QCamera3HardwareInterface::onShutter(uint32_t requestId, int64_t apSensorTimestampNs)
@@ -15473,9 +15657,8 @@ void QCamera3HardwareInterface::onCaptureResult(pbcamera::CaptureResult *result,
             // Return the buffer to camera framework.
             pthread_mutex_lock(&mMutex);
             handleBufferWithLock(frameworkOutputBuffer, result->requestId);
-            pthread_mutex_unlock(&mMutex);
-
             channel->unregisterBuffer(outputBufferDef.get());
+            pthread_mutex_unlock(&mMutex);
         }
     }
 
@@ -15651,6 +15834,11 @@ void ShutterDispatcher::markShutterReady(uint32_t frameNumber, uint64_t timestam
         shutters = &mReprocessShutters;
     } else {
         shutters = &mShutters;
+    }
+
+    if (shutter->second.ready) {
+        // If shutter is already ready, don't update timestamp again.
+        return;
     }
 
     // Make this frame's shutter ready.

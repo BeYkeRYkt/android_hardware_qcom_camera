@@ -506,6 +506,9 @@ private:
             T output[BLACK_LEVEL_PATTERN_CNT],
             cam_color_filter_arrangement_t color_arrangement);
 
+    int32_t startChannelLocked();
+    void stopChannelLocked(bool stopChannelImmediately);
+
     camera3_device_t   mCameraDevice;
     uint32_t           mCameraId;
     mm_camera_vtbl_t  *mCameraHandle;
@@ -604,6 +607,8 @@ private:
         bool enableZsl; // If ZSL is enabled.
         bool hdrplus; // If this is an HDR+ request.
         uint8_t requestedLensShadingMapMode; // Lens shading map mode for this request.
+        uint8_t requestedFaceDetectMode; // Face detect mode for this request.
+        bool partialResultDropped; // Whether partial metadata is dropped.
     } PendingRequestInfo;
     typedef struct {
         uint32_t frame_number;
@@ -693,6 +698,8 @@ private:
     QCamera3CropRegionMapper mCropRegionMapper;
     // Last lens shading map mode framework requsted.
     uint8_t mLastRequestedLensShadingMapMode;
+    // Last face detect mode framework requsted.
+    uint8_t mLastRequestedFaceDetectMode;
 
     cam_feature_mask_t mCurrFeatureState;
     /* Ldaf calibration data */
@@ -701,6 +708,7 @@ private:
     int32_t mLastCustIntentFrmNum;
     // Easel firmware version
     char mEaselFwVersion[FW_VER_SIZE];
+    bool mEaselFwUpdated;
     static const QCameraMap<camera_metadata_enum_android_control_effect_mode_t,
             cam_effect_mode_type> EFFECT_MODES_MAP[];
     static const QCameraMap<camera_metadata_enum_android_control_awb_mode_t,
@@ -744,6 +752,11 @@ private:
     static const QCameraPropMap CDS_MAP[];
 
     pendingRequestIterator erasePendingRequest(pendingRequestIterator i);
+
+    // Remove unrequested metadata due to Easel HDR+.
+    void removeUnrequestedMetadata(pendingRequestIterator requestIter,
+            camera_metadata_t *resultMetadata);
+
     //GPU library to read buffer padding details.
     void *lib_surface_utils;
     int (*LINK_get_surface_pixel_alignment)();
@@ -827,6 +840,13 @@ private:
 
     // Wait until opening HDR+ client completes if it's being opened.
     void finishHdrPlusClientOpeningLocked(std::unique_lock<std::mutex> &lock);
+
+    // Handle Easel error asynchronuously in another thread.
+    void handleEaselFatalErrorAsync();
+
+    // Handle Easel error.
+    void handleEaselFatalError();
+
     // Easel manager client callbacks.
     void onEaselFatalError(std::string errMsg);
 
@@ -855,6 +875,9 @@ private:
     // If ZSL is enabled (android.control.enableZsl).
     bool mZslEnabled;
 
+    // If Easel MIPI has been started.
+    bool mEaselMipiStarted;
+
     // If HAL provides RAW input buffers to Easel. This is just for prototyping.
     bool mIsApInputUsedForHdrPlus;
 
@@ -867,6 +890,10 @@ private:
     bool m_bSensorHDREnabled;
 
     cam_trigger_t mAfTrigger;
+
+    int32_t mSceneDistance;
+
+    std::future<void> mEaselErrorFuture;
 };
 
 }; // namespace qcamera

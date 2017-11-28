@@ -350,6 +350,9 @@ vendor_tag_info_t nexus_experimental_2017[NEXUS_EXPERIMENTAL_2017_END -
     { "stats.histogramBucketCount", TYPE_INT32 },
     { "stats.histogram", TYPE_INT32 },
     { "sensorEepromInfo", TYPE_BYTE },
+    { "sensorEepromPDAFRightGains", TYPE_BYTE },
+    { "sensorEepromPDAFLeftGains", TYPE_BYTE },
+    { "sensorEepromPDAFConvCoeff", TYPE_BYTE },
     { "control.tracking_af_trigger", TYPE_BYTE },
     { "control.af_regions_confidence", TYPE_INT32 },
     { "stats.ois_frame_timestamp_vsync", TYPE_INT64 },
@@ -369,6 +372,7 @@ vendor_tag_info_t nexus_experimental_2017[NEXUS_EXPERIMENTAL_2017_END -
     { "request.postview_data", TYPE_BYTE},
     { "request.continuous_zsl_capture", TYPE_INT32},
     { "request.disable_hdrplus", TYPE_INT32},
+    { "control.scene_distance", TYPE_INT32},
 };
 
 vendor_tag_info_t tango_mode_data[TANGO_MODE_DATA_END -
@@ -595,6 +599,9 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)NEXUS_EXPERIMENTAL_2017_HISTOGRAM_BINS,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_HISTOGRAM,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_EEPROM_VERSION_INFO,
+    (uint32_t)NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_RIGHT_GAINS,
+    (uint32_t)NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_LEFT_GAINS,
+    (uint32_t)NEXUS_EXPERIMENTAL_2017_EEPROM_PDAF_CALIB_CONV_COEFF,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_TRACKING_AF_TRIGGER,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_AF_REGIONS_CONFIDENCE,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_OIS_FRAME_TIMESTAMP_VSYNC,
@@ -614,6 +621,7 @@ uint32_t qcamera3_all_tags[] = {
     (uint32_t)NEXUS_EXPERIMENTAL_2017_POSTVIEW_DATA,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_CONTINUOUS_ZSL_CAPTURE,
     (uint32_t)NEXUS_EXPERIMENTAL_2017_DISABLE_HDRPLUS,
+    (uint32_t)NEXUS_EXPERIMENTAL_2017_SCENE_DISTANCE,
 
     //TANGO_MODE
     (uint32_t)TANGO_MODE_DATA_SENSOR_FULLFOV,
