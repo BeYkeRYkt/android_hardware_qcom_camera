@@ -10791,7 +10791,9 @@ int32_t QCamera3HardwareInterface::setHalFpsRange(const CameraMetadata &settings
      * capture request
      */
     mBatchSize = 0;
-    if (CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == mOpMode) {
+    //Raw only mode also can be hfr
+    if ((CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == mOpMode) ||
+       (QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE == mOpMode)) {
         fps_range.min_fps = fps_range.video_max_fps;
         fps_range.video_min_fps = fps_range.video_max_fps;
         int val = lookupHalName(HFR_MODE_MAP, METADATA_MAP_SIZE(HFR_MODE_MAP),
