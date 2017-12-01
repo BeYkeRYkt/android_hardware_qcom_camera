@@ -1807,6 +1807,11 @@ typedef enum {
     CAM_3A_SYNC_ALGO_CTRL,/* Algorithm updated cameras directly */
 } cam_3a_sync_mode_t;
 
+typedef struct {
+    cam_3a_sync_mode_t sync_mode_stats;
+    cam_3a_sync_mode_t sync_mode_af;
+} cam_3a_sync_config_t;
+
 typedef enum {
     OIS_MODE_INACTIVE,
     OIS_MODE_ACTIVE,
@@ -2473,6 +2478,7 @@ typedef enum {
     CAM_INTF_META_DC_CAPTURE,
     /* Enable/Disable AF fine scan */
     CAM_INTF_PARM_SKIP_FINE_SCAN,
+    CAM_INTF_PARM_BOKEH_MODE,
     CAM_INTF_PARM_MAX
 } cam_intf_parm_type_t;
 

@@ -131,7 +131,7 @@ typedef struct {
     cam_sync_mechanism_t sync_mechanism;
     cam_sync_type_t type;
     cam_sync_mode_t mode;
-    cam_3a_sync_mode_t sync_3a_mode;
+    cam_3a_sync_config_t sync_3a_config;
     cam_dual_camera_role_t cam_role;
     /* session Id of the other camera session
        Linking will be done with this session in the
@@ -1182,6 +1182,7 @@ typedef struct {
     INCLUDE(CAM_INTF_PARAM_BOKEH_BLUR_LEVEL,            cam_rtb_blur_info_t,         1);
     INCLUDE(CAM_INTF_META_RTB_DATA,                     cam_rtb_msg_type_t,          1);
     INCLUDE(CAM_INTF_META_DC_CAPTURE,                   uint8_t,                     1);
+    INCLUDE(CAM_INTF_PARM_BOKEH_MODE,                   uint8_t,                     1);
 } metadata_data_t;
 
 /* Update clear_metadata_buffer() function when a new is_xxx_valid is added to

@@ -3232,13 +3232,17 @@ int32_t QCameraParameters::setBokehMode(const QCameraParameters& params)
     if (bRequestedBokehMode != m_bBokehMode) {
          m_bBokehMode = bRequestedBokehMode;
          m_bNeedRestart = true;
-         if (m_bBokehMode) {
-            char val[32];
-            int depthW, depthH;
-            getDepthMapSize(depthW, depthH);
-            snprintf(val, sizeof(val), "%dx%d", depthW, depthH);
-            updateParamEntry(KEY_QC_DEPTH_MAP_SIZE, val);
-         }
+        if (ADD_SET_PARAM_ENTRY_TO_BATCH
+                (m_pParamBuf, CAM_INTF_PARM_BOKEH_MODE, m_bBokehMode)) {
+            return BAD_VALUE;
+        }
+        if (m_bBokehMode) {
+           char val[32];
+           int depthW, depthH;
+           getDepthMapSize(depthW, depthH);
+           snprintf(val, sizeof(val), "%dx%d", depthW, depthH);
+           updateParamEntry(KEY_QC_DEPTH_MAP_SIZE, val);
+        }
     }
     if (m_bBokehMode) {
         //Bokeh Mode set, set halpp type
@@ -12858,6 +12862,14 @@ int32_t QCameraParameters::setDualCamBundleInfo(bool enable_sync,
     cam_sync_related_sensors_control_t syncControl = CAM_SYNC_RELATED_SENSORS_OFF;
     property_get("persist.camera.stats.test.2outs", prop, "0");
     sync_3a_mode = (atoi(prop) > 0) ? CAM_3A_SYNC_ALGO_CTRL : sync_3a_mode;
+    cam_3a_sync_mode_t sync_stats_common, af_sync;
+    sync_stats_common = af_sync = sync_3a_mode;
+
+    //Set AF sync mode to none, if either of the sensors doesn't support auto focus.
+    if (!isAutoFocusSupported(CAM_TYPE_MAIN) || !isAutoFocusSupported(CAM_TYPE_AUX))
+        af_sync = CAM_3A_SYNC_NONE;
+
+    cam_3a_sync_config_t sync_config_3a = {sync_stats_common, af_sync};
 
     //Check if dual camera by handle
     if (isDualCamera()) {
@@ -12881,7 +12893,7 @@ int32_t QCameraParameters::setDualCamBundleInfo(bool enable_sync,
         else
             bundle_info[num_cam].cam_role =
                 m_pFovControl->isMainCamFovWider() ? CAM_ROLE_WIDE : CAM_ROLE_TELE;
-        bundle_info[num_cam].sync_3a_mode = sync_3a_mode;
+        bundle_info[num_cam].sync_3a_config = sync_config_3a;
         m_pCamOpsTbl->ops->get_session_id(
                 get_aux_camera_handle(m_pCamOpsTbl->camera_handle), &sessionID);
         bundle_info[num_cam].related_sensor_session_id = sessionID;
@@ -12897,7 +12909,7 @@ int32_t QCameraParameters::setDualCamBundleInfo(bool enable_sync,
         else
             bundle_info[num_cam].cam_role =
                 m_pFovControl->isMainCamFovWider() ? CAM_ROLE_TELE : CAM_ROLE_WIDE;
-        bundle_info[num_cam].sync_3a_mode = sync_3a_mode;
+        bundle_info[num_cam].sync_3a_config = sync_config_3a;
         m_pCamOpsTbl->ops->get_session_id(
                 get_main_camera_handle(m_pCamOpsTbl->camera_handle), &sessionID);
         bundle_info[num_cam].related_sensor_session_id = sessionID;
@@ -16908,6 +16920,22 @@ bool QCameraParameters::isDualCamAvailable()
         }
     }
     return available;
+}
+
+bool QCameraParameters::isAutoFocusSupported(uint32_t cam_type)
+{
+    bool bAFSupported = false;
+    bool bMainCamAFSupported = (m_pCapability->main_cam_cap->supported_focus_modes_cnt > 1);
+    bool bAuxCamAFSupported = (m_pCapability->aux_cam_cap->supported_focus_modes_cnt > 1);
+    if (cam_type == MM_CAMERA_DUAL_CAM) {
+        bAFSupported =  (bMainCamAFSupported || bAuxCamAFSupported) ;
+    } else if (cam_type == CAM_TYPE_AUX) {
+        bAFSupported =  bAuxCamAFSupported;
+    } else {
+        bAFSupported =  bMainCamAFSupported;
+    }
+    LOGH("bAFSupported: %d cam_type: %d", bAFSupported, cam_type);
+    return bAFSupported;
 }
 
 }; // namespace qcamera
