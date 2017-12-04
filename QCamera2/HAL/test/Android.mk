@@ -46,6 +46,11 @@ LOCAL_C_INCLUDES += \
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
 LOCAL_MODULE:= camera_test
+ifeq ($(call is-platform-sdk-version-at-least,26),true)
+LOCAL_VENDOR_MODULE := true
+LOCAL_SDCLANG := $(SDCLANGSAVE)
+LOCAL_SDCLANG_LTO := $(SDCLANGSAVE)
+endif
 LOCAL_MODULE_TAGS:= tests
 
 LOCAL_CFLAGS += -Wall -Wextra -Werror -Wno-unused-parameter

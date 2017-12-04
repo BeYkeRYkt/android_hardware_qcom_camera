@@ -24,7 +24,9 @@
 #include <cutils/properties.h>
 
 // System dependencies
+#ifndef ANDROID_O
 #include <camera/CameraParameters.h>
+#endif //ANDROID_O
 #include <utils/Errors.h>
 
 // Camera dependencies
@@ -34,6 +36,9 @@
 #include "QCameraThermalAdapter.h"
 #include "QCameraCommon.h"
 #include "QCameraFOVControl.h"
+#ifdef ANDROID_O
+#include "CameraParameters.h"
+#endif //ANDROID_O
 
 extern "C" {
 #include "mm_jpeg_interface.h"

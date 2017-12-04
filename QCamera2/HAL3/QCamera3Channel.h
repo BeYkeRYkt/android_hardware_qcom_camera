@@ -35,7 +35,9 @@
 #include <utils/Mutex.h>
 #include <utils/Vector.h>
 #include "gralloc_priv.h"
-
+#ifdef ANDROID_O
+#include <sys/stat.h>
+#endif //ANDROID_O
 // Camera dependencies
 #include "cam_intf.h"
 #include "cam_types.h"
