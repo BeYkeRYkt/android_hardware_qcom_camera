@@ -55,6 +55,10 @@ if DRONE_TARGET
 AM_CPPFLAGS += -D_DRONE_
 endif
 
+if CAMERA_DEBUG_DATA
+AM_CPPFLAGS += -DCAMERA_DEBUG_DATA
+endif
+
 AM_CPPFLAGS += -DQCAMERA_HAL3_SUPPORT
 
 # System header file path prefix
