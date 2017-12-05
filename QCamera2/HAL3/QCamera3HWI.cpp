@@ -1360,9 +1360,13 @@ void QCamera3HardwareInterface::addToPPFeatureMask(int stream_format,
                     |= CAM_QTI_FEATURE_SW_TNR;
             LOGH("Added SW TNR to pp feature mask");
         } else if ((m_bIsVideo) && (feature_mask & CAM_QCOM_FEATURE_LLVD)) {
+          #ifdef _DRONE_
+            LOGH("not added llvd SeeMore to pp feature mask");
+          #else
             mStreamConfigInfo.postprocess_mask[stream_idx]
                     |= CAM_QCOM_FEATURE_LLVD;
             LOGH("Added LLVD SeeMore to pp feature mask");
+          #endif
         }
 
         if (feature_mask & CAM_QCOM_FEATURE_LCAC) {
@@ -1617,6 +1621,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     cam_dimension_t previewSize = {0, 0};
 
     cam_padding_info_t padding_info = gCamCapability[mCameraId]->padding_info;
+    cam_is_type_t is_type;
 
     /*EIS configuration*/
     bool oisSupported = false;
@@ -1984,7 +1989,8 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
 
     char is_type_value[PROPERTY_VALUE_MAX];
     property_get("persist.camera.is_type", is_type_value, "4");
-    m_bEis3PropertyEnabled = (atoi(is_type_value) == IS_TYPE_EIS_3_0);
+    is_type = static_cast<cam_is_type_t>(atoi(is_type_value));
+    m_bEis3PropertyEnabled = (is_type == IS_TYPE_EIS_3_0);
 
     //Create metadata channel and initialize it
     cam_feature_mask_t metadataFeatureMask = CAM_QCOM_FEATURE_NONE;
@@ -2067,6 +2073,11 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                     if (m_bEis3PropertyEnabled /* hint for EIS 3 needed here */) {
                         mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] |=
                             CAM_QTI_FEATURE_PPEISCORE;
+                    }
+                    if (IS_TYPE_DIG_GIMB == is_type) {
+                        mStreamConfigInfo.postprocess_mask[
+                                mStreamConfigInfo.num_streams] |=
+                            CAM_QTI_FEATURE_PPDGCORE;
                     }
                 } else {
                         mStreamConfigInfo.type[mStreamConfigInfo.num_streams] =
@@ -4351,6 +4362,18 @@ int QCamera3HardwareInterface::processCaptureRequest(
             clear_metadata_buffer(mParameters);
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_PARM_HAL_VERSION, hal_version);
+            if (meta.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+                float mode =  meta.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+                ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                        CAM_INTF_META_LENS_FOCAL_LENGTH, mode);
+                rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                        mParameters);
+                if (rc < 0) {
+                    LOGE("set_parms for unconfigure failed");
+                    pthread_mutex_unlock(&mMutex);
+                    return rc;
+                }
+            }
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_META_STREAM_INFO, stream_config_info);
             rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
@@ -4471,6 +4494,19 @@ int QCamera3HardwareInterface::processCaptureRequest(
                      mStreamConfigInfo.dewarp_type[i] = DEWARP_NONE;
                  }
             }
+        }
+
+        if (meta.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+            float mode =  meta.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_META_LENS_FOCAL_LENGTH, mode)) {
+                LOGE("Set Sensor Mode is failed");
+            }
+        }
+        rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                mParameters);
+        if (rc < 0) {
+            LOGE("set_parms for unconfigure failed");
         }
 
         ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
@@ -4939,6 +4975,7 @@ no_error:
     // Acquire all request buffers first
     streamsArray.num_streams = 0;
     int blob_request = 0;
+    int blob_request_under_batch_mode = 0;
     uint32_t snapshotStreamId = 0;
     for (size_t i = 0; i < request->num_output_buffers; i++) {
         const camera3_stream_buffer_t& output = request->output_buffers[i];
@@ -4952,6 +4989,8 @@ no_error:
         if (output.stream->format == HAL_PIXEL_FORMAT_BLOB) {
             //FIXME??:Call function to store local copy of jpeg data for encode params.
             blob_request = 1;
+            if (mBatchSize)
+                blob_request_under_batch_mode = 1;
             snapshotStreamId = channel->getStreamID(channel->getStreamTypeMask());
         }
 
@@ -5446,7 +5485,7 @@ no_error:
                 LOGE("set_parms failed");
             }
             /* reset to zero coz, the batch is queued */
-            if (mBatchSize) {
+           if (mBatchSize ||blob_request_under_batch_mode) {
                 mToBeQueuedVidBufs = 0;
                 mPendingBatchMap.add(frameNumber, mFirstFrameNumberInBatch);
                 memset(&mBatchedStreamsArray, 0, sizeof(cam_stream_ID_t));
@@ -8309,8 +8348,8 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
 
     /*should be using focal lengths but sensor doesn't provide that info now*/
     staticInfo.update(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS,
-                      &gCamCapability[cameraId]->focal_length,
-                      1);
+                      gCamCapability[cameraId]->focal_lengths,
+                      gCamCapability[cameraId]->focal_lengths_count);
 
     staticInfo.update(ANDROID_LENS_INFO_AVAILABLE_APERTURES,
             gCamCapability[cameraId]->apertures,
@@ -10784,7 +10823,9 @@ int32_t QCamera3HardwareInterface::setHalFpsRange(const CameraMetadata &settings
      * capture request
      */
     mBatchSize = 0;
-    if (CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == mOpMode) {
+    //Raw only mode also can be hfr
+    if ((CAMERA3_STREAM_CONFIGURATION_CONSTRAINED_HIGH_SPEED_MODE == mOpMode) ||
+       (QCAMERA3_VENDOR_STREAM_CONFIGURATION_RAW_ONLY_MODE == mOpMode)) {
         fps_range.min_fps = fps_range.video_max_fps;
         fps_range.video_min_fps = fps_range.video_max_fps;
         int val = lookupHalName(HFR_MODE_MAP, METADATA_MAP_SIZE(HFR_MODE_MAP),
