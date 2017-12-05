@@ -1028,6 +1028,7 @@ typedef enum {
     IS_TYPE_EIS_2_0,
     IS_TYPE_EIS_3_0,
     IS_TYPE_EIS_DG,
+    IS_TYPE_DIG_GIMB,
     IS_TYPE_MAX
 } cam_is_type_t;
 
@@ -2721,6 +2722,7 @@ typedef struct {
 #define CAM_QTI_FEATURE_BINNING_CORRECTION (((cam_feature_mask_t)1UL)<<44)
 #define CAM_QTI_FEATURE_RTB             (((cam_feature_mask_t)1UL)<<45)
 #define CAM_QCOM_FEATURE_LCAC           ((cam_feature_mask_t)1UL<<46)
+#define CAM_QTI_FEATURE_PPDGCORE        (((cam_feature_mask_t)1UL)<<47)
 #define CAM_QCOM_FEATURE_PP_SUPERSET    (CAM_QCOM_FEATURE_DENOISE2D|CAM_QCOM_FEATURE_CROP|\
                                          CAM_QCOM_FEATURE_ROTATION|CAM_QCOM_FEATURE_SHARPNESS|\
                                          CAM_QCOM_FEATURE_SCALE|CAM_QCOM_FEATURE_CAC|\
