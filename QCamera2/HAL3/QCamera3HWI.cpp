@@ -91,6 +91,10 @@ namespace qcamera {
 #define MAX_PROCESSED_STREAMS  3
 #endif
 
+#ifdef _DRONE_
+#define DRONE_STEREO_CAMERA_ID (2)
+#endif
+
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #ifdef _DRONE_
 #define MIN_FPS_FOR_BATCH_MODE (90)
@@ -2417,7 +2421,19 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     property_get("persist.camera.analysis.enable", analysis_prop, "0");
     int32_t analysis_enable = atoi(analysis_prop);
 
-    if ((!onlyRaw) && (analysis_enable) ) {
+#ifdef _DRONE_
+    char stereo_analysis_prop[PROPERTY_VALUE_MAX];
+    memset(stereo_analysis_prop, 0, sizeof(stereo_analysis_prop));
+    /* Disable analysis stram by default for stereo camera */
+    property_get("persist.stereo.analysis.enable", stereo_analysis_prop, "0");
+    int32_t stereo_analysis_enable = atoi(stereo_analysis_prop);
+
+    if (mCameraId == DRONE_STEREO_CAMERA_ID) {
+        analysis_enable &= stereo_analysis_enable;
+    }
+#endif
+
+    if ((!onlyRaw) && (analysis_enable)) {
         cam_feature_mask_t analysisFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
         setPAAFSupport(analysisFeatureMask, CAM_STREAM_TYPE_ANALYSIS,
                 gCamCapability[mCameraId]->color_arrangement);
