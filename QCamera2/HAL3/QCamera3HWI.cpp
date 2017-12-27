@@ -1988,7 +1988,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     }
 
     char is_type_value[PROPERTY_VALUE_MAX];
-    property_get("persist.camera.is_type", is_type_value, "4");
+    property_get("persist.camera.is_type", is_type_value, "6");
     is_type = static_cast<cam_is_type_t>(atoi(is_type_value));
     m_bEis3PropertyEnabled = (is_type == IS_TYPE_EIS_3_0);
 
@@ -4389,7 +4389,7 @@ int QCamera3HardwareInterface::processCaptureRequest(
         cam_is_type_t isTypeVideo, isTypePreview, is_type=IS_TYPE_NONE;
         cam_dewarp_type_t dewarp_type = DEWARP_NONE;
         char is_type_value[PROPERTY_VALUE_MAX];
-        property_get("persist.camera.is_type", is_type_value, "4");
+        property_get("persist.camera.is_type", is_type_value, "6");
         isTypeVideo = static_cast<cam_is_type_t>(atoi(is_type_value));
         // Make default value for preview IS_TYPE as IS_TYPE_EIS_2_0
         property_get("persist.camera.is_type_preview", is_type_value, "4");
@@ -10005,7 +10005,7 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
         focusMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE;
         optStabMode = ANDROID_LENS_OPTICAL_STABILIZATION_MODE_ON;
         edge_mode = ANDROID_EDGE_MODE_HIGH_QUALITY;
-        noise_red_mode = ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY;
+        noise_red_mode = ANDROID_NOISE_REDUCTION_MODE_FAST;
         tonemap_mode = ANDROID_TONEMAP_MODE_HIGH_QUALITY;
         cacMode = ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF;
         // Order of priority for default CAC is HIGH Quality -> FAST -> OFF
