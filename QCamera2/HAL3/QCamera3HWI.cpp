@@ -91,6 +91,10 @@ namespace qcamera {
 #define MAX_PROCESSED_STREAMS  3
 #endif
 
+#ifdef _DRONE_
+#define DRONE_STEREO_CAMERA_ID (2)
+#endif
+
 /* Batch mode is enabled only if FPS set is equal to or greater than this */
 #ifdef _DRONE_
 #define MIN_FPS_FOR_BATCH_MODE (90)
@@ -1621,6 +1625,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     cam_dimension_t previewSize = {0, 0};
 
     cam_padding_info_t padding_info = gCamCapability[mCameraId]->padding_info;
+    cam_is_type_t is_type;
 
     /*EIS configuration*/
     bool oisSupported = false;
@@ -1987,8 +1992,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     }
 
     char is_type_value[PROPERTY_VALUE_MAX];
-    property_get("persist.camera.is_type", is_type_value, "4");
-    m_bEis3PropertyEnabled = (atoi(is_type_value) == IS_TYPE_EIS_3_0);
+    property_get("persist.camera.is_type", is_type_value, "6");
+    is_type = static_cast<cam_is_type_t>(atoi(is_type_value));
+    m_bEis3PropertyEnabled = (is_type == IS_TYPE_EIS_3_0);
 
     //Create metadata channel and initialize it
     cam_feature_mask_t metadataFeatureMask = CAM_QCOM_FEATURE_NONE;
@@ -2071,6 +2077,11 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                     if (m_bEis3PropertyEnabled /* hint for EIS 3 needed here */) {
                         mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] |=
                             CAM_QTI_FEATURE_PPEISCORE;
+                    }
+                    if (IS_TYPE_DIG_GIMB == is_type) {
+                        mStreamConfigInfo.postprocess_mask[
+                                mStreamConfigInfo.num_streams] |=
+                            CAM_QTI_FEATURE_PPDGCORE;
                     }
                 } else {
                         mStreamConfigInfo.type[mStreamConfigInfo.num_streams] =
@@ -2410,7 +2421,19 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     property_get("persist.camera.analysis.enable", analysis_prop, "0");
     int32_t analysis_enable = atoi(analysis_prop);
 
-    if ((!onlyRaw) && (analysis_enable) ) {
+#ifdef _DRONE_
+    char stereo_analysis_prop[PROPERTY_VALUE_MAX];
+    memset(stereo_analysis_prop, 0, sizeof(stereo_analysis_prop));
+    /* Disable analysis stram by default for stereo camera */
+    property_get("persist.stereo.analysis.enable", stereo_analysis_prop, "0");
+    int32_t stereo_analysis_enable = atoi(stereo_analysis_prop);
+
+    if (mCameraId == DRONE_STEREO_CAMERA_ID) {
+        analysis_enable &= stereo_analysis_enable;
+    }
+#endif
+
+    if ((!onlyRaw) && (analysis_enable)) {
         cam_feature_mask_t analysisFeatureMask = CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
         setPAAFSupport(analysisFeatureMask, CAM_STREAM_TYPE_ANALYSIS,
                 gCamCapability[mCameraId]->color_arrangement);
@@ -4355,6 +4378,18 @@ int QCamera3HardwareInterface::processCaptureRequest(
             clear_metadata_buffer(mParameters);
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_PARM_HAL_VERSION, hal_version);
+            if (meta.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+                float mode =  meta.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+                ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                        CAM_INTF_META_LENS_FOCAL_LENGTH, mode);
+                rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                        mParameters);
+                if (rc < 0) {
+                    LOGE("set_parms for unconfigure failed");
+                    pthread_mutex_unlock(&mMutex);
+                    return rc;
+                }
+            }
             ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
                     CAM_INTF_META_STREAM_INFO, stream_config_info);
             rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
@@ -4370,7 +4405,7 @@ int QCamera3HardwareInterface::processCaptureRequest(
         cam_is_type_t isTypeVideo, isTypePreview, is_type=IS_TYPE_NONE;
         cam_dewarp_type_t dewarp_type = DEWARP_NONE;
         char is_type_value[PROPERTY_VALUE_MAX];
-        property_get("persist.camera.is_type", is_type_value, "4");
+        property_get("persist.camera.is_type", is_type_value, "6");
         isTypeVideo = static_cast<cam_is_type_t>(atoi(is_type_value));
         // Make default value for preview IS_TYPE as IS_TYPE_EIS_2_0
         property_get("persist.camera.is_type_preview", is_type_value, "4");
@@ -4475,6 +4510,19 @@ int QCamera3HardwareInterface::processCaptureRequest(
                      mStreamConfigInfo.dewarp_type[i] = DEWARP_NONE;
                  }
             }
+        }
+
+        if (meta.exists(ANDROID_LENS_FOCAL_LENGTH)) {
+            float mode =  meta.find(ANDROID_LENS_FOCAL_LENGTH).data.f[0];
+            if (ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
+                    CAM_INTF_META_LENS_FOCAL_LENGTH, mode)) {
+                LOGE("Set Sensor Mode is failed");
+            }
+        }
+        rc = mCameraHandle->ops->set_parms(mCameraHandle->camera_handle,
+                mParameters);
+        if (rc < 0) {
+            LOGE("set_parms for unconfigure failed");
         }
 
         ADD_SET_PARAM_ENTRY_TO_BATCH(mParameters,
@@ -8316,8 +8364,8 @@ int QCamera3HardwareInterface::initStaticMetadata(uint32_t cameraId)
 
     /*should be using focal lengths but sensor doesn't provide that info now*/
     staticInfo.update(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS,
-                      &gCamCapability[cameraId]->focal_length,
-                      1);
+                      gCamCapability[cameraId]->focal_lengths,
+                      gCamCapability[cameraId]->focal_lengths_count);
 
     staticInfo.update(ANDROID_LENS_INFO_AVAILABLE_APERTURES,
             gCamCapability[cameraId]->apertures,
@@ -9973,7 +10021,7 @@ camera_metadata_t* QCamera3HardwareInterface::translateCapabilityToMetadata(int 
         focusMode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE;
         optStabMode = ANDROID_LENS_OPTICAL_STABILIZATION_MODE_ON;
         edge_mode = ANDROID_EDGE_MODE_HIGH_QUALITY;
-        noise_red_mode = ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY;
+        noise_red_mode = ANDROID_NOISE_REDUCTION_MODE_FAST;
         tonemap_mode = ANDROID_TONEMAP_MODE_HIGH_QUALITY;
         cacMode = ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF;
         // Order of priority for default CAC is HIGH Quality -> FAST -> OFF
