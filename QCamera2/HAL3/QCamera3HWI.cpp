@@ -1543,6 +1543,11 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
 
     mOpMode = streamList->operation_mode;
     LOGD("mOpMode: %d", mOpMode);
+    int32_t fwkDeWarpType = DEWARP_NONE;
+    char ds_prop[PROPERTY_VALUE_MAX];
+    memset(ds_prop, 0, sizeof(ds_prop));
+    property_get("persist.camera.dewarp.type", ds_prop, "0");
+    fwkDeWarpType = (uint8_t)atoi(ds_prop);
 
     mCurrentSceneMode = 0;
 
@@ -1616,6 +1621,7 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
     bool bUseCommonFeatureMask = false;
     cam_feature_mask_t commonFeatureMask = 0;
     bool bSmallJpegSize = false;
+    bool bLDCEnable = false;
     uint32_t width_ratio;
     uint32_t height_ratio;
     maxViewfinderSize = gCamCapability[mCameraId]->max_viewfinder_size;
@@ -1723,6 +1729,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
             }
             m_bEisSupportedSize = (newStream->width <= maxEisWidth) &&
                                   (newStream->height <= maxEisHeight);
+        }
+        if((fwkDeWarpType == true) && (videoWidth > 0) && (videoHeight > 0)) {
+          bLDCEnable = true;
         }
         if (newStream->stream_type == CAMERA3_STREAM_BIDIRECTIONAL ||
                 newStream->stream_type == CAMERA3_STREAM_OUTPUT) {
@@ -2135,9 +2144,9 @@ int QCamera3HardwareInterface::configureStreamsPerfLocked(
                 onlyRaw = false; // There is non-raw stream - bypass flag if set
                 mStreamConfigInfo.type[mStreamConfigInfo.num_streams] = CAM_STREAM_TYPE_SNAPSHOT;
                 // No need to check bSmallJpegSize if ZSL is present since JPEG uses ZSL stream
-                if ((m_bIs4KVideo && !isZsl) || (bSmallJpegSize && !isZsl)) {
+                if ((m_bIs4KVideo && !isZsl) || (bSmallJpegSize && !isZsl) || (bLDCEnable)) {
                      mStreamConfigInfo.postprocess_mask[mStreamConfigInfo.num_streams] =
-                             CAM_QCOM_FEATURE_PP_SUPERSET_HAL3;
+                             CAM_QCOM_FEATURE_PP_SUPERSET_HAL3|CAM_QTI_FEATURE_SW_TNR;
                      /* Remove rotation if it is not supported
                         for 4K LiveVideo snapshot case (online processing) */
                      if (!(gCamCapability[mCameraId]->qcom_supported_feature_mask &
@@ -4504,7 +4513,9 @@ int QCamera3HardwareInterface::processCaptureRequest(
                  mStreamConfigInfo.dewarp_type[i] = (cam_dewarp_type_t)fwkDeWarpType;
             } else {
                  mStreamConfigInfo.is_type[i] = IS_TYPE_NONE;
-                 if (mStreamConfigInfo.type[i] == CAM_STREAM_TYPE_VIDEO ) {
+                 if ((mStreamConfigInfo.type[i] == CAM_STREAM_TYPE_VIDEO) ||
+                         ((mStreamConfigInfo.type[i] == CAM_STREAM_TYPE_SNAPSHOT) &&
+                         (fwkDeWarpType == DEWARP_LDC))) {
                      mStreamConfigInfo.dewarp_type[i] = (cam_dewarp_type_t)fwkDeWarpType;
                  } else {
                      mStreamConfigInfo.dewarp_type[i] = DEWARP_NONE;
@@ -4671,8 +4682,10 @@ int QCamera3HardwareInterface::processCaptureRequest(
         for (List<stream_info_t *>::iterator it = mStreamInfo.begin();
             it != mStreamInfo.end(); it++) {
             QCamera3Channel *channel = (QCamera3Channel *)(*it)->stream->priv;
-            if ((((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask()) ||
-                       ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()))) {
+            if (((1U << CAM_STREAM_TYPE_VIDEO) == channel->getStreamTypeMask()) ||
+                       ((1U << CAM_STREAM_TYPE_PREVIEW) == channel->getStreamTypeMask()) ||
+                       (((1U << CAM_STREAM_TYPE_SNAPSHOT) == channel->getStreamTypeMask())&&
+                       (fwkDeWarpType == DEWARP_LDC))) {
                 for (size_t i = 0; i < mStreamConfigInfo.num_streams; i++) {
                     if ( (1U << mStreamConfigInfo.type[i]) == channel->getStreamTypeMask() ) {
                         if(setEis)
@@ -13416,7 +13429,8 @@ void QCamera3HardwareInterface::setPAAFSupport(
     case CAM_FILTER_ARRANGEMENT_BGGR:
         if ((stream_type == CAM_STREAM_TYPE_PREVIEW) ||
                 (stream_type == CAM_STREAM_TYPE_ANALYSIS) ||
-                (stream_type == CAM_STREAM_TYPE_VIDEO)) {
+                (stream_type == CAM_STREAM_TYPE_VIDEO) ||
+                (stream_type == CAM_STREAM_TYPE_SNAPSHOT)) {
             if (!(feature_mask & CAM_QTI_FEATURE_PPEISCORE))
                 feature_mask |= CAM_QCOM_FEATURE_PAAF;
         }

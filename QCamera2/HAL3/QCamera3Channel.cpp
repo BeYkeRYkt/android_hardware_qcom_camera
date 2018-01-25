@@ -3708,6 +3708,16 @@ QCamera3PicChannel::~QCamera3PicChannel()
 {
 }
 
+uint32_t QCamera3PicChannel::getStreamTypeMask()
+{
+    if (mStreams[0]) {
+        return QCamera3Channel::getStreamTypeMask();
+    } else {
+        return (1U << mStreamType);
+    }
+}
+
+
 int32_t QCamera3PicChannel::initialize(cam_is_type_t isType)
 {
     int32_t rc = NO_ERROR;
