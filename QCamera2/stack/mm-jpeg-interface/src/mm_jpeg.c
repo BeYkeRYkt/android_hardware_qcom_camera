@@ -1208,23 +1208,17 @@ OMX_ERRORTYPE mm_jpeg_update_thumbnail_crop(mm_jpeg_dim_t *p_thumb_dim,
  *       Configure OMX ports
  *
  **/
-OMX_ERRORTYPE mm_jpeg_session_config_thumbnail(mm_jpeg_job_session_t* p_session)
+OMX_ERRORTYPE mm_jpeg_session_config_thumbnail(mm_jpeg_job_session_t* p_session,
+  mm_jpeg_dim_t *p_thumb_dim, OMX_STRING thumbnail_name)
 {
   OMX_ERRORTYPE ret = OMX_ErrorNone;
   QOMX_THUMBNAIL_INFO thumbnail_info;
   OMX_INDEXTYPE thumb_indextype;
   mm_jpeg_encode_params_t *p_params = &p_session->params;
   mm_jpeg_encode_job_t *p_jobparams = &p_session->encode_job;
-  mm_jpeg_dim_t *p_thumb_dim = &p_jobparams->thumb_dim;
   mm_jpeg_dim_t *p_main_dim = &p_jobparams->main_dim;
   QOMX_YUV_FRAME_INFO *p_frame_info = &thumbnail_info.tmbOffset;
   mm_jpeg_buf_t *p_tmb_buf = &p_params->src_thumb_buf[p_jobparams->thumb_index];
-
-  LOGH("encode_thumbnail %u",
-    p_params->encode_thumbnail);
-  if (OMX_FALSE == p_params->encode_thumbnail) {
-    return ret;
-  }
 
   if ((p_thumb_dim->dst_dim.width == 0) || (p_thumb_dim->dst_dim.height == 0)) {
     LOGE("Error invalid output dim for thumbnail");
@@ -1256,7 +1250,7 @@ OMX_ERRORTYPE mm_jpeg_session_config_thumbnail(mm_jpeg_job_session_t* p_session)
 
   memset(&thumbnail_info, 0x0, sizeof(QOMX_THUMBNAIL_INFO));
   ret = OMX_GetExtensionIndex(p_session->omx_handle,
-    QOMX_IMAGE_EXT_THUMBNAIL_NAME,
+    thumbnail_name,
     &thumb_indextype);
   if (ret) {
     LOGE("Error %d", ret);
@@ -1359,104 +1353,6 @@ OMX_ERRORTYPE mm_jpeg_session_config_thumbnail(mm_jpeg_job_session_t* p_session)
 
   ret = OMX_SetConfig(p_session->omx_handle, thumb_indextype,
     &thumbnail_info);
-  if (ret) {
-    LOGE("Error");
-    return ret;
-  }
-
-  return ret;
-}
-
-/** mm_jpeg_session_config_second_thumbnail:
- *
- *  Arguments:
- *    @p_session: job session
- *
- *  Return:
- *       OMX error values
- *
- *  Description:
- *      Configure second thumbnail
- *
- **/
-OMX_ERRORTYPE mm_jpeg_session_config_second_thumbnail(
-    mm_jpeg_job_session_t* p_session)
-{
-  OMX_ERRORTYPE ret = OMX_ErrorNone;
-  QOMX_THUMBNAIL_INFO thumbnail_info;
-  OMX_INDEXTYPE thumb_indextype;
-  mm_jpeg_encode_params_t *p_params = &p_session->params;
-  mm_jpeg_encode_job_t *p_jobparams = &p_session->encode_job;
-  mm_jpeg_dim_t *p_thumb_dim = &p_jobparams->second_thumb_dim;
-  QOMX_YUV_FRAME_INFO *p_frame_info = &thumbnail_info.tmbOffset;
-  mm_jpeg_buf_t *p_tmb_buf = &p_params->src_thumb_buf[p_jobparams->thumb_index];
-
-  LOGH("encode_second_thumbnail %u", p_params->encode_second_thumbnail);
-  if (OMX_FALSE == p_params->encode_second_thumbnail) {
-    return ret;
-  }
-
-  if ((p_thumb_dim->dst_dim.width == 0) || (p_thumb_dim->dst_dim.height == 0)) {
-    LOGE("Error invalid output dim for second thumbnail");
-    return OMX_ErrorBadParameter;
-  }
-
-  if ((p_thumb_dim->src_dim.width == 0) || (p_thumb_dim->src_dim.height == 0)) {
-    LOGE("Error invalid input dim for second thumbnail");
-    return OMX_ErrorBadParameter;
-  }
-
-  if ((p_thumb_dim->crop.width == 0) || (p_thumb_dim->crop.height == 0)) {
-    p_thumb_dim->crop.width = p_thumb_dim->src_dim.width;
-    p_thumb_dim->crop.height = p_thumb_dim->src_dim.height;
-  }
-
-  /* check crop boundary */
-  if ((p_thumb_dim->crop.width + p_thumb_dim->crop.left > p_thumb_dim->src_dim.width) ||
-    (p_thumb_dim->crop.height + p_thumb_dim->crop.top > p_thumb_dim->src_dim.height)) {
-    LOGE("invalid second thumbnail crop boundary (%d, %d) offset (%d, %d) "
-      "out of (%d, %d)",
-      p_thumb_dim->crop.width,
-      p_thumb_dim->crop.height,
-      p_thumb_dim->crop.left,
-      p_thumb_dim->crop.top,
-      p_thumb_dim->src_dim.width,
-      p_thumb_dim->src_dim.height);
-    return OMX_ErrorBadParameter;
-  }
-
-  ret = OMX_GetExtensionIndex(p_session->omx_handle,
-    QOMX_IMAGE_EXT_SECOND_THUMBNAIL_NAME, &thumb_indextype);
-  if (ret) {
-    LOGE("Error %d", ret);
-    return ret;
-  }
-
-  /* Fill second thumbnail info */
-  memset(&thumbnail_info, 0x0, sizeof(QOMX_THUMBNAIL_INFO));
-  thumbnail_info.scaling_enabled = 1;
-  thumbnail_info.input_width = (OMX_U32)p_thumb_dim->src_dim.width;
-  thumbnail_info.input_height = (OMX_U32)p_thumb_dim->src_dim.height;
-  thumbnail_info.rotation = (OMX_U32)p_params->thumb_rotation;
-  thumbnail_info.quality = (OMX_U32)p_params->thumb_quality;
-  thumbnail_info.output_width = (OMX_U32)p_thumb_dim->dst_dim.width;
-  thumbnail_info.output_height = (OMX_U32)p_thumb_dim->dst_dim.height;
-
-  /* Fill second thumbnail crop info */
-  thumbnail_info.crop_info.nWidth = (OMX_U32)p_thumb_dim->crop.width;
-  thumbnail_info.crop_info.nHeight = (OMX_U32)p_thumb_dim->crop.height;
-  thumbnail_info.crop_info.nLeft = p_thumb_dim->crop.left;
-  thumbnail_info.crop_info.nTop = p_thumb_dim->crop.top;
-
-  memset(p_frame_info, 0x0, sizeof(*p_frame_info));
-
-  p_frame_info->cbcrStartOffset[0] = p_tmb_buf->offset.mp[0].len;
-  p_frame_info->cbcrStartOffset[1] = p_tmb_buf->offset.mp[1].len;
-  p_frame_info->yOffset = p_tmb_buf->offset.mp[0].offset;
-  p_frame_info->cbcrOffset[0] = p_tmb_buf->offset.mp[1].offset;
-  p_frame_info->cbcrOffset[1] = p_tmb_buf->offset.mp[2].offset;
-
-  ret = OMX_SetConfig(p_session->omx_handle, thumb_indextype, &thumbnail_info);
   if (ret) {
     LOGE("Error");
     return ret;
@@ -1849,17 +1745,25 @@ static OMX_ERRORTYPE mm_jpeg_configure_job_params(
   }
 
   /* config thumbnail */
-  ret = mm_jpeg_session_config_thumbnail(p_session);
-  if (OMX_ErrorNone != ret) {
-    LOGE("config thumbnail img failed");
-    return ret;
+  LOGH("encode_thumbnail %u", p_params->encode_thumbnail);
+  if (OMX_TRUE == p_session->params.encode_thumbnail) {
+    ret = mm_jpeg_session_config_thumbnail(p_session,
+        &p_jobparams->thumb_dim, QOMX_IMAGE_EXT_THUMBNAIL_NAME);
+    if (OMX_ErrorNone != ret) {
+      LOGE("config thumbnail img failed");
+      return ret;
+    }
   }
 
   /* config second thumbnail */
-  ret = mm_jpeg_session_config_second_thumbnail(p_session);
-  if (OMX_ErrorNone != ret) {
-    LOGE("config second thumbnail img failed");
-    return ret;
+  LOGH("encode_second_thumbnail %u", p_params->encode_second_thumbnail);
+  if (OMX_TRUE == p_session->params.encode_second_thumbnail) {
+    ret = mm_jpeg_session_config_thumbnail(p_session,
+        &p_jobparams->second_thumb_dim, QOMX_IMAGE_EXT_SECOND_THUMBNAIL_NAME);
+    if (OMX_ErrorNone != ret) {
+      LOGE("config second thumbnail img failed");
+      return ret;
+    }
   }
 
   //Pass the ION buffer to be used as o/p for HW
