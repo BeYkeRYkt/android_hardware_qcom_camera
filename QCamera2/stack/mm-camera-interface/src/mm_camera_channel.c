@@ -1483,7 +1483,7 @@ uint32_t mm_channel_reg_frame_sync(mm_channel_t *my_obj,
     //Frame sync reg for channel
     mm_frame_sync_t *frame_sync = &my_obj->frame_sync;
     pthread_mutex_lock(&frame_sync->sync_lock);
-    volatile mm_frame_sync_queue_t *queue = NULL;
+    mm_frame_sync_queue_t *queue = NULL;
     if (sync->sync_attr->buf_cb == NULL) {
         frame_sync->super_buf_notify_cb =
                 my_obj->bundle.super_buf_notify_cb;
@@ -1500,7 +1500,7 @@ uint32_t mm_channel_reg_frame_sync(mm_channel_t *my_obj,
     queue = &frame_sync->superbuf_queue;
     queue->attr = sync->sync_attr->attr;
     queue->num_objs = 0;
-    memset((void*)(&queue->bundled_objs), 0, sizeof(queue->bundled_objs));
+    memset(&queue->bundled_objs, 0, sizeof(queue->bundled_objs));
     queue->bundled_objs[queue->num_objs] = my_obj->my_hdl;
     queue->num_objs++;
     queue->bundled_objs[queue->num_objs] = sync->a_ch_obj->my_hdl;
